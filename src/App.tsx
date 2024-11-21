@@ -1,26 +1,41 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+// import React from 'react';
+// import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// import LoginPage from './pages/Login';
+// import SignupPage from './pages/Signup';
+// import MainPage from './pages/MainPage';
 
-function App() {
+// const App: React.FC = () => {
+//   // Check if the user is authenticated
+//   const isAuthenticated = localStorage.getItem('authToken'); // Replace with proper auth logic
+
+//   return (
+//     <Router>
+//       <Routes>
+//         <Route path="/" element={<Navigate to="/login" />} />
+//         <Route path="/login" element={<LoginPage />} />
+//         <Route path="/signup" element={<SignupPage />} />
+//         <Route
+//           path="/main"
+//           element={isAuthenticated ? <MainPage /> : <Navigate to="/login" />}
+//         />
+//       </Routes>
+//     </Router>
+//   );
+// };
+
+// export default App;
+
+import React from 'react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import MainPage from './pages/MainPage';
+
+const App: React.FC = () => {
+  // Wrap MainPage with Router for testing
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <MainPage />
+    </Router>
   );
-}
+};
 
 export default App;
