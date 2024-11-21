@@ -26,16 +26,20 @@
 // export default App;
 
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MainPage from './pages/MainPage';
+import QRScanner from './pages/QRScanner';
 
 const App: React.FC = () => {
-  // Wrap MainPage with Router for testing
   return (
     <Router>
-      <MainPage />
+      <Routes>
+        <Route path="/" element={<MainPage />} />
+        <Route path="/QRScanner" element={<QRScanner />} />
+      </Routes>
     </Router>
   );
 };
 
 export default App;
+
