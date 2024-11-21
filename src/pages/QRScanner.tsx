@@ -1,49 +1,81 @@
-import React, { useEffect, useRef } from 'react';
-import { Html5Qrcode, Html5QrcodeScanner } from 'html5-qrcode';
+import React, { useEffect, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import styles from "../styles/QRScanner.styles";
 
 const QRScanner: React.FC = () => {
-  const qrCodeScannerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
-    if (qrCodeScannerRef.current) {
-      const html5QrCodeScanner = new Html5QrcodeScanner(
-        qrCodeScannerRef.current.id,
+    const html5QrCode = new Html5Qrcode("qr-code-scanner");
+
+    const initializeScanner = async () => {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        console.log("Available cameras:", devices);
+
+        if (devices && devices.length > 0) {
+          const preferredDevice =
+            devices.find((d) => d.label.toLowerCase().includes("back")) ||
+            devices[0];
+          startScanner(preferredDevice.id, html5QrCode);
+        } else {
+          setError("No cameras found on this device.");
+        }
+      } catch (err) {
+        if ((err as Error).message?.includes("Permission denied")) {
+          setError("Camera permission was denied. Please allow camera access.");
+        } else {
+          setError("Error accessing camera. Please try again.");
+        }
+        console.error("Camera error:", err);
+      }
+    };
+
+    initializeScanner();
+
+    return () => {
+      if (isScanning) {
+        html5QrCode
+          .stop()
+          .catch((err: unknown) => console.error("Failed to stop scanner:", err));
+      }
+    };
+  }, [isScanning]);
+
+  const startScanner = (deviceId: string, html5QrCode: Html5Qrcode) => {
+    setIsScanning(true);
+
+    html5QrCode
+      .start(
+        { deviceId },
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
         },
-        false
-      );
-
-      html5QrCodeScanner.render(
         (decodedText) => {
-          console.log('Scanned QR Code:', decodedText);
+          console.log("QR Code scanned:", decodedText);
           alert(`Scanned QR Code: ${decodedText}`);
+          html5QrCode
+            .stop()
+            .catch((err: unknown) => console.error("Failed to stop scanner:", err));
+          setIsScanning(false);
         },
-        (errorMessage) => {
-          console.error('QR Scanner Error:', errorMessage);
+        (error) => {
+          console.error("Scanning error:", error);
         }
-      );
-
-      return () => {
-        html5QrCodeScanner.clear().catch((err) => {
-          console.error('Failed to clear QR scanner:', err);
-        });
-      };
-    }
-  }, []);
+      )
+      .catch((err) => {
+        setError("Failed to start scanner.");
+        console.error("Scanner error:", err);
+      });
+  };
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+    <div style={styles.container as React.CSSProperties}>
       <h1>QR Scanner</h1>
-      <div
-        id="qr-code-scanner"
-        ref={qrCodeScannerRef}
-        style={{
-          width: '300px',
-          margin: 'auto',
-        }}
-      />
+      {error && <p style={styles.error}>{error}</p>}
+      <div id="qr-code-scanner" style={styles.scanner} />
     </div>
   );
 };
