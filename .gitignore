@@ -1,17 +1,53 @@
 node_modules/
 .env
 
-# Ignore environment files
-*.env
-*.pyc
-__pycache__/
-
 # Node.js dependencies
 queueease-frontend/node_modules/
 
 # Python virtual environment
 queueease-backend/env/
 queueease-backend/venv/
+queueease_env/
 
-# Django migrations
+# Django migration files
 queueease-backend/**/migrations/
+
+# Byte-compiled Python files
+*.pyc
+__pycache__/
+
+# IDE-specific files
+*.vscode/
+*.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Environment variables
+*.env
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
