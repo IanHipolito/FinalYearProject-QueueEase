@@ -1,23 +1,17 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+node_modules/
+.env
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Ignore environment files
+*.env
+*.pyc
+__pycache__/
 
-# testing
-/coverage
+# Node.js dependencies
+queueease-frontend/node_modules/
 
-# production
-/build
+# Python virtual environment
+queueease-backend/env/
+queueease-backend/venv/
 
-# misc
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Django migrations
+queueease-backend/**/migrations/
