@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeScanner } from "html5-qrcode";
 import styles from "../styles/QRScanner.styles";
 
 const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    const html5QrCode = new Html5Qrcode("qr-code-scanner");
+    const qrCodeScanner = new Html5Qrcode("qr-code-scanner");
+    setHtml5QrCode(qrCodeScanner);
 
     const initializeScanner = async () => {
       try {
@@ -18,7 +20,7 @@ const QRScanner: React.FC = () => {
           const preferredDevice =
             devices.find((d) => d.label.toLowerCase().includes("back")) ||
             devices[0];
-          startScanner(preferredDevice.id, html5QrCode);
+          startScanner(preferredDevice.id, qrCodeScanner);
         } else {
           setError("No cameras found on this device.");
         }
@@ -35,18 +37,19 @@ const QRScanner: React.FC = () => {
     initializeScanner();
 
     return () => {
-      if (isScanning) {
-        html5QrCode
-          .stop()
-          .catch((err: unknown) => console.error("Failed to stop scanner:", err));
-      }
+      stopScanner(qrCodeScanner);
     };
-  }, [isScanning]);
+  }, []);
 
-  const startScanner = (deviceId: string, html5QrCode: Html5Qrcode) => {
+  const startScanner = (deviceId: string, qrScanner: Html5Qrcode) => {
+    if (isScanning) {
+      console.warn("Scanner is already running.");
+      return;
+    }
+
     setIsScanning(true);
 
-    html5QrCode
+    qrScanner
       .start(
         { deviceId },
         {
@@ -56,18 +59,32 @@ const QRScanner: React.FC = () => {
         (decodedText) => {
           console.log("QR Code scanned:", decodedText);
           alert(`Scanned QR Code: ${decodedText}`);
-          html5QrCode
-            .stop()
-            .catch((err: unknown) => console.error("Failed to stop scanner:", err));
-          setIsScanning(false);
+          stopScanner(qrScanner);
         },
         (error) => {
-          console.error("Scanning error:", error);
+          console.warn("Scanning error:", error);
         }
       )
       .catch((err) => {
         setError("Failed to start scanner.");
         console.error("Scanner error:", err);
+      });
+  };
+
+  const stopScanner = (qrScanner: Html5Qrcode | null) => {
+    if (!qrScanner || !isScanning) {
+      console.warn("Scanner is not running.");
+      return;
+    }
+
+    qrScanner
+      .stop()
+      .then(() => {
+        console.log("Scanner stopped successfully.");
+        setIsScanning(false);
+      })
+      .catch((err) => {
+        console.error("Failed to stop scanner:", err);
       });
   };
 
