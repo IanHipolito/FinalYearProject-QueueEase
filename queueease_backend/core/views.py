@@ -7,8 +7,43 @@ from .models import Queue, QRCode, User, Service
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
+from django.contrib.auth.hashers import make_password
 
 logger = logging.getLogger(__name__)
+
+@api_view(['POST'])
+def signup_view(request):
+    print("Request received:", request.body)
+    try:
+        data = request.data
+        name = data.get('name')
+        email = data.get('email')
+        password = data.get('password')
+        phone_number = data.get('phone_number')
+
+        if not all([name, email, password, phone_number]):
+            return JsonResponse({'error': 'All fields are required.'}, status=400)
+
+        if User.objects.filter(name=name).exists():
+            return JsonResponse({'error': 'Username already exists.'}, status=400)
+
+        if User.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'Email already exists.'}, status=400)
+
+        if User.objects.filter(mobile_number=phone_number).exists():
+            return JsonResponse({'error': 'Phone number already exists.'}, status=400)
+
+        user = User.objects.create(
+            name=name,
+            email=email,
+            mobile_number=phone_number,
+            password=make_password(password)
+        )
+
+        return JsonResponse({'message': 'User created successfully.', 'user_id': user.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @api_view(['GET'])
 def api_overview(request):
