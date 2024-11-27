@@ -45,38 +45,75 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <form style={styles.formGroup} onSubmit={handleSubmit}>
-        <h1>Create Account</h1>
-        <input
-          name="email"
-          placeholder="Email"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="name"
-          placeholder="Name"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="phone_number"
-          placeholder="Phone Number"
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="password"
-          placeholder="Password"
-          type="password"
-          onChange={handleChange}
-          required
-        />
-        <button type="submit">Sign up</button>
-      </form>
+    <div style={styles.page as React.CSSProperties}>
+        <h1 style={styles.title}>QueueEase</h1>
+        <h2 style={styles.subtitle}>Create an account</h2>
+
+        <div style={styles.container}>
+            <form onSubmit={handleSubmit}>
+                <div style={styles.formGroup}>
+                    <label htmlFor="name">Name</label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Name"
+                        style={styles.input}
+                    />
+                </div>
+                <div style={styles.formGroup}>
+                    <label htmlFor="email">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Email Address"
+                        style={styles.input}
+                    />
+                </div>
+                <div style={styles.formGroup}>
+                    <label htmlFor="phoneNumber">Phone Number</label>
+                    <input
+                        type="tel"
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        value={formData.phoneNumber}
+                        onChange={handleChange}
+                        placeholder="Phone Number"
+                        style={styles.input}
+                    />
+                </div>
+                <div style={styles.formGroup}>
+                    <label htmlFor="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        placeholder="Password"
+                        style={styles.input}
+                    />
+                </div>
+                <button type="submit" style={styles.button}>
+                    Sign Up
+                </button>
+            </form>
+        </div>
+
+        <p style={styles.divider}>
+            <span>— or sign in as guest —</span>
+        </p>
+
+        <button style={styles.guestButton} onClick={() => navigate('/guest')}>
+            Continue as guest
+        </button>
     </div>
-  );
+);
 };
 
 export default Signup;

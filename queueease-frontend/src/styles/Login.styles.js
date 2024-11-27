@@ -10,7 +10,12 @@ const styles = {
     },
     subtitle: {
         fontSize: '1.5rem',
-        marginBottom: '30px',
+        marginBottom: '10px',
+    },
+    welcomeMessage: {
+        fontSize: '1rem',
+        marginBottom: '20px',
+        color: '#666',
     },
     container: {
         maxWidth: '400px',
@@ -29,12 +34,39 @@ const styles = {
         border: '1px solid #ccc',
         borderRadius: '4px',
     },
+    formActions: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+    },
+    checkboxGroup: {
+        display: 'flex',
+        alignItems: 'center',
+    },
+    forgotPasswordButton: {
+        background: 'none',
+        border: 'none',
+        color: '#007bff',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+    },
     button: {
         width: '100%',
         padding: '10px',
         backgroundColor: '#007bff',
         color: '#fff',
         border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        marginTop: '10px',
+    },
+    secondaryButton: {
+        width: '100%',
+        padding: '10px',
+        backgroundColor: '#ccc',
+        color: '#000',
+        border: '1px solid #aaa',
         borderRadius: '4px',
         cursor: 'pointer',
         marginTop: '10px',

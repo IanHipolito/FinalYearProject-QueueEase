@@ -68,6 +68,7 @@ CORS_ALLOWED_ORIGINS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://4f0772zf-8000.eun1.devtunnels.ms",
     "https://4f0772zf-3000.eun1.devtunnels.ms",
+    "http://localhost:3000",
 ]
 
 

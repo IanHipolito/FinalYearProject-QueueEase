@@ -8,8 +8,49 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import check_password
+import json
 
 logger = logging.getLogger(__name__)
+
+from django.http import JsonResponse
+
+@csrf_exempt
+def login_view(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            email = data.get('email', '').strip()
+            password = data.get('password', '').strip()
+
+            # Validate input
+            if not email or not password:
+                return JsonResponse({'error': 'Email and password are required.'}, status=400)
+
+            # Check if the user exists
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return JsonResponse({'error': 'Invalid email or password.'}, status=401)
+
+            # Verify password
+            if not check_password(password, user.password):
+                return JsonResponse({'error': 'Invalid email or password.'}, status=401)
+
+            # Successful login
+            return JsonResponse({
+                'message': 'Login successful!',
+                'user_id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'user_type': user.user_type
+            }, status=200)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid request body.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method. Only POST is allowed.'}, status=405)
 
 @api_view(['POST'])
 def signup_view(request):
