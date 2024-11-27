@@ -25,7 +25,12 @@ SECRET_KEY = 'django-insecure-nd!t0p79rj(u%jo)@&g(w)tyg_==s-ua7)xt&+%c(+4_4syh-m
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "4f0772zf-8000.eun1.devtunnels.ms",
+    "4f0772zf-3000.eun1.devtunnels.ms",
+]
 
 
 # Application definition
@@ -55,8 +60,16 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
+    "https://4f0772zf-8000.eun1.devtunnels.ms",
+    "https://4f0772zf-3000.eun1.devtunnels.ms",
     "http://localhost:3000",
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://4f0772zf-8000.eun1.devtunnels.ms",
+    "https://4f0772zf-3000.eun1.devtunnels.ms",
+]
+
 
 ROOT_URLCONF = 'queueease_backend.urls'
 

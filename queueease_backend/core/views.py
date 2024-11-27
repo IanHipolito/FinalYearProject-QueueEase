@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service
+from .models import Queue, QRCode, User, Service, EmployeeDetails
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
@@ -50,31 +50,54 @@ def api_overview(request):
     return Response({"message": "Welcome to the API!"})
 
 @csrf_exempt
+@api_view(['POST'])
 def create_queue(request):
-    logger.info(f"Request received: {request.method} {request.body}")
+    logger.info(f"Request method: {request.method}, Data: {request.data}")
+    
     if request.method == 'POST':
-        user_id = request.POST.get('user_id')
-        service_id = request.POST.get('service_id')
-        employee_id = request.POST.get('employee_id')
+        try:
+            # Extract data from the request
+            user_id = request.data.get('user_id')
+            service_id = request.data.get('service_id')
+            employee_id = request.data.get('employee_id')
 
-        user = get_object_or_404(User, id=user_id)
-        service = get_object_or_404(Service, id=service_id)
-        employee = get_object_or_404(User, id=employee_id)
+            # Validate input data
+            if not all([user_id, service_id]):
+                return JsonResponse({"error": "user_id and service_id are required."}, status=400)
 
-        queue = Queue.objects.create(
-            user_id=user_id,
-            service_id=service_id,
-            employee_id=employee_id,
-            sequence_number=Queue.objects.filter(service_id=service_id).count() + 1
-        )
+            # Fetch the required objects
+            user = get_object_or_404(User, id=user_id)
+            service = get_object_or_404(Service, id=service_id)
+            employee = None
+            if employee_id:
+                employee = get_object_or_404(EmployeeDetails, id=employee_id)
 
-        # Testing 
-        qr_data = f"Queue ID: {queue.id}"
-        qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
+            # Create the queue object
+            sequence_number = Queue.objects.filter(service=service).count() + 1
+            queue = Queue.objects.create(
+                user=user,
+                service=service,
+                employee=employee,
+                sequence_number=sequence_number
+            )
 
-        return JsonResponse({"queue_id": queue.id, "qr_hash": qr_data})
+            # Generate QR code hash
+            qr_data = f"Queue ID: {queue.id}"
+            qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
 
-    return JsonResponse({"error": "Invalid request"}, status=400)
+            return JsonResponse({
+                "queue_id": queue.id,
+                "user": user.name,
+                "service": service.name,
+                "sequence_number": sequence_number,
+                "qr_hash": qr_code.qr_hash
+            })
+
+        except Exception as e:
+            logger.error(f"Error in create_queue: {str(e)}")
+            return JsonResponse({"error": "An error occurred while creating the queue.", "details": str(e)}, status=500)
+
+    return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=400)
 
 def get_qr_code(request, queue_id):
     try:

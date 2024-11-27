@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Html5Qrcode, Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import styles from "../styles/QRScanner.styles";
 
 const QRScanner: React.FC = () => {
@@ -8,8 +8,10 @@ const QRScanner: React.FC = () => {
   const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    const qrCodeScanner = new Html5Qrcode("qr-code-scanner");
-    setHtml5QrCode(qrCodeScanner);
+    if (!html5QrCode) {
+      const qrCodeScanner = new Html5Qrcode("qr-code-scanner");
+      setHtml5QrCode(qrCodeScanner);
+    }
 
     const initializeScanner = async () => {
       try {
@@ -20,7 +22,7 @@ const QRScanner: React.FC = () => {
           const preferredDevice =
             devices.find((d) => d.label.toLowerCase().includes("back")) ||
             devices[0];
-          startScanner(preferredDevice.id, qrCodeScanner);
+          startScanner(preferredDevice.id);
         } else {
           setError("No cameras found on this device.");
         }
@@ -37,29 +39,33 @@ const QRScanner: React.FC = () => {
     initializeScanner();
 
     return () => {
-      stopScanner(qrCodeScanner);
+      if (html5QrCode) {
+        html5QrCode
+          .stop()
+          .then(() => console.log("Scanner stopped successfully."))
+          .catch((err) => console.error("Failed to stop scanner:", err));
+      }
     };
-  }, []);
+  }, [html5QrCode]);
 
-  const startScanner = (deviceId: string, qrScanner: Html5Qrcode) => {
-    if (isScanning) {
-      console.warn("Scanner is already running.");
+  const startScanner = (deviceId: string) => {
+    if (!html5QrCode || isScanning) {
       return;
     }
 
     setIsScanning(true);
 
-    qrScanner
+    html5QrCode
       .start(
         { deviceId },
         {
-          fps: 10,
+          fps: 30,
           qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
           console.log("QR Code scanned:", decodedText);
           alert(`Scanned QR Code: ${decodedText}`);
-          stopScanner(qrScanner);
+          stopScanner();
         },
         (error) => {
           console.warn("Scanning error:", error);
@@ -71,13 +77,12 @@ const QRScanner: React.FC = () => {
       });
   };
 
-  const stopScanner = (qrScanner: Html5Qrcode | null) => {
-    if (!qrScanner || !isScanning) {
-      console.warn("Scanner is not running.");
+  const stopScanner = () => {
+    if (!html5QrCode || !isScanning) {
       return;
     }
 
-    qrScanner
+    html5QrCode
       .stop()
       .then(() => {
         console.log("Scanner stopped successfully.");
