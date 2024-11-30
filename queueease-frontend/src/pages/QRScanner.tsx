@@ -6,6 +6,7 @@ const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   useEffect(() => {
     if (!html5QrCode) {
@@ -64,6 +65,8 @@ const QRScanner: React.FC = () => {
         },
         (decodedText) => {
           console.log("QR Code scanned:", decodedText);
+          setShowOverlay(true);
+          setTimeout(() => setShowOverlay(false), 500);
           alert(`Scanned QR Code: ${decodedText}`);
           stopScanner();
         },
@@ -98,6 +101,7 @@ const QRScanner: React.FC = () => {
       <h1>QR Scanner</h1>
       {error && <p style={styles.error}>{error}</p>}
       <div id="qr-code-scanner" style={styles.scanner} />
+      {showOverlay && <div style={styles.overlay as React.CSSProperties} />}
     </div>
   );
 };

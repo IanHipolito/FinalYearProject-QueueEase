@@ -24,7 +24,6 @@ const MainPage: React.FC = () => {
 
   return (
     <div style={styles.container as React.CSSProperties}>
-      {/* Header Section */}
       <header style={styles.header as React.CSSProperties}>
         <div>
           <h1 style={styles.titleText as React.CSSProperties}>QueueEase</h1>
@@ -34,12 +33,10 @@ const MainPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Banner Section */}
       <div style={styles.banner as React.CSSProperties}>
         <h2>{displayText}</h2>
       </div>
 
-      {/* Buttons Section */}
       <div style={styles.buttonContainer as React.CSSProperties}>
         <div
           style={styles.iconButtonWrapper as React.CSSProperties}

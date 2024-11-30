@@ -10,10 +10,10 @@ class User(models.Model):
         ('guest', 'Guest'),
     ]
 
-    name = models.CharField(max_length=255, null=True, blank=True)  # Allow null for guests
+    name = models.CharField(max_length=255, null=True, blank=True)
     email = models.EmailField(unique=True)
-    mobile_number = models.CharField(max_length=15, null=True, blank=True)  # Allow null for guests
-    password = models.CharField(max_length=255, null=True, blank=True)  # Allow null for guests
+    mobile_number = models.CharField(max_length=15, null=True, blank=True)
+    password = models.CharField(max_length=255, null=True, blank=True)
     user_type = models.CharField(max_length=50, choices=USER_TYPE_CHOICES)
     signup_type = models.CharField(max_length=50, choices=SIGNUP_TYPE_CHOICES, default='regular')
     is_active = models.BooleanField(default=True)

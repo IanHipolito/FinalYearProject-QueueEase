@@ -24,11 +24,9 @@ def login_view(request):
             email = data.get('email', '').strip()
             password = data.get('password', '').strip()
 
-            # Validate input
             if not email or not password:
                 return JsonResponse({'error': 'Email and password are required.'}, status=400)
 
-            # Check if the user exists
             try:
                 user = User.objects.get(email=email)
             except User.DoesNotExist:
@@ -38,7 +36,6 @@ def login_view(request):
             if not check_password(password, user.password):
                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
 
-            # Successful login
             return JsonResponse({
                 'message': 'Login successful!',
                 'user_id': user.id,
