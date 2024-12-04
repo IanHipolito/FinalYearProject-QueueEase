@@ -57,7 +57,7 @@ def signup_view(request):
         name = data.get('name')
         email = data.get('email')
         password = data.get('password')
-        phone_number = data.get('phone_number')
+        phone_number = data.get('phoneNumber')
 
         if not all([name, email, password, phone_number]):
             return JsonResponse({'error': 'All fields are required.'}, status=400)
