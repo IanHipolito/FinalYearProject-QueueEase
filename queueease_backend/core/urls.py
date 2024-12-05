@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import api_overview, create_queue, get_qr_code, signup_view, login_view
+from .views import api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr
 from django.http import JsonResponse
 
 def test_view(request):
@@ -13,4 +13,5 @@ urlpatterns = [
     path('get-qr-code/<int:queue_id>/', get_qr_code, name='get-qr-code'),
     path('signup/', signup_view, name='signup'),
     path('login/', login_view, name='login'),
+    path('validate-qr/', validate_qr, name='validate-qr'),
 ]

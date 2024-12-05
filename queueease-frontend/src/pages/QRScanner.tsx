@@ -67,7 +67,9 @@ const QRScanner: React.FC = () => {
           console.log("QR Code scanned:", decodedText);
           setShowOverlay(true);
           setTimeout(() => setShowOverlay(false), 500);
-          alert(`Scanned QR Code: ${decodedText}`);
+          // alert(`Scanned QR Code: ${decodedText}`);
+          const queryParams = new URLSearchParams({ queueInfo: decodedText }).toString();
+          window.location.href = `/success?${queryParams}`;
           stopScanner();
         },
         (error) => {

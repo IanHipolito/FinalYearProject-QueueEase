@@ -5,6 +5,7 @@ import SignupPage from './pages/Signup';
 import LoginPage from './pages/Login';
 import QRScanner from './pages/QRScanner';
 import GuestSignup from './pages/GuestSignup';
+import SuccessPage from './pages/SuccessPage';
 
 const App: React.FC = () => {
   return (
@@ -16,6 +17,7 @@ const App: React.FC = () => {
         <Route path="/main" element={<MainPage />} />
         <Route path="/guest" element={<GuestSignup />} />
         <Route path="/qrscanner" element={<QRScanner />} />
+        <Route path="/success" element={<SuccessPage />} />
       </Routes>
     </Router>
   );

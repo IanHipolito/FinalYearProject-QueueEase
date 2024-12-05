@@ -149,3 +149,29 @@ def get_qr_code(request, queue_id):
         return HttpResponse(buffer, content_type="image/png")
     except QRCode.DoesNotExist:
         return JsonResponse({"error": "QR code not found"}, status=404)
+    
+@csrf_exempt
+@api_view(['POST'])
+def validate_qr(request):
+    try:
+        data = json.loads(request.body)
+        qr_hash = data.get('qrHash')
+
+        if not qr_hash:
+            return JsonResponse({"error": "QR hash is required."}, status=400)
+
+        qr_code = QRCode.objects.filter(qr_hash=qr_hash).first()
+        if not qr_code:
+            return JsonResponse({"error": "Invalid QR code."}, status=404)
+
+        queue = qr_code.queue
+        return JsonResponse({
+            "id": queue.id,
+            "service": queue.service.name,
+            "status": "Active"
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON format."}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
