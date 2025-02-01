@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from '../styles/MainPage.styles';
-import IconButton from '@mui/material/IconButton';
-import MenuIcon from '@mui/icons-material/Menu';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import MapIcon from '@mui/icons-material/Map';

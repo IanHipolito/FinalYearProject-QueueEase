@@ -6,6 +6,7 @@ import LoginPage from './pages/Login';
 import QRScanner from './pages/QRScanner';
 import GuestSignup from './pages/GuestSignup';
 import SuccessPage from './pages/SuccessPage';
+import MapProximity from './pages/MapProximity';
 
 const App: React.FC = () => {
   return (
@@ -18,6 +19,7 @@ const App: React.FC = () => {
         <Route path="/guest" element={<GuestSignup />} />
         <Route path="/qrscanner" element={<QRScanner />} />
         <Route path="/success" element={<SuccessPage />} />
+        <Route path="/MapProximity" element={<MapProximity />} />
       </Routes>
     </Router>
   );
