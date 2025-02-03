@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../styles/Login.styles";
+import { useAuth } from './AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -32,6 +34,7 @@ const Login: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+        await login(data.email, formData.password);
         alert("Login successful!");
         navigate("/main");
         console.log("User data:", data);

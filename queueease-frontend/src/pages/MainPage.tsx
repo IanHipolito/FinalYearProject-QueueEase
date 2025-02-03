@@ -45,7 +45,7 @@ const MainPage: React.FC = () => {
         </div>
         <div
           style={styles.iconButtonWrapper as React.CSSProperties}
-          onClick={() => navigate('/Appointment')}
+          onClick={() => navigate('/appointments')}
         >
           <CalendarTodayIcon fontSize="large" />
           <p style={styles.buttonLabel as React.CSSProperties}>

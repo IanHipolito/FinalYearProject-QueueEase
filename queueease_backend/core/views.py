@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails
+from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
@@ -11,10 +11,20 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password
 import json
+from .serializers import AppointmentDetailsSerializer
+from datetime import datetime, timedelta
+import random
 
 logger = logging.getLogger(__name__)
 
 from django.http import JsonResponse
+
+SERVICE_TYPES = {
+    "General Checkup": 15,
+    "Dentist": 30,
+    "Surgery": 60,
+    "Restaurant": 90,
+}
 
 @csrf_exempt
 def login_view(request):
@@ -175,3 +185,99 @@ def validate_qr(request):
         return JsonResponse({"error": "Invalid JSON format."}, status=400)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def user_appointments(request, user_id):
+    appointments = AppointmentDetails.objects.filter(user_id=user_id).order_by('-appointment_date')
+    serializer = AppointmentDetailsSerializer(appointments, many=True)
+    return Response(serializer.data)
+
+# Get appointment details by order ID
+@api_view(['GET'])
+def appointment_detail(request, order_id):
+    appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+
+    # Retrieve appointments for the same service and date
+    same_day_appointments = AppointmentDetails.objects.filter(
+        appointment_date=appointment.appointment_date,
+        service=appointment.service
+    ).order_by('appointment_time')
+
+    # Determine queue position
+    position = list(same_day_appointments).index(appointment) + 1
+
+    # Estimate wait time based on average durations
+    average_duration = SERVICE_TYPES.get(appointment.service, 15)  # Default to 15 mins if not found
+    estimated_waiting_time = (position - 1) * average_duration
+
+    # Include queue data in the response
+    serializer = AppointmentDetailsSerializer(appointment)
+    data = serializer.data
+    data['queue_position'] = position
+    data['estimated_wait_time'] = estimated_waiting_time
+
+    return Response(data)
+
+@api_view(['POST'])
+def get_or_create_appointment(request):
+    try:
+        order_id = request.data.get('order_id')
+        user_id = request.data.get('user_id')
+
+        if not order_id or not user_id:
+            return Response({"error": "Order ID and User ID are required."}, status=400)
+
+        # Check if appointment exists
+        appointment = AppointmentDetails.objects.filter(order_id=order_id).first()
+        if appointment:
+            serializer = AppointmentDetailsSerializer(appointment)
+            return Response(serializer.data)
+
+        # Create new appointment if not exists
+        default_service = Service.objects.get(name='Default Service')
+
+        new_appointment = AppointmentDetails.objects.create(
+            order_id=order_id,
+            user_id=user_id,
+            service=default_service,
+            appointment_date='2025-01-01',  # Replace with actual date
+            appointment_time='09:00:00',   # Replace with actual time
+            duration_minutes=30,
+            status='pending',
+            queue_status='not_started',
+            is_active=True
+        )
+
+        serializer = AppointmentDetailsSerializer(new_appointment)
+        return Response(serializer.data, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+def simulate_appointment(order_id, user_id):
+    service_name = random.choice(SERVICE_TYPES)
+    
+    service_instance, created = Service.objects.get_or_create(name=service_name, defaults={
+        'description': f"{service_name} description",
+        'is_active': True,
+    })
+
+    average_duration = 15 if service_name == "General Checkup" else 30
+    appointment_date = datetime.now().replace(hour=9, minute=0, second=0) + timedelta(days=random.randint(0, 5))
+    appointment_time = appointment_date + timedelta(minutes=random.randint(0, 180))  # Random time within first 3 hours
+
+    # Create the appointment with the Service instance
+    appointment = AppointmentDetails.objects.create(
+        order_id=order_id,
+        user_id=user_id,
+        service=service_instance,
+        appointment_date=appointment_date,
+        appointment_time=appointment_time.time(),
+        duration_minutes=average_duration,
+        status="pending",
+        queue_status="not_started",
+        is_active=True
+    )
+
+    return appointment

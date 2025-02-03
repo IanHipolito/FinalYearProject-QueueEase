@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class User(models.Model):
     USER_TYPE_CHOICES = [
@@ -147,23 +148,22 @@ class AppointmentDetails(models.Model):
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
+
     QUEUE_STATUS_CHOICES = [
         ('not_started', 'Not Started'),
         ('in_queue', 'In Queue'),
         ('completed', 'Completed'),
     ]
 
-    order_id = models.CharField(max_length=50, unique=True)
+    order_id = models.CharField(max_length=255, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.SET_NULL, null=True, blank=True)
-    appointment_date = models.DateTimeField()
+    service = models.ForeignKey('Service', on_delete=models.CASCADE)
+    appointment_date = models.DateField()
     appointment_time = models.TimeField()
-    duration_minutes = models.IntegerField()
+    duration_minutes = models.IntegerField(default=30)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     queue_status = models.CharField(max_length=50, choices=QUEUE_STATUS_CHOICES, default='not_started')
-    estimated_wait_time = models.IntegerField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    date_created = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)  # Track whether the appointment is active
 
     def __str__(self):
-        return f"Appointment {self.order_id} - {self.user.name}"
+        return f"Appointment {self.order_id} - {self.user.username}"
