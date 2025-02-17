@@ -20,7 +20,6 @@ const OrderIDInput: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Redirect to appointment details page with the orderID
         navigate(`/appointment/${data.order_id}`);
       } else {
         setError(data.error || 'Failed to fetch appointment.');

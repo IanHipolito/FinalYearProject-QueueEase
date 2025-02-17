@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Queue, QRCode
+from .models import User, Queue, QRCode, Service
 
 admin.site.register(User)
 
@@ -20,3 +20,7 @@ class QRCodeAdmin(admin.ModelAdmin):
         return QRCode.objects.count()
 
 admin.site.register(QRCode, QRCodeAdmin)
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description', 'is_active', 'date_created')

@@ -10,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,10 +25,16 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const login = async (email: string, password: string) => {
+    const apiUrl =
+      window.location.hostname === 'localhost'
+        ? 'http://localhost:8000/api/login/'
+        : 'https://m2xb3cv3-8000.eun1.devtunnels.ms/api/login/';
+
     try {
-      const response = await fetch('http://localhost:8000/api/login/', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -35,7 +42,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (response.ok) {
         const data = await response.json();
-        setUser({ id: data.user_id, name: data.name, email: data.email });
+        const newUser = { id: data.user_id, name: data.name, email: data.email };
+        setUser(newUser);
         localStorage.setItem('user', JSON.stringify(data));
       } else {
         throw new Error('Invalid email or password');
@@ -57,10 +65,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const parsedUser = JSON.parse(savedUser);
       setUser({ id: parsedUser.user_id, name: parsedUser.name, email: parsedUser.email });
     }
+    setLoading(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, loading  }}>
       {children}
     </AuthContext.Provider>
   );

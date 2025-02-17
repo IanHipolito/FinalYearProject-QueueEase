@@ -19,11 +19,13 @@ logger = logging.getLogger(__name__)
 
 from django.http import JsonResponse
 
-SERVICE_TYPES = {
+SERVICE_OPTIONS = {
     "General Checkup": 15,
     "Dentist": 30,
     "Surgery": 60,
     "Restaurant": 90,
+    "McDonald's": 5,
+    "Burger King": 7,
 }
 
 @csrf_exempt
@@ -107,7 +109,7 @@ def create_queue(request):
             # Extract data from the request
             user_id = request.data.get('user_id')
             service_id = request.data.get('service_id')
-            employee_id = request.data.get('employee_id')
+            employee_id = request.data.get('employee_id')  # optional
 
             # Validate input data
             if not all([user_id, service_id]):
@@ -119,9 +121,26 @@ def create_queue(request):
             employee = None
             if employee_id:
                 employee = get_object_or_404(EmployeeDetails, id=employee_id)
+            
+            existing_queue = Queue.objects.filter(
+                user=user,
+                service=service,
+                status='pending',
+                is_active=True
+            ).first()
+            if existing_queue:
+                # If a QR code already exists for this queue, return it.
+                qr_code = QRCode.objects.filter(queue=existing_queue).first()
+                return JsonResponse({
+                    "queue_id": existing_queue.id,
+                    "user": user.name,
+                    "service": service.name,
+                    "sequence_number": existing_queue.sequence_number,
+                    "qr_hash": qr_code.qr_hash if qr_code else None,
+                    "message": "Existing queue entry used."
+                })
 
-            # Create the queue object
-            sequence_number = Queue.objects.filter(service=service).count() + 1
+            sequence_number = Queue.objects.filter(service=service, status='pending', is_active=True).count() + 1
             queue = Queue.objects.create(
                 user=user,
                 service=service,
@@ -129,7 +148,7 @@ def create_queue(request):
                 sequence_number=sequence_number
             )
 
-            # Generate QR code hash
+            # Generate a QR code hash (you could use a more robust scheme in production)
             qr_data = f"Queue ID: {queue.id}"
             qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
 
@@ -138,7 +157,8 @@ def create_queue(request):
                 "user": user.name,
                 "service": service.name,
                 "sequence_number": sequence_number,
-                "qr_hash": qr_code.qr_hash
+                "qr_hash": qr_code.qr_hash,
+                "message": "New queue entry created."
             })
 
         except Exception as e:
@@ -146,6 +166,7 @@ def create_queue(request):
             return JsonResponse({"error": "An error occurred while creating the queue.", "details": str(e)}, status=500)
 
     return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=400)
+
 
 def get_qr_code(request, queue_id):
     try:
@@ -206,15 +227,17 @@ def appointment_detail(request, order_id):
     # Determine queue position
     position = list(same_day_appointments).index(appointment) + 1
 
-    # Estimate wait time based on average durations
-    average_duration = SERVICE_TYPES.get(appointment.service, 15)  # Default to 15 mins if not found
+    # Estimate wait time based on the number of people ahead in the queue
+    average_duration = appointment.duration_minutes or 15  # Use stored duration or default to 15 mins
     estimated_waiting_time = (position - 1) * average_duration
 
-    # Include queue data in the response
+    # Include service name and queue data in the response
     serializer = AppointmentDetailsSerializer(appointment)
     data = serializer.data
     data['queue_position'] = position
     data['estimated_wait_time'] = estimated_waiting_time
+    data['service_name'] = appointment.service.name  # Add service name
+    data['appointment_title'] = f"{appointment.service.name} Appointment"
 
     return Response(data)
 
@@ -236,12 +259,13 @@ def get_or_create_appointment(request):
         # Create new appointment if not exists
         default_service = Service.objects.get(name='Default Service')
 
+        # Filler For Now
         new_appointment = AppointmentDetails.objects.create(
             order_id=order_id,
             user_id=user_id,
             service=default_service,
-            appointment_date='2025-01-01',  # Replace with actual date
-            appointment_time='09:00:00',   # Replace with actual time
+            appointment_date='2025-01-01',
+            appointment_time='09:00:00',
             duration_minutes=30,
             status='pending',
             queue_status='not_started',
@@ -255,29 +279,70 @@ def get_or_create_appointment(request):
         return Response({"error": str(e)}, status=500)
 
 
-def simulate_appointment(order_id, user_id):
-    service_name = random.choice(SERVICE_TYPES)
+def generate_order_id(user_id):
+    """Generate a unique order ID using user ID and timestamp."""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
+    return f"{user_id}-{timestamp}-{random_str}"
+
+def simulate_appointment(user_id):
+    """Simulate realistic appointment data for demonstration purposes."""
+    service_name = random.choice(list(SERVICE_OPTIONS.keys()))
+    service, _ = Service.objects.get_or_create(name=service_name, defaults={"description": f"{service_name} description"})
     
-    service_instance, created = Service.objects.get_or_create(name=service_name, defaults={
-        'description': f"{service_name} description",
-        'is_active': True,
-    })
+    appointment_date = datetime.now() + timedelta(days=random.randint(1, 30))
+    appointment_time = appointment_date.replace(hour=random.randint(8, 17), minute=random.choice([0, 15, 30, 45]))
+    duration_minutes = SERVICE_OPTIONS[service_name]
+    order_id = generate_order_id(user_id)
 
-    average_duration = 15 if service_name == "General Checkup" else 30
-    appointment_date = datetime.now().replace(hour=9, minute=0, second=0) + timedelta(days=random.randint(0, 5))
-    appointment_time = appointment_date + timedelta(minutes=random.randint(0, 180))  # Random time within first 3 hours
-
-    # Create the appointment with the Service instance
     appointment = AppointmentDetails.objects.create(
         order_id=order_id,
         user_id=user_id,
-        service=service_instance,
-        appointment_date=appointment_date,
+        service=service,
+        appointment_date=appointment_date.date(),
         appointment_time=appointment_time.time(),
-        duration_minutes=average_duration,
+        duration_minutes=duration_minutes,
         status="pending",
         queue_status="not_started",
         is_active=True
     )
 
     return appointment
+
+@api_view(['POST'])
+def generate_demo_appointments(request):
+    user_id = request.data.get('user_id')
+    if not user_id:
+        return Response({"error": "User ID is required."}, status=400)
+
+    demo_appointments = []
+    for i in range(5):
+        order_id = generate_order_id(user_id)
+        service, _ = Service.objects.get_or_create(name="General Checkup", defaults={"description": "General Checkup", "is_active": True})
+        appointment_date = datetime.now().date() + timedelta(days=1)
+        appointment_time = (datetime.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(minutes=15 * i)).time()
+        appointment = AppointmentDetails.objects.create(
+            order_id=order_id,
+            user_id=user_id,
+            service=service,
+            appointment_date=appointment_date,
+            appointment_time=appointment_time,
+            duration_minutes=15,
+            status='pending',
+            queue_status='not_started',
+            is_active=True
+        )
+        demo_appointments.append(appointment)
+    return Response({"message": "Demo appointments generated successfully."})
+
+@api_view(['DELETE'])
+def delete_appointment(request, order_id):
+    appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+    appointment.delete()
+    return Response({"message": "Appointment deleted successfully."}, status=200)
+
+@api_view(['GET'])
+def list_services(request):
+    services = Service.objects.filter(is_active=True)
+    data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
+    return Response(data)

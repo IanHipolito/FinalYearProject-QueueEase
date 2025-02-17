@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr, user_appointments, appointment_detail, get_or_create_appointment
+from .views import api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr, user_appointments, appointment_detail, get_or_create_appointment, generate_demo_appointments, delete_appointment, list_services
 from django.http import JsonResponse
 
 def test_view(request):
@@ -17,4 +17,7 @@ urlpatterns = [
     path('appointments/<int:user_id>/', user_appointments, name='user-appointments'),
     path('appointment/<str:order_id>/', appointment_detail, name='appointment-detail'),
     path('appointment/', get_or_create_appointment, name='get_or_create_appointment'),
+    path('generate-demo/', generate_demo_appointments, name='generate-demo'),
+    path('appointment/delete/<str:order_id>/', delete_appointment, name='delete-appointment'),
+    path('list_services/', list_services, name='list_services'),
 ]

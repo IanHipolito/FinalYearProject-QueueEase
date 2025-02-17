@@ -18,7 +18,7 @@ const Signup: React.FC = () => {
     const apiUrl =
       window.location.hostname === "localhost"
         ? "http://127.0.0.1:8000/api/signup/"
-        : "https://4f0772zf-8000.eun1.devtunnels.ms/api/signup/";
+        : "https://m2xb3cv3-8000.eun1.devtunnels.ms/api/signup/";
 
     try {
       const response = await fetch(apiUrl, {

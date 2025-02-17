@@ -4,6 +4,7 @@ import MainPage from './pages/MainPage';
 import SignupPage from './pages/Signup';
 import LoginPage from './pages/Login';
 import QRScanner from './pages/QRScanner';
+import QRCodeScreenWrapper from './pages/QRCodeScreenWrapper';
 import GuestSignup from './pages/GuestSignup';
 import SuccessPage from './pages/SuccessPage';
 import MapProximity from './pages/MapProximity';
@@ -12,9 +13,24 @@ import AppointmentDetail from './pages/AppointmentDetail';
 import OrderIDInput from './pages/OrderIDInput';
 import AddAppointment from './pages/AddAppointment';
 import { AuthProvider, useAuth } from './pages/AuthContext';
+import ServiceSelection from './pages/ServiceSelection';
+
+// const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+//   const { user } = useAuth();
+//   return user ? <>{children}</> : <Navigate to="/login" />;
+// };
+
+// const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+//   // Temporarily bypass authentication for testing
+//   // return <>{children}</>;
+//   const { user } = useAuth();
+//   console.log("User in PrivateRoute:", user);
+//   return user ? <>{children}</> : <Navigate to="/login" />;
+// };
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <div>Loading...</div>;
   return user ? <>{children}</> : <Navigate to="/login" />;
 };
 
@@ -37,12 +53,14 @@ const App: React.FC = () => {
                   <Route path="/" element={<Navigate to="/main" />} />
                   <Route path="/main" element={<MainPage />} />
                   <Route path="/qrscanner" element={<QRScanner />} />
+                  <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />
                   <Route path="/success" element={<SuccessPage />} />
                   <Route path="/MapProximity" element={<MapProximity />} />
                   <Route path="/appointments" element={<AppointmentsList />} />
                   <Route path="/appointment/:orderId" element={<AppointmentDetail />} />
                   <Route path="/input-order" element={<OrderIDInput />} />
                   <Route path="/add-appointment" element={<AddAppointment />} />
+                  <Route path="/services" element={<ServiceSelection />} />
                 </Routes>
               </PrivateRoute>
             }
