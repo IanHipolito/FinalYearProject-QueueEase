@@ -36,7 +36,6 @@ class User(models.Model):
             )
         ]
 
-
 class Company(models.Model):
     name = models.CharField(max_length=255)
     address = models.TextField()
@@ -45,7 +44,6 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class Department(models.Model):
     name = models.CharField(max_length=255)
@@ -67,7 +65,6 @@ class Specialization(models.Model):
     def __str__(self):
         return self.name
 
-
 class EmployeeDetails(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True)
@@ -79,7 +76,6 @@ class EmployeeDetails(models.Model):
     def __str__(self):
         return f"{self.user.name} - {self.company.name if self.company else 'No Company'}"
 
-
 class Service(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
@@ -88,10 +84,13 @@ class Service(models.Model):
     date_valid_from = models.DateTimeField(null=True, blank=True)
     date_valid_to = models.DateTimeField(null=True, blank=True)
     date_deleted = models.DateTimeField(null=True, blank=True)
+    requires_prep_time = models.BooleanField(default=True)
+    minimal_prep_time = models.IntegerField(default=3)
+    parallel_capacity = models.IntegerField(default=1)
+    average_duration = models.IntegerField(default=15)
 
     def __str__(self):
         return self.name
-
 
 class ServiceCompany(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
@@ -99,7 +98,6 @@ class ServiceCompany(models.Model):
 
     class Meta:
         unique_together = ('service', 'company')
-
 
 class Queue(models.Model):
     STATUS_CHOICES = [
@@ -119,6 +117,7 @@ class Queue(models.Model):
     date_valid_from = models.DateTimeField(null=True, blank=True)
     date_valid_to = models.DateTimeField(null=True, blank=True)
     date_deleted = models.DateTimeField(null=True, blank=True)
+    expected_ready_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['sequence_number']
@@ -131,7 +130,6 @@ class Queue(models.Model):
     def __str__(self):
         return f"Queue {self.id} - {self.user.name}"
 
-
 class QRCode(models.Model):
     queue = models.OneToOneField(Queue, on_delete=models.CASCADE)
     qr_hash = models.CharField(max_length=255, unique=True)
@@ -140,7 +138,6 @@ class QRCode(models.Model):
 
     def __str__(self):
         return f"QR Code for Queue {self.queue.id}"
-
 
 class AppointmentDetails(models.Model):
     STATUS_CHOICES = [

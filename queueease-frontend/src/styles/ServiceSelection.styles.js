@@ -1,0 +1,72 @@
+const styles = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "40px",
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+    minHeight: "100vh",
+    fontFamily: "'Roboto', sans-serif",
+  },
+  header: {
+    fontSize: "2rem",
+    marginBottom: "30px",
+    color: "#333",
+  },
+  filterInput: {
+    padding: "10px",
+    marginBottom: "30px",
+    fontSize: "1rem",
+    width: "80%",
+    maxWidth: "400px",
+    border: "1px solid #ccc",
+    borderRadius: "5px",
+  },
+  list: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    padding: 0,
+    listStyle: "none",
+    gap: "20px",
+    width: "100%",
+    maxWidth: "1200px",
+  },
+  listItem: {
+    background: "#fff",
+    borderRadius: "10px",
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+    padding: "20px",
+    width: "calc(33.33% - 20px)",
+    minWidth: "250px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    transition: "transform 0.2s ease",
+  },
+  listItemHover: {
+    transform: "scale(1.05)",
+  },
+  button: {
+    background: "#007BFF",
+    border: "none",
+    color: "#fff",
+    padding: "10px 20px",
+    fontSize: "1rem",
+    borderRadius: "5px",
+    cursor: "pointer",
+    transition: "background 0.3s ease",
+    marginBottom: "10px",
+  },
+  buttonHover: {
+    background: "#0056b3",
+  },
+  description: {
+    fontSize: "0.9rem",
+    color: "#555",
+    textAlign: "center",
+  },
+};
+
+export default styles;

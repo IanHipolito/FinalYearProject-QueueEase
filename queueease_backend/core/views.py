@@ -99,73 +99,181 @@ def signup_view(request):
 def api_overview(request):
     return Response({"message": "Welcome to the API!"})
 
+def compute_expected_ready_time(service, position):
+    parallel_capacity = service.parallel_capacity or 1
+    avg_duration = service.average_duration or 15
+    minimal_prep = service.minimal_prep_time or 3
+
+    wave_number = (position - 1) // parallel_capacity
+    base_wait = wave_number * avg_duration
+
+    if service.requires_prep_time and wave_number == 0:
+        base_wait = max(base_wait, minimal_prep)
+
+    now = datetime.now()
+    return now + timedelta(minutes=base_wait)
+
 @csrf_exempt
 @api_view(['POST'])
 def create_queue(request):
-    logger.info(f"Request method: {request.method}, Data: {request.data}")
-    
-    if request.method == 'POST':
-        try:
-            # Extract data from the request
-            user_id = request.data.get('user_id')
-            service_id = request.data.get('service_id')
-            employee_id = request.data.get('employee_id')  # optional
+    try:
+        user_id = request.data.get('user_id')
+        service_id = request.data.get('service_id')
+        if not all([user_id, service_id]):
+            return Response({"error": "user_id and service_id are required."}, status=400)
 
-            # Validate input data
-            if not all([user_id, service_id]):
-                return JsonResponse({"error": "user_id and service_id are required."}, status=400)
+        user = get_object_or_404(User, id=user_id)
+        service = get_object_or_404(Service, id=service_id)
 
-            # Fetch the required objects
-            user = get_object_or_404(User, id=user_id)
-            service = get_object_or_404(Service, id=service_id)
-            employee = None
-            if employee_id:
-                employee = get_object_or_404(EmployeeDetails, id=employee_id)
+        pending_queues = Queue.objects.filter(
+            service=service,
+            status='pending',
+            is_active=True
+        ).order_by('date_created')
+
+        position = pending_queues.count() + 1
+        queue_item = Queue.objects.create(
+            user=user,
+            service=service,
+            sequence_number=position,
+            status='pending'
+        )
+
+        queue_item.expected_ready_time = compute_expected_ready_time(service, position)
+        queue_item.save()
+        qr_data = f"Queue ID: {queue_item.id}"
+        qr_code = QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
+
+        return Response({
+            "message": "Queue created",
+            "queue_id": queue_item.id,
+            "position": position,
+            "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+            "qr_hash": qr_code.qr_hash
+        })
+    except Exception as e:
+        logger.error(f"Error in create_queue: {str(e)}")
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def queue_detail(request, queue_id):
+    """
+    Return up-to-date information for a queue item, including:
+      - current_position (recalculated)
+      - expected_ready_time
+      - total_wait (in seconds) computed from date_created to expected_ready_time.
+    """
+    queue_item = get_object_or_404(Queue, id=queue_id)
+
+    total_wait = 0
+    if queue_item.expected_ready_time:
+        total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
+
+    if queue_item.status != 'pending':
+        return Response({
+            "queue_id": queue_item.id,
+            "service_name": queue_item.service.name,
+            "current_position": None,
+            "status": queue_item.status,
+            "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+            "total_wait": total_wait,
+            "time_created": queue_item.date_created.isoformat()
+        })
+
+    pending_queues = Queue.objects.filter(
+        service=queue_item.service,
+        status='pending',
+        is_active=True
+    ).order_by('date_created')
+
+    new_position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
+
+    data = {
+        "queue_id": queue_item.id,
+        "service_name": queue_item.service.name,
+        "current_position": new_position,
+        "status": queue_item.status,
+        "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+        "total_wait": total_wait,
+        "time_created": queue_item.date_created.isoformat()
+    }
+    return Response(data)
+
+@api_view(['POST'])
+def complete_queue(request, queue_id):
+    """
+    Mark a queue item as completed (e.g., staff says order is done).
+    This can help us test the 'completed' flow on the frontend.
+    """
+    queue_item = get_object_or_404(Queue, id=queue_id)
+    queue_item.status = 'completed'
+    queue_item.save()
+    return Response({"message": "Order marked as completed."})
+
+# @csrf_exempt
+# @api_view(['POST'])
+# def create_queue(request):
+#     if request.method == 'POST':
+#         try:
+#             # Extract data from the request
+#             user_id = request.data.get('user_id')
+#             service_id = request.data.get('service_id')
+#             employee_id = request.data.get('employee_id')  # optional
+
+#             if not all([user_id, service_id]):
+#                 return JsonResponse({"error": "user_id and service_id are required."}, status=400)
+
+#             user = get_object_or_404(User, id=user_id)
+#             service = get_object_or_404(Service, id=service_id)
+#             employee = None
+#             if employee_id:
+#                 employee = get_object_or_404(EmployeeDetails, id=employee_id)
             
-            existing_queue = Queue.objects.filter(
-                user=user,
-                service=service,
-                status='pending',
-                is_active=True
-            ).first()
-            if existing_queue:
-                # If a QR code already exists for this queue, return it.
-                qr_code = QRCode.objects.filter(queue=existing_queue).first()
-                return JsonResponse({
-                    "queue_id": existing_queue.id,
-                    "user": user.name,
-                    "service": service.name,
-                    "sequence_number": existing_queue.sequence_number,
-                    "qr_hash": qr_code.qr_hash if qr_code else None,
-                    "message": "Existing queue entry used."
-                })
+#             # Check for an existing active queue for this service on the current day
+#             existing_queue = Queue.objects.filter(
+#                 service=service,
+#                 status='pending',
+#                 is_active=True,
+#                 date_created__date=datetime.now().date()
+#             ).first()
+#             if existing_queue:
+#                 qr_code = QRCode.objects.filter(queue=existing_queue).first()
+#                 return JsonResponse({
+#                     "queue_id": existing_queue.id,
+#                     "user": user.name,
+#                     "service": service.name,
+#                     "sequence_number": existing_queue.sequence_number,
+#                     "qr_hash": qr_code.qr_hash if qr_code else None,
+#                     "message": "Existing queue entry used."
+#                 })
 
-            sequence_number = Queue.objects.filter(service=service, status='pending', is_active=True).count() + 1
-            queue = Queue.objects.create(
-                user=user,
-                service=service,
-                employee=employee,
-                sequence_number=sequence_number
-            )
+#             # Create a new queue entry if none exists
+#             sequence_number = Queue.objects.filter(service=service, status='pending', is_active=True).count() + 1
+#             queue = Queue.objects.create(
+#                 user=user,
+#                 service=service,
+#                 employee=employee,
+#                 sequence_number=sequence_number
+#             )
 
-            # Generate a QR code hash (you could use a more robust scheme in production)
-            qr_data = f"Queue ID: {queue.id}"
-            qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
+#             qr_data = f"Queue ID: {queue.id}"
+#             qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
 
-            return JsonResponse({
-                "queue_id": queue.id,
-                "user": user.name,
-                "service": service.name,
-                "sequence_number": sequence_number,
-                "qr_hash": qr_code.qr_hash,
-                "message": "New queue entry created."
-            })
+#             return JsonResponse({
+#                 "queue_id": queue.id,
+#                 "user": user.name,
+#                 "service": service.name,
+#                 "sequence_number": sequence_number,
+#                 "qr_hash": qr_code.qr_hash,
+#                 "message": "New queue entry created."
+#             })
 
-        except Exception as e:
-            logger.error(f"Error in create_queue: {str(e)}")
-            return JsonResponse({"error": "An error occurred while creating the queue.", "details": str(e)}, status=500)
+#         except Exception as e:
+#             logger.error(f"Error in create_queue: {str(e)}")
+#             return JsonResponse({"error": "An error occurred while creating the queue.", "details": str(e)}, status=500)
 
-    return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=400)
+#     return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=400)
+
 
 
 def get_qr_code(request, queue_id):
@@ -213,31 +321,35 @@ def user_appointments(request, user_id):
     serializer = AppointmentDetailsSerializer(appointments, many=True)
     return Response(serializer.data)
 
-# Get appointment details by order ID
 @api_view(['GET'])
 def appointment_detail(request, order_id):
     appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
 
-    # Retrieve appointments for the same service and date
     same_day_appointments = AppointmentDetails.objects.filter(
         appointment_date=appointment.appointment_date,
         service=appointment.service
     ).order_by('appointment_time')
 
-    # Determine queue position
     position = list(same_day_appointments).index(appointment) + 1
 
-    # Estimate wait time based on the number of people ahead in the queue
-    average_duration = appointment.duration_minutes or 15  # Use stored duration or default to 15 mins
-    estimated_waiting_time = (position - 1) * average_duration
+    average_duration = appointment.duration_minutes or 15  # Default duration
 
-    # Include service name and queue data in the response
+    if appointment.service.requires_prep_time:
+        minimal_prep = appointment.service.minimal_prep_time
+        estimated_waiting_time = max(minimal_prep, (position - 1) * average_duration)
+    else:
+        estimated_waiting_time = (position - 1) * average_duration
+
     serializer = AppointmentDetailsSerializer(appointment)
     data = serializer.data
     data['queue_position'] = position
     data['estimated_wait_time'] = estimated_waiting_time
-    data['service_name'] = appointment.service.name  # Add service name
+    data['service_name'] = appointment.service.name
     data['appointment_title'] = f"{appointment.service.name} Appointment"
+
+    appointment_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+    expected_start_time = appointment_start + timedelta(minutes=estimated_waiting_time)
+    data['expected_start_time'] = expected_start_time.isoformat()
 
     return Response(data)
 
@@ -250,16 +362,13 @@ def get_or_create_appointment(request):
         if not order_id or not user_id:
             return Response({"error": "Order ID and User ID are required."}, status=400)
 
-        # Check if appointment exists
         appointment = AppointmentDetails.objects.filter(order_id=order_id).first()
         if appointment:
             serializer = AppointmentDetailsSerializer(appointment)
             return Response(serializer.data)
 
-        # Create new appointment if not exists
         default_service = Service.objects.get(name='Default Service')
 
-        # Filler For Now
         new_appointment = AppointmentDetails.objects.create(
             order_id=order_id,
             user_id=user_id,
@@ -346,3 +455,33 @@ def list_services(request):
     services = Service.objects.filter(is_active=True)
     data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
     return Response(data)
+
+@api_view(['GET'])
+def queue_status(request, queue_id):
+    try:
+        queue = get_object_or_404(Queue, id=queue_id)
+        
+        pending_queues = Queue.objects.filter(
+            service=queue.service,
+            status='pending',
+            is_active=True
+        ).order_by('sequence_number')
+        
+        if queue.status != 'pending' or queue not in pending_queues:
+            current_position = None
+        else:
+            current_position = list(pending_queues).index(queue) + 1
+        
+        average_duration = SERVICE_OPTIONS.get(queue.service.name, 15)
+        estimated_wait = (current_position - 1) * average_duration if current_position else 0
+        
+        data = {
+            "currentPosition": current_position,
+            "estimatedWait": estimated_wait,
+            "serviceName": queue.service.name,
+            "queueNumber": queue.sequence_number,
+            "status": queue.status,
+        }
+        return Response(data)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

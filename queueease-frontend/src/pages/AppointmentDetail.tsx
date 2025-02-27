@@ -1,4 +1,4 @@
-import React, { ReactComponentElement, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from '../styles/AppointmentDetails.styles';
 
@@ -11,6 +11,7 @@ interface AppointmentDetail {
   estimated_wait_time: number;
   queue_position: number;
   appointment_title: string;
+  expected_start_time: string;
 }
 
 const AppointmentDetail: React.FC = () => {
@@ -20,29 +21,41 @@ const AppointmentDetail: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/appointment/${orderId}/`)
-      .then(response => response.json())
-      .then(data => {
-        setAppointment(data);
-        setRemainingTime(data.estimated_wait_time * 60);
-      })
-      .catch(error => console.error('Error fetching appointment details:', error));
+    const fetchAppointment = () => {
+      fetch(`http://localhost:8000/api/appointment/${orderId}/`)
+        .then(response => response.json())
+        .then(data => {
+          setAppointment(data);
+        })
+        .catch(error => console.error('Error fetching appointment details:', error));
+    };
+
+    fetchAppointment();
+    const pollingInterval = setInterval(fetchAppointment, 60000);
+    return () => clearInterval(pollingInterval);
   }, [orderId]);
 
   useEffect(() => {
-    if (remainingTime > 0) {
-      const timer = setInterval(() => {
-        setRemainingTime(prevTime => prevTime - 1);
-      }, 1000);
-      return () => clearInterval(timer);
+    let timer: NodeJS.Timeout;
+    if (appointment) {
+      const updateRemainingTime = () => {
+        const expectedTime = new Date(appointment.expected_start_time).getTime();
+        const diffInSeconds = Math.max(0, Math.floor((expectedTime - Date.now()) / 1000));
+        setRemainingTime(diffInSeconds);
+      };
+      updateRemainingTime();
+      timer = setInterval(updateRemainingTime, 1000);
     }
-  }, [remainingTime]);
+    return () => timer && clearInterval(timer);
+  }, [appointment]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}m ${secs}s`;
   };
+
+  const progressPercentage = appointment ? (remainingTime / (appointment.estimated_wait_time * 60)) * 100 : 0;
 
   return (
     <div style={styles.container}>
@@ -60,7 +73,23 @@ const AppointmentDetail: React.FC = () => {
           </p>
           <p style={styles.detailItem}><strong>Appointment Time:</strong> {appointment.appointment_time}</p>
           <p style={styles.detailItem}><strong>Estimated Waiting Time:</strong> {appointment.estimated_wait_time} minutes</p>
-          <p style={styles.timer}><strong>Time Remaining:</strong> {formatTime(remainingTime)}</p>
+          <div style={{ marginTop: '20px' }}>
+            <div style={{
+              width: '100%',
+              height: '20px',
+              backgroundColor: '#e0e0e0',
+              borderRadius: '10px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${progressPercentage}%`,
+                height: '100%',
+                backgroundColor: '#76c7c0',
+                transition: 'width 1s linear'
+              }}></div>
+            </div>
+            <p style={{ textAlign: 'center' }}>{formatTime(remainingTime)} remaining</p>
+          </div>
         </div>
       ) : (
         <p style={{ textAlign: 'center' }}>Loading appointment details...</p>

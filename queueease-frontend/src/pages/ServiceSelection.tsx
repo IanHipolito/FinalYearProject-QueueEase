@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import styles from "../styles/ServiceSelection.styles";
 
 interface Service {
   id: number;
@@ -20,8 +21,12 @@ interface CreateQueueResponse {
 
 const ServiceSelection: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [filterText, setFilterText] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+  const [buttonHover, setButtonHover] = useState<number | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const loggedInUserId = user ? user.id : null;
@@ -31,6 +36,7 @@ const ServiceSelection: React.FC = () => {
       try {
         const response = await axios.get<Service[]>("http://127.0.0.1:8000/api/list_services/");
         setServices(response.data);
+        setFilteredServices(response.data);
         setLoading(false);
       } catch (err: any) {
         setError("Failed to fetch services.");
@@ -40,6 +46,20 @@ const ServiceSelection: React.FC = () => {
 
     fetchServices();
   }, []);
+
+  useEffect(() => {
+    if (filterText.trim() === "") {
+      setFilteredServices(services);
+    } else {
+      const lowerFilter = filterText.toLowerCase();
+      const filtered = services.filter(
+        (service) =>
+          service.name.toLowerCase().includes(lowerFilter) ||
+          service.description.toLowerCase().includes(lowerFilter)
+      );
+      setFilteredServices(filtered);
+    }
+  }, [filterText, services]);
 
   const handleServiceSelect = async (serviceId: number) => {
     if (!loggedInUserId) {
@@ -63,25 +83,61 @@ const ServiceSelection: React.FC = () => {
   };
 
   if (loading) {
-    return <div>Loading services...</div>;
+    return (
+      <div style={{ textAlign: "center", marginTop: "40px" }}>
+        Loading services...
+      </div>
+    );
   }
 
   if (error) {
-    return <div style={{ color: "red" }}>{error}</div>;
+    return (
+      <div style={{ color: "red", textAlign: "center", marginTop: "40px" }}>
+        {error}
+      </div>
+    );
   }
 
   return (
-    <div style={{ textAlign: "center", marginTop: "20px" }}>
-      <h2>Select a Service</h2>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {services.map((service) => (
-          <li key={service.id} style={{ margin: "10px 0" }}>
-            <button onClick={() => handleServiceSelect(service.id)}>
-              {service.name}
-            </button>
-            <p>{service.description}</p>
-          </li>
-        ))}
+    <div style={styles.container as React.CSSProperties}>
+      <h2 style={styles.header}>Select a Service</h2>
+      <input
+        type="text"
+        placeholder="Search services..."
+        value={filterText}
+        onChange={(e) => setFilterText(e.target.value)}
+        style={styles.filterInput as React.CSSProperties}
+      />
+      <ul style={styles.list as React.CSSProperties}>
+        {filteredServices.map((service) => {
+          const isHovered = hoveredItem === service.id;
+          return (
+            <li
+              key={service.id}
+              style={{
+                ...styles.listItem,
+                ...(isHovered ? styles.listItemHover : {}),
+              } as React.CSSProperties}
+              onMouseEnter={() => setHoveredItem(service.id)}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              <button
+                style={{
+                  ...styles.button,
+                  ...(buttonHover === service.id ? styles.buttonHover : {}),
+                }}
+                onMouseEnter={() => setButtonHover(service.id)}
+                onMouseLeave={() => setButtonHover(null)}
+                onClick={() => handleServiceSelect(service.id)}
+              >
+                {service.name}
+              </button>
+              <p style={styles.description as React.CSSProperties}>
+                {service.description}
+              </p>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

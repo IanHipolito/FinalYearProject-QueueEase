@@ -43,8 +43,14 @@ const QRScanner: React.FC = () => {
             (decodedText) => {
               console.log("QR Code scanned:", decodedText);
               setError(null);
-              const queryParams = new URLSearchParams({ queueInfo: decodedText }).toString();
-              navigate(`/success?${queryParams}`);
+              const match = decodedText.match(/Queue ID:\s*(\d+)/);
+              if (!match) {
+                console.error("Invalid QR code format");
+                setError("Invalid QR code format");
+                return;
+              }
+              const queueId = match[1];
+              navigate(`/success/${queueId}`);
             },
             (scanError) => console.warn("Scanning error:", scanError)
           );

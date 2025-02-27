@@ -14,6 +14,13 @@ import OrderIDInput from './pages/OrderIDInput';
 import AddAppointment from './pages/AddAppointment';
 import { AuthProvider, useAuth } from './pages/AuthContext';
 import ServiceSelection from './pages/ServiceSelection';
+import AdminLayout from './components/AdminLayout';
+import DashboardPage from './pages/DashboardPage';
+import CustomersPage from './pages/CustomersPage';
+import QueuesPage from './pages/QueuesPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import NotificationsPage from './pages/NotificationsPage';
+import SettingsPage from './pages/SettingsPage';
 
 // const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 //   const { user } = useAuth();
@@ -39,22 +46,42 @@ const App: React.FC = () => {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public routes: accessible without login */}
+          {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/guest" element={<GuestSignup />} />
 
-          {/* Protected routes: user must be logged in */}
+          {/* Admin routes: Wrapped in AdminLayout */}
+          <Route
+            path="/admin/*"
+            element={
+              <PrivateRoute>
+                <AdminLayout>
+                  <Routes>
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="customers" element={<CustomersPage />} />
+                    <Route path="queues" element={<QueuesPage />} />
+                    <Route path="analytics" element={<AnalyticsPage />} />
+                    <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="*" element={<Navigate to="dashboard" replace />} />
+                  </Routes>
+                </AdminLayout>
+              </PrivateRoute>
+            }
+          />
+
+          {/* Regular authenticated user routes */}
           <Route
             path="/*"
             element={
               <PrivateRoute>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/main" />} />
+                  <Route path="/" element={<Navigate to="/main" replace />} />
                   <Route path="/main" element={<MainPage />} />
                   <Route path="/qrscanner" element={<QRScanner />} />
                   <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />
-                  <Route path="/success" element={<SuccessPage />} />
+                  <Route path="/success/:queueId" element={<SuccessPage />} />
                   <Route path="/MapProximity" element={<MapProximity />} />
                   <Route path="/appointments" element={<AppointmentsList />} />
                   <Route path="/appointment/:orderId" element={<AppointmentDetail />} />
@@ -70,5 +97,4 @@ const App: React.FC = () => {
     </AuthProvider>
   );
 };
-
 export default App;
