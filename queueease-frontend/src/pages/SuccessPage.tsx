@@ -100,7 +100,7 @@ const SuccessPage: React.FC = () => {
         <div style={styles.icon}>✔️</div>
         <h1 style={styles.title}>Success!</h1>
         <p style={styles.message as React.CSSProperties}>Your order is complete!</p>
-        <button style={styles.button} onClick={() => navigate('/main')}>Back to Main</button>
+        <button style={styles.button} onClick={() => navigate('/usermainpage')}>Back to Main</button>
       </div>
     );
   }
@@ -125,7 +125,7 @@ const SuccessPage: React.FC = () => {
             />
           </div>
 
-          <button style={styles.button} onClick={() => navigate('/main')}>Back to Main</button>
+          <button style={styles.button} onClick={() => navigate('/usermainpage')}>Back to Main</button>
         </div>
       ) : (
         <p style={styles.message as React.CSSProperties}>Loading queue details...</p>

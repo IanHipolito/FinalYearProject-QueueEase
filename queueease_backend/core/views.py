@@ -210,6 +210,25 @@ def complete_queue(request, queue_id):
     queue_item.save()
     return Response({"message": "Order marked as completed."})
 
+
+@api_view(['GET'])
+def active_queue(request, user_id):
+    queue_item = Queue.objects.filter(user_id=user_id, status='pending', is_active=True).order_by('date_created').first()
+    if not queue_item:
+        return Response({"message": "No active queue found"}, status=404)
+    
+    data = {
+        "queue_id": queue_item.id,
+        "service_name": queue_item.service.name,
+        "current_position": Queue.objects.filter(
+            service=queue_item.service,
+            status='pending',
+            is_active=True,
+            date_created__lt=queue_item.date_created
+        ).count() + 1,
+    }
+    return Response(data)
+
 # @csrf_exempt
 # @api_view(['POST'])
 # def create_queue(request):

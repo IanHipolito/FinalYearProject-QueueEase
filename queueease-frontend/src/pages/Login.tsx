@@ -36,7 +36,7 @@ const Login: React.FC = () => {
         const data = await response.json();
         await login(data.email, formData.password);
         alert("Login successful!");
-        navigate("/main");
+        navigate("/usermainpage");
         console.log("User data:", data);
       } else {
         const errorData = await response.json();

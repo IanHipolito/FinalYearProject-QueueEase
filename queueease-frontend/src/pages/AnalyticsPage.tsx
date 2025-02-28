@@ -42,7 +42,7 @@ const AnalyticsPage: React.FC = () => {
     { 
       id: 1, 
       name: 'John Doe', 
-      date: '2023-04-15', 
+      date: '2025-04-15', 
       queue: 'General Queue',
       rating: 5,
       comment: 'The staff was very professional and the queue moved quickly. Great experience overall!' 
@@ -50,7 +50,7 @@ const AnalyticsPage: React.FC = () => {
     { 
       id: 2, 
       name: 'Maria Garcia', 
-      date: '2023-04-14', 
+      date: '2025-04-14', 
       queue: 'Technical Support',
       rating: 4,
       comment: 'The wait was reasonable but the seating area could be improved. Otherwise good service.' 
@@ -58,7 +58,7 @@ const AnalyticsPage: React.FC = () => {
     { 
       id: 3, 
       name: 'Robert Johnson', 
-      date: '2023-04-14', 
+      date: '2025-04-14', 
       queue: 'VIP Service',
       rating: 2,
       comment: 'Despite being in the VIP queue, I had to wait nearly 20 minutes. Not what I expected from premium service.' 
@@ -66,7 +66,7 @@ const AnalyticsPage: React.FC = () => {
     { 
       id: 4, 
       name: 'Emily Chen', 
-      date: '2023-04-13', 
+      date: '2025-04-13', 
       queue: 'Cashier Queue',
       rating: 5,
       comment: 'Very efficient service! The new digital queue system is a great improvement.' 
@@ -74,7 +74,7 @@ const AnalyticsPage: React.FC = () => {
     { 
       id: 5, 
       name: 'Michael Brown', 
-      date: '2023-04-12', 
+      date: '2025-04-12', 
       queue: 'Returns',
       rating: 3,
       comment: 'Process was okay but staff seemed unsure about the return policy. More training needed.' 

@@ -118,10 +118,10 @@ const QRScanner: React.FC = () => {
     if (scannerRef.current?.isScanning) {
       scannerRef.current
         .stop()
-        .then(() => navigate("/main"))
+        .then(() => navigate("/usermainpage"))
         .catch((err) => console.warn("Error stopping scanner before navigation:", err));
     } else {
-      navigate("/main");
+      navigate("/usermainpage");
     }
   };
 

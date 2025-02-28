@@ -1,13 +1,37 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from "./AuthContext";
 import styles from "../styles/ServiceSelection.styles";
+import {
+  Box,
+  Container,
+  Typography,
+  TextField,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Button,
+  Chip,
+  InputAdornment,
+  Alert,
+  CircularProgress,
+  Divider,
+  Paper
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import PersonIcon from '@mui/icons-material/Person';
+import AddIcon from '@mui/icons-material/Add';
 
 interface Service {
   id: number;
   name: string;
   description: string;
+  wait_time: number;
+  queue_length: number;
 }
 
 interface CreateQueueResponse {
@@ -20,25 +44,27 @@ interface CreateQueueResponse {
 }
 
 const ServiceSelection: React.FC = () => {
+  const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
-  const [filterText, setFilterText] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [filterText, setFilterText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
-  const [buttonHover, setButtonHover] = useState<number | null>(null);
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState<boolean>(true);
+  
   const { user } = useAuth();
-  const loggedInUserId = user ? user.id : null;
+  const loggedInUserId = user?.id;
 
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await axios.get<Service[]>("http://127.0.0.1:8000/api/list_services/");
+        const response = await axios.get<Service[]>(
+          "http://127.0.0.1:8000/api/list_services/"
+        );
         setServices(response.data);
         setFilteredServices(response.data);
         setLoading(false);
-      } catch (err: any) {
+      } catch (error) {
+        console.error("Error fetching services", error);
         setError("Failed to fetch services.");
         setLoading(false);
       }
@@ -82,64 +108,158 @@ const ServiceSelection: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: "center", marginTop: "40px" }}>
-        Loading services...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ color: "red", textAlign: "center", marginTop: "40px" }}>
-        {error}
-      </div>
-    );
-  }
-
   return (
-    <div style={styles.container as React.CSSProperties}>
-      <h2 style={styles.header}>Select a Service</h2>
-      <input
-        type="text"
-        placeholder="Search services..."
-        value={filterText}
-        onChange={(e) => setFilterText(e.target.value)}
-        style={styles.filterInput as React.CSSProperties}
-      />
-      <ul style={styles.list as React.CSSProperties}>
-        {filteredServices.map((service) => {
-          const isHovered = hoveredItem === service.id;
-          return (
-            <li
-              key={service.id}
-              style={{
-                ...styles.listItem,
-                ...(isHovered ? styles.listItemHover : {}),
-              } as React.CSSProperties}
-              onMouseEnter={() => setHoveredItem(service.id)}
-              onMouseLeave={() => setHoveredItem(null)}
-            >
-              <button
-                style={{
-                  ...styles.button,
-                  ...(buttonHover === service.id ? styles.buttonHover : {}),
+    <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', py: 4 }}>
+      <Container maxWidth="lg">
+        <Paper elevation={0} sx={{ borderRadius: 4, p: 3, mb: 4 }}>
+          <Typography variant="h5" fontWeight="500" gutterBottom>
+            Select a Service
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Choose the service you want to queue for from the options below.
+          </Typography>
+
+          {/* Search Box */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search for services..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            sx={{ 
+              mb: 2, 
+              mt: 3,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                bgcolor: '#fff'
+              }
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Paper>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert 
+            severity="error" 
+            onClose={() => setError(null)} 
+            sx={{ mb: 3, borderRadius: 2 }}
+          >
+            {error}
+          </Alert>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+            <CircularProgress sx={{ color: '#6f42c1' }} />
+          </Box>
+        ) : (
+          <>
+            {/* Services Grid */}
+            {filteredServices.length > 0 ? (
+              <Grid container spacing={3}>
+                {filteredServices.map((service) => (
+                  <Grid item xs={12} sm={6} md={4} key={service.id}>
+                    <Card 
+                      sx={{ 
+                        height: '100%', 
+                        borderRadius: 4,
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                          transform: 'translateY(-5px)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+                        },
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    >
+                      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                          <Typography variant="h6" fontWeight="600">
+                            {service.name}
+                          </Typography>
+                          <Chip 
+                            label={`Queue: ${service.queue_length}`}
+                            size="small"
+                            icon={<PersonIcon fontSize="small" />}
+                            sx={{ 
+                              bgcolor: service.queue_length > 10 ? '#ffebee' : '#e8f5e9',
+                              color: service.queue_length > 10 ? '#c62828' : '#2e7d32',
+                              fontWeight: 500,
+                              '& .MuiChip-icon': {
+                                color: service.queue_length > 10 ? '#c62828' : '#2e7d32',
+                              }
+                            }}
+                          />
+                        </Box>
+                        
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          {service.description}
+                        </Typography>
+                        
+                        <Divider sx={{ my: 2 }} />
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <AccessTimeIcon sx={{ color: 'text.secondary', mr: 1, fontSize: '0.9rem' }} />
+                          <Typography variant="body2" fontWeight="500" color="text.secondary">
+                            Estimated Wait: <Box component="span" sx={{ color: service.wait_time > 30 ? '#c62828' : '#2e7d32' }}>
+                              {service.wait_time} mins
+                            </Box>
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                      <CardActions sx={{ p: 2, pt: 0 }}>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          color="primary"
+                          onClick={() => handleServiceSelect(service.id)}
+                          endIcon={<AddIcon />}
+                          sx={{ 
+                            borderRadius: 2, 
+                            bgcolor: '#6f42c1', 
+                            '&:hover': { 
+                              bgcolor: '#8551d9' 
+                            },
+                            mt: 2
+                          }}
+                        >
+                          Join Queue
+                        </Button>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 4, 
+                  textAlign: 'center',
+                  borderRadius: 4,
+                  bgcolor: '#fff'
                 }}
-                onMouseEnter={() => setButtonHover(service.id)}
-                onMouseLeave={() => setButtonHover(null)}
-                onClick={() => handleServiceSelect(service.id)}
               >
-                {service.name}
-              </button>
-              <p style={styles.description as React.CSSProperties}>
-                {service.description}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No services found
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Try adjusting your search or check back later for new services.
+                </Typography>
+              </Paper>
+            )}
+          </>
+        )}
+      </Container>
+    </Box>
   );
 };
 

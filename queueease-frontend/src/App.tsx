@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from './pages/MainPage';
+import UserMainPage from './pages/UserMainPage';
 import SignupPage from './pages/Signup';
 import LoginPage from './pages/Login';
 import QRScanner from './pages/QRScanner';
@@ -79,6 +80,7 @@ const App: React.FC = () => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/main" replace />} />
                   <Route path="/main" element={<MainPage />} />
+                  <Route path="/usermainpage" element={<UserMainPage />} />
                   <Route path="/qrscanner" element={<QRScanner />} />
                   <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />
                   <Route path="/success/:queueId" element={<SuccessPage />} />
