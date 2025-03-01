@@ -1,13 +1,27 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
-import styles from "../styles/QRScanner.styles";
+import { 
+  Box, 
+  Container, 
+  Typography, 
+  IconButton,
+  Paper,
+  Alert,
+  Backdrop,
+  CircularProgress,
+  Fade,
+  useTheme
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 
 const QRScanner: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isTransitioning = useRef(false);
-  const [isHovered, setIsHovered] = useState(false);
+  const theme = useTheme();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +37,7 @@ const QRScanner: React.FC = () => {
         return;
       }
       isTransitioning.current = true;
+      setLoading(true);
 
       try {
         const devices = await Html5Qrcode.getCameras();
@@ -61,6 +76,7 @@ const QRScanner: React.FC = () => {
               width: "100%",
               height: "100%",
               objectFit: "cover",
+              borderRadius: "12px"
             });
           }
         } else {
@@ -71,6 +87,7 @@ const QRScanner: React.FC = () => {
         setError("Error accessing camera. Please check permissions.");
       } finally {
         isTransitioning.current = false;
+        setLoading(false);
       }
     };
 
@@ -106,14 +123,6 @@ const QRScanner: React.FC = () => {
     };
   }, [navigate]);
 
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
-
   const handleBackClick = () => {
     if (scannerRef.current?.isScanning) {
       scannerRef.current
@@ -126,21 +135,128 @@ const QRScanner: React.FC = () => {
   };
 
   return (
-    <div style={styles.container as React.CSSProperties}>
-      <button
-        style={{
-          ...styles.backButton,
-          ...(isHovered ? styles.backButtonHover : {}),
-        } as React.CSSProperties}
-        onClick={handleBackClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        &lt;
-      </button>
-      {error && <p style={styles.error as React.CSSProperties}>{error}</p>}
-      <div id="qr-code-scanner" style={styles.scannerContainer as React.CSSProperties}></div>
-    </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        backgroundColor: '#f5f7fb',
+        display: 'flex',
+        flexDirection: 'column',
+        pt: 2,
+        px: 2,
+        pb: 4
+      }}
+    >
+      <Container maxWidth="sm">
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+          <IconButton 
+            onClick={handleBackClick} 
+            sx={{ 
+              mr: 2,
+              color: theme.palette.primary.main,
+              '&:hover': { 
+                bgcolor: 'rgba(111, 66, 193, 0.08)' 
+              }
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h5" fontWeight={600} color="textPrimary">
+            Scan QR Code
+          </Typography>
+        </Box>
+        
+        {error && (
+          <Alert 
+            severity="error" 
+            sx={{ mb: 2, borderRadius: 2 }}
+            onClose={() => setError(null)}
+          >
+            {error}
+          </Alert>
+        )}
+        
+        <Paper
+          elevation={2}
+          sx={{
+            borderRadius: 3,
+            overflow: 'hidden',
+            position: 'relative',
+            height: 'calc(100vh - 180px)',
+            maxHeight: '600px',
+            mb: 2,
+            border: `1px solid ${theme.palette.divider}`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {loading && (
+            <Backdrop
+              open={loading}
+              sx={{ 
+                position: 'absolute', 
+                zIndex: (theme) => theme.zIndex.drawer + 1,
+                color: theme.palette.primary.main,
+                backgroundColor: 'rgba(255, 255, 255, 0.8)'
+              }}
+            >
+              <CircularProgress color="inherit" />
+            </Backdrop>
+          )}
+          
+          <Box
+            id="qr-code-scanner"
+            sx={{
+              width: '100%',
+              height: '100%',
+              position: 'relative'
+            }}
+          />
+          
+          <Box
+            sx={{
+              position: 'absolute',
+              width: '260px',
+              height: '260px',
+              border: '2px solid #ffffff',
+              borderRadius: '12px',
+              boxShadow: '0 0 0 4000px rgba(0, 0, 0, 0.3)',
+              zIndex: 2,
+              pointerEvents: 'none',
+            }}
+          />
+          
+          <Fade in={!loading && !error}>
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                bgcolor: 'rgba(255, 255, 255, 0.8)',
+                borderRadius: '30px',
+                px: 3,
+                py: 1,
+                display: 'flex',
+                alignItems: 'center',
+                zIndex: 3,
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <QrCodeScannerIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+              <Typography variant="body2" color="text.secondary">
+                Position the QR code in the frame
+              </Typography>
+            </Box>
+          </Fade>
+        </Paper>
+        
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          Make sure the QR code is well lit and clearly visible
+        </Typography>
+      </Container>
+    </Box>
   );
 };
 

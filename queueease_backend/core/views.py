@@ -201,10 +201,6 @@ def queue_detail(request, queue_id):
 
 @api_view(['POST'])
 def complete_queue(request, queue_id):
-    """
-    Mark a queue item as completed (e.g., staff says order is done).
-    This can help us test the 'completed' flow on the frontend.
-    """
     queue_item = get_object_or_404(Queue, id=queue_id)
     queue_item.status = 'completed'
     queue_item.save()

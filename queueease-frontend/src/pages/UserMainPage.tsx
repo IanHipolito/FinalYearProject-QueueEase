@@ -16,7 +16,8 @@ import {
   Menu,
   MenuItem,
   Badge,
-  Divider
+  Divider,
+  CircularProgress
 } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -31,40 +32,180 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { useAuth } from '../pages/AuthContext';
 
+interface Queue {
+  id?: number;
+  service_name?: string;
+  position?: number;
+  total_wait?: number;
+  expected_ready_time?: string;
+  estimated_time?: number;
+  status?: string;
+}
+
 const UserMainPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth(); // Get the current logged-in user
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const [remainingTime, setRemainingTime] = useState<number>(0);
+  const [initialTime, setInitialTime] = useState<number>(0);
+  
+  // Separate loading states
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [isLeavingQueue, setIsLeavingQueue] = useState<boolean>(false);
 
-  // Remove mock queue data and use null as the default.
-  const [activeQueue, setActiveQueue] = useState<any>(null);
-  // Mock notification count remains for demo purposes.
+  // Active queue state
+  const [activeQueue, setActiveQueue] = useState<Queue | null>(null);
+
+  // Mock notification count for demo purposes
   const [notificationCount, setNotificationCount] = useState(3);
 
   // Fetch the active queue for the logged-in user
   useEffect(() => {
     if (!user) return;
-    const fetchActiveQueue = async () => {
+
+    const fetchDetailedQueue = async (queueId: number, isInitialLoad = false) => {
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/active-queue/${user.id}/`);
-        if (response.ok) {
-          const data = await response.json();
-          setActiveQueue(data);
+        const detailRes = await fetch(`http://127.0.0.1:8000/api/queue-detail/${queueId}/`);
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          if (detailData.status !== 'pending') {
+            setActiveQueue(null);
+            return;
+          }
+          
+          setActiveQueue((prev: Queue | null) => ({
+            ...(prev || {}),
+            id: detailData.queue_id,
+            service_name: detailData.service_name,
+            position: detailData.current_position,
+            total_wait: detailData.total_wait,
+            expected_ready_time: detailData.expected_ready_time,
+            status: detailData.status,
+          }));
         } else {
-          // If no active queue is found, clear any previous state.
-          setActiveQueue(null);
+          if (isInitialLoad) {
+            setActiveQueue(null);
+          }
         }
       } catch (error) {
-        console.error("Error fetching active queue:", error);
-        setActiveQueue(null);
+        console.error("Error fetching queue details:", error);
+        if (isInitialLoad) {
+          setActiveQueue(null);
+        }
+      } finally {
+        if (isInitialLoad) {
+          setInitialLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
     };
 
-    if (user) {
-      fetchActiveQueue();
-    }
+    const fetchActiveQueue = async (isInitialLoad = false) => {
+      if (isInitialLoad) {
+        setInitialLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      try {
+        console.log("Fetching active queue for user:", user.id);
+        
+        if (isInitialLoad) {
+          setActiveQueue(null);
+        }
+
+        if (!user) return;
+        const res = await fetch(`http://127.0.0.1:8000/api/active-queue/${user?.id}/`);
+
+        if (!res.ok) {
+          console.log("No active queue found (status):", res.status);
+
+          if (activeQueue !== null) {
+            setActiveQueue(null);
+          }
+          
+          if (isInitialLoad) {
+            setInitialLoading(false);
+          } else {
+            setRefreshing(false);
+          }
+          return;
+        }
+
+        const data = await res.json();
+        console.log("Active queue response:", data);
+
+        if (data && data.queue_id && data.current_position !== undefined) {
+          const basicQueue = {
+            ...(activeQueue || {}),
+            id: data.queue_id,
+            service_name: data.service_name,
+            position: data.current_position,
+            status: 'pending'
+          };
+
+          setActiveQueue(basicQueue);
+
+          await fetchDetailedQueue(data.queue_id, isInitialLoad);
+        } else {
+          console.log("Invalid queue data:", data);
+          if (isInitialLoad) {
+            setInitialLoading(false);
+          } else {
+            setRefreshing(false);
+          }
+          
+          if (activeQueue !== null) {
+            setActiveQueue(null);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching active queue:", error);
+        if (isInitialLoad) {
+          setActiveQueue(null);
+        }
+        
+        if (isInitialLoad) {
+          setInitialLoading(false);
+        } else {
+          setRefreshing(false);
+        }
+      }
+    };
+
+    fetchActiveQueue(true);
+
+    const intervalId = setInterval(() => fetchActiveQueue(false), 5000);
+    return () => clearInterval(intervalId);
   }, [user]);
+
+  useEffect(() => {
+    if (activeQueue && activeQueue.expected_ready_time && activeQueue.total_wait !== undefined) {
+      const expectedMs = new Date(activeQueue.expected_ready_time).getTime();
+      const nowMs = Date.now();
+      const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
+      setRemainingTime(diffSec);
+      if (!initialTime && activeQueue.total_wait > 0) {
+        setInitialTime(activeQueue.total_wait);
+      }
+    } else {
+      setRemainingTime(0);
+    }
+
+    if (activeQueue && activeQueue.expected_ready_time) {
+      const timer = setInterval(() => {
+        const expectedMs = new Date(activeQueue.expected_ready_time!).getTime();
+        const nowMs = Date.now();
+        const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
+        setRemainingTime(diffSec);
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [activeQueue, initialTime]);
 
   const handleProfileMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -79,7 +220,68 @@ const UserMainPage: React.FC = () => {
     navigate('/');
   };
 
-  // If user is not logged in, redirect to the login page.
+  const refreshQueueData = async (showLoading = true) => {
+    if (showLoading) {
+      setRefreshing(true);
+    }
+    
+    try {
+      if (!user) return;
+      const res = await fetch(`http://127.0.0.1:8000/api/active-queue/${user?.id}/`);
+      
+      if (!res.ok) {
+        console.log("No active queue found after refresh");
+        setActiveQueue(null);
+        setRefreshing(false);
+        return;
+      }
+      
+      const data = await res.json();
+      
+      if (data && data.queue_id && data.current_position !== undefined) {
+        const basicQueue = {
+          ...(activeQueue || {}),
+          id: data.queue_id,
+          service_name: data.service_name,
+          position: data.current_position,
+          status: 'pending'
+        };
+        
+        setActiveQueue(basicQueue);
+        
+        try {
+          const detailRes = await fetch(`http://127.0.0.1:8000/api/queue-detail/${data.queue_id}/`);
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            
+            if (detailData.status === 'pending') {
+              setActiveQueue({
+                ...(activeQueue || {}),
+                id: detailData.queue_id,
+                service_name: detailData.service_name,
+                position: detailData.current_position,
+                total_wait: detailData.total_wait,
+                expected_ready_time: detailData.expected_ready_time,
+                status: detailData.status
+              });
+            } else {
+              setActiveQueue(null);
+            }
+          }
+        } catch (detailError) {
+          console.error("Error fetching queue details:", detailError);
+        }
+      } else {
+        setActiveQueue(null);
+      }
+    } catch (error) {
+      console.error("Error refreshing queue data:", error);
+      setActiveQueue(null);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (!user) {
     navigate('/login');
     return null;
@@ -168,8 +370,14 @@ const UserMainPage: React.FC = () => {
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 6, flexGrow: 1 }}>
-        {/* Active Queue Card */}
-        {activeQueue ? (
+        {initialLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress sx={{ color: '#6f42c1' }} />
+          </Box>
+        ) : (activeQueue &&
+          activeQueue.id &&
+          activeQueue.status === 'pending' &&
+          activeQueue.position !== undefined) ? (
           <Card
             sx={{
               borderRadius: 4,
@@ -180,12 +388,186 @@ const UserMainPage: React.FC = () => {
               overflow: 'hidden'
             }}
           >
-            {/* Your existing active queue card content */}
+            {refreshing && (
+              <Box sx={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                zIndex: 2,
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'rgba(255,255,255,0.2)',
+                borderRadius: 10,
+                px: 1,
+                py: 0.5
+              }}>
+                <CircularProgress size={14} sx={{ color: '#fff', mr: 1 }} />
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Updating...
+                </Typography>
+              </Box>
+            )}
             <CardContent sx={{ p: 3 }}>
-              {/* ...existing content... */}
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={8}>
+                  <Typography variant="h5" fontWeight={600} gutterBottom>
+                    You are currently in queue
+                  </Typography>
+                  <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
+                    {activeQueue.service_name || 'Service'}
+                  </Typography>
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="body1">
+                      {activeQueue.position !== undefined && activeQueue.position !== null ? (
+                        <>Your position: <strong>#{activeQueue.position}</strong></>
+                      ) : (
+                        <>Queue registered - awaiting position</>
+                      )}
+                    </Typography>
+                  </Box>
+                  {activeQueue.position !== undefined && activeQueue.position !== null &&
+                    remainingTime > 0 && (
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <AccessTimeIcon sx={{ mr: 1, fontSize: 20, opacity: 0.9 }} />
+                        <Typography variant="body1">
+                          Estimated wait: {Math.round(remainingTime / 60)} min
+                        </Typography>
+                      </Box>
+                    )}
+                </Grid>
+                <Grid item xs={12} sm={4} sx={{ textAlign: 'right' }}>
+                  <Box sx={{
+                    display: 'inline-flex',
+                    bgcolor: 'rgba(255,255,255,0.2)',
+                    borderRadius: '50%',
+                    p: 2
+                  }}>
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      {activeQueue.position !== undefined && activeQueue.position !== null ? (
+                        <>
+                          <Typography variant="h3" fontWeight={700} lineHeight={1}>
+                            {activeQueue.position}
+                          </Typography>
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            in line
+                          </Typography>
+                        </>
+                      ) : (
+                        <AccessTimeIcon sx={{ fontSize: 48 }} />
+                      )}
+                    </Box>
+                  </Box>
+                </Grid>
+
+                {/* Queue Progress */}
+                {activeQueue.position !== undefined && activeQueue.position !== null &&
+                  (activeQueue.position > 0) && (
+                    <Grid item xs={12}>
+                      <Box sx={{ mt: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="body2">Queue Progress</Typography>
+                          <Typography variant="body2">
+                            {activeQueue.position === 1 ?
+                              "You're next!" :
+                              `${activeQueue.position} people ahead of you`}
+                          </Typography>
+                        </Box>
+                        <Box sx={{
+                          width: '100%',
+                          bgcolor: 'rgba(255,255,255,0.2)',
+                          borderRadius: 2,
+                          height: 8,
+                          position: 'relative'
+                        }}>
+                          <Box sx={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            borderRadius: 2,
+                            width: `${Math.max(5, 100 - (activeQueue.position * 20))}%`,
+                            bgcolor: 'rgba(255,255,255,0.8)'
+                          }} />
+                        </Box>
+                      </Box>
+                    </Grid>
+                  )}
+              </Grid>
             </CardContent>
             <CardActions sx={{ bgcolor: 'rgba(0,0,0,0.1)', p: 2 }}>
-              {/* ...existing actions... */}
+              <Button
+                variant="contained"
+                size="medium"
+                onClick={() => navigate(`/success/${activeQueue.id}`)}
+                sx={{
+                  bgcolor: '#fff',
+                  color: '#6f42c1',
+                  '&:hover': { bgcolor: '#f0f0f0' },
+                  borderRadius: 2,
+                  fontWeight: 600
+                }}
+              >
+                View Details
+              </Button>
+              <Button
+                variant="outlined"
+                size="medium"
+                disabled={isLeavingQueue}
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to leave this queue?")) {
+                    setIsLeavingQueue(true);
+                    
+                    fetch(`http://127.0.0.1:8000/api/leave-queue/${activeQueue.id}/`, {
+                      method: 'POST'
+                    })
+                      .then(response => {
+                        if (response.ok) {
+                          setActiveQueue(null);
+                          setIsLeavingQueue(false);
+                          setTimeout(() => refreshQueueData(false), 500);
+                        } else {
+                          alert("Failed to leave the queue. Please try again.");
+                          setIsLeavingQueue(false);
+                        }
+                      })
+                      .catch(error => {
+                        console.error("Error leaving queue:", error);
+                        alert("An error occurred. Please try again.");
+                        setIsLeavingQueue(false);
+                      });
+                  }
+                }}
+                sx={{
+                  borderColor: '#fff',
+                  color: '#fff',
+                  ml: 1,
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                  borderRadius: 2,
+                  position: 'relative'
+                }}
+              >
+                {isLeavingQueue ? (
+                  <>
+                    <CircularProgress 
+                      size={24}
+                      sx={{ 
+                        color: '#fff',
+                        position: 'absolute',
+                        left: '50%',
+                        marginLeft: '-12px'
+                      }} 
+                    />
+                    <span style={{ visibility: 'hidden' }}>Leave Queue</span>
+                  </>
+                ) : (
+                  'Leave Queue'
+                )}
+              </Button>
             </CardActions>
           </Card>
         ) : (
@@ -350,7 +732,7 @@ const UserMainPage: React.FC = () => {
               title: "Find Location",
               description: "Find the nearest QueueEase location",
               icon: <MapIcon sx={{ fontSize: 48, color: '#198754' }} />,
-              action: () => navigate('/locations'),
+              action: () => navigate('/mapproximity'),
               color: "linear-gradient(135deg, #198754 0%, #28a745 100%)"
             },
             {
