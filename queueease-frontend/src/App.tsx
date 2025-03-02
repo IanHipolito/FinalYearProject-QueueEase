@@ -51,6 +51,7 @@ const App: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/guest" element={<GuestSignup />} />
+          <Route path="/main" element={<MainPage />} />
 
           {/* Admin routes: Wrapped in AdminLayout */}
           <Route
@@ -79,7 +80,6 @@ const App: React.FC = () => {
               <PrivateRoute>
                 <Routes>
                   <Route path="/" element={<Navigate to="/main" replace />} />
-                  <Route path="/main" element={<MainPage />} />
                   <Route path="/usermainpage" element={<UserMainPage />} />
                   <Route path="/qrscanner" element={<QRScanner />} />
                   <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />

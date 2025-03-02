@@ -76,9 +76,11 @@ class EmployeeDetails(models.Model):
     def __str__(self):
         return f"{self.user.name} - {self.company.name if self.company else 'No Company'}"
 
+
 class Service(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField()
+    category = models.CharField(max_length=100, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     date_created = models.DateTimeField(auto_now_add=True)
     date_valid_from = models.DateTimeField(null=True, blank=True)
@@ -88,6 +90,9 @@ class Service(models.Model):
     minimal_prep_time = models.IntegerField(default=3)
     parallel_capacity = models.IntegerField(default=1)
     average_duration = models.IntegerField(default=15)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    details = models.JSONField(null=True, blank=True)
 
     def __str__(self):
         return self.name

@@ -1,27 +1,46 @@
-import React from 'react';
-import Map, { MapboxStyle } from 'react-map-gl';
-
-// Import the CSS for the map
+import React, { useEffect, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || ''; // Mapbox token from .env
-const CUSTOM_MAP_STYLE = 'mapbox://styles/ianhipolito/cm69xpqqq002501r22n875z5f';
+mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
 
 const MapProximity: React.FC = () => {
-  return (
-    <div style={{ width: '100%', height: '100vh' }}>
-      <Map
-        initialViewState={{
-          longitude: -6.2603, // Default longitude (Dublin, Ireland)
-          latitude: 53.3498,  // Default latitude
-          zoom: 10,           // Default zoom level
-        }}
-        style={{ width: '100%', height: '100%' }}
-        mapStyle={CUSTOM_MAP_STYLE} // Custom styled map
-        mapboxAccessToken={MAPBOX_TOKEN}
-      />
-    </div>
-  );
+  interface Service {
+    id: number;
+    name: string;
+    category: string;
+    latitude: number;
+    longitude: number;
+  }
+
+  const [services, setServices] = useState<Service[]>([]);
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/api/services/')
+      .then(response => response.json())
+      .then(data => setServices(data))
+      .catch(error => console.error('Error fetching services:', error));
+  }, []);
+
+  useEffect(() => {
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-6.0930492, 53.5222146],
+      zoom: 13
+    });
+
+    services.forEach(service => {
+      new mapboxgl.Marker()
+        .setLngLat([service.longitude, service.latitude])
+        .setPopup(new mapboxgl.Popup().setHTML(`<h3>${service.name}</h3><p>${service.category}</p>`))
+        .addTo(map);
+    });
+
+    return () => map.remove();
+  }, [services]);
+
+  return <div id="map" style={{ height: '100vh', width: '100%' }} />;
 };
 
 export default MapProximity;

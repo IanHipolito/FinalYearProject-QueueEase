@@ -14,6 +14,7 @@ import json
 from .serializers import AppointmentDetailsSerializer
 from datetime import datetime, timedelta
 import random
+from .serializers import ServiceSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -465,11 +466,17 @@ def delete_appointment(request, order_id):
     appointment.delete()
     return Response({"message": "Appointment deleted successfully."}, status=200)
 
+# @api_view(['GET'])
+# def list_services(request):
+#     services = Service.objects.filter(is_active=True)
+#     data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
+#     return Response(data)
+
 @api_view(['GET'])
 def list_services(request):
-    services = Service.objects.filter(is_active=True)
-    data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
-    return Response(data)
+    services = Service.objects.all()
+    serializer = ServiceSerializer(services, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 def queue_status(request, queue_id):
