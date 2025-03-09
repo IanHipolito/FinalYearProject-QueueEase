@@ -22,19 +22,7 @@ import QueuesPage from './pages/QueuesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
-
-// const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   const { user } = useAuth();
-//   return user ? <>{children}</> : <Navigate to="/login" />;
-// };
-
-// const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   // Temporarily bypass authentication for testing
-//   // return <>{children}</>;
-//   const { user } = useAuth();
-//   console.log("User in PrivateRoute:", user);
-//   return user ? <>{children}</> : <Navigate to="/login" />;
-// };
+import FBCloudMessaging from './hooks/FBCloudMessaging';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -45,6 +33,8 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 const App: React.FC = () => {
   return (
     <AuthProvider>
+      {/* Include FCM component so notifications are initialized */}
+      <FBCloudMessaging />
       <Router>
         <Routes>
           {/* Public routes */}
@@ -99,4 +89,5 @@ const App: React.FC = () => {
     </AuthProvider>
   );
 };
+
 export default App;

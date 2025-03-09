@@ -30,6 +30,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "m2xb3cv3-8000.eun1.devtunnels.ms",
     "m2xb3cv3-3000.eun1.devtunnels.ms",
+    "abed-208-127-203-3.ngrok-free.app",
 ]
 
 
@@ -63,12 +64,14 @@ CORS_ALLOWED_ORIGINS = [
     "https://m2xb3cv3-8000.eun1.devtunnels.ms",
     "https://m2xb3cv3-3000.eun1.devtunnels.ms",
     "http://localhost:3000",
+    "https://abed-208-127-203-3.ngrok-free.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://m2xb3cv3-8000.eun1.devtunnels.ms",
     "https://m2xb3cv3-3000.eun1.devtunnels.ms",
     "http://localhost:3000",
+    "https://abed-208-127-203-3.ngrok-free.app",
 ]
 
 

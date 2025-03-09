@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails
+from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
@@ -15,6 +15,8 @@ from .serializers import AppointmentDetailsSerializer
 from datetime import datetime, timedelta
 import random
 from .serializers import ServiceSerializer
+import numpy as np
+from .services.notifications import send_push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -100,19 +102,49 @@ def signup_view(request):
 def api_overview(request):
     return Response({"message": "Welcome to the API!"})
 
-def compute_expected_ready_time(service, position):
+def compute_expected_ready_time(service, position, historical_data=None):
+    """
+    Calculate expected time by combining a base formula with historical data.
+    For services like fast food that normally have short wait times (e.g. McDonald's),
+    use the historical average directly.
+    """
+    # Basic parameters:
     parallel_capacity = service.parallel_capacity or 1
-    avg_duration = service.average_duration or 15
+    default_avg_duration = service.average_duration or 15
     minimal_prep = service.minimal_prep_time or 3
 
+    # Calculate base wait time as in waves.
     wave_number = (position - 1) // parallel_capacity
-    base_wait = wave_number * avg_duration
+    base_wait = wave_number * default_avg_duration
 
     if service.requires_prep_time and wave_number == 0:
         base_wait = max(base_wait, minimal_prep)
 
+    # Get historical average if available
+    if historical_data:
+        avg_historical_wait = np.mean(historical_data)
+    else:
+        avg_historical_wait = base_wait
+
+    # For fast food services use a cap based on historical data:
+    fast_food_services = ["McDonald's", "Burger King"]
+    if service.name in fast_food_services:
+        # Instead of adding a multiple of default_avg_duration,
+        # use historical average wait time if it is lower than the computed base.
+        estimated_wait = min(avg_historical_wait, base_wait)
+        # In fast food, we may ignore position multiplication beyond a limit.
+        if position > 1:
+            estimated_wait = avg_historical_wait
+    else:
+        # For services like doctors or surgeries, use full computed wait.
+        estimated_wait = base_wait
+        # You could also blend in the historical average for healthcare.
+        if historical_data:
+            # For example, blend 50/50 between computed and historical for healthcare.
+            estimated_wait = (estimated_wait + avg_historical_wait) / 2
+
     now = datetime.now()
-    return now + timedelta(minutes=base_wait)
+    return now + timedelta(minutes=estimated_wait)
 
 @csrf_exempt
 @api_view(['POST'])
@@ -133,6 +165,9 @@ def create_queue(request):
         ).order_by('date_created')
 
         position = pending_queues.count() + 1
+
+        historical_data = fetch_historical_data(service.id)
+        
         queue_item = Queue.objects.create(
             user=user,
             service=service,
@@ -140,7 +175,7 @@ def create_queue(request):
             status='pending'
         )
 
-        queue_item.expected_ready_time = compute_expected_ready_time(service, position)
+        queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
         queue_item.save()
         qr_data = f"Queue ID: {queue_item.id}"
         qr_code = QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
@@ -155,6 +190,10 @@ def create_queue(request):
     except Exception as e:
         logger.error(f"Error in create_queue: {str(e)}")
         return Response({"error": str(e)}, status=500)
+
+def fetch_historical_data(service_id):
+    historical_data = ServiceWaitTime.objects.filter(service_id=service_id).values_list('wait_time', flat=True)
+    return list(historical_data)
 
 @api_view(['GET'])
 def queue_detail(request, queue_id):
@@ -205,6 +244,10 @@ def complete_queue(request, queue_id):
     queue_item = get_object_or_404(Queue, id=queue_id)
     queue_item.status = 'completed'
     queue_item.save()
+
+    wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
+    ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
+
     return Response({"message": "Order marked as completed."})
 
 
@@ -507,3 +550,18 @@ def queue_status(request, queue_id):
         return Response(data)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def update_queue_position(request, queue_id):
+    queue_item = Queue.objects.get(id=queue_id)
+    new_position = queue_item.sequence_number  # updated user position
+    estimated_wait = ...  # recalc estimated wait time
+
+    # Retrieve the user's FCM token from the user profile
+    fcm_token = queue_item.user.fcm_token
+    if fcm_token:
+        title = "Queue Update"
+        body = f"Your position is now {new_position}. Estimated wait time: {estimated_wait} minutes."
+        send_push_notification(fcm_token, title, body)
+    
+    return Response({"message": "Queue updated and notification sent."})

@@ -90,9 +90,16 @@ const ServiceSelection: React.FC = () => {
     if (selectedCategory !== "All") {
       filtered = filtered.filter((service) => {
         const category = service.category?.toLowerCase();
+        const serviceName = service.name.toLowerCase();
+
         if (selectedCategory === "healthcare") {
-          return ["doctors", "clinic", "dentist"].includes(category ?? "");
+          return ["doctors", "clinic", "dentist", "general checkup", "doctor"].includes(category ?? "");
         }
+
+        if (selectedCategory === "fast_food") {
+          return category === "fast_food" || ["mcdonald's", "burger king"].includes(serviceName);
+        }
+
         return category === selectedCategory.toLowerCase();
       });
     }

@@ -169,3 +169,11 @@ class AppointmentDetails(models.Model):
 
     def __str__(self):
         return f"Appointment {self.order_id} - {self.user.username}"
+
+class ServiceWaitTime(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    wait_time = models.IntegerField()
+    date_recorded = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.service.name} - {self.wait_time} minutes"
