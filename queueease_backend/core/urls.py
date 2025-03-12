@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr, user_appointments, appointment_detail, get_or_create_appointment, generate_demo_appointments, delete_appointment, list_services, queue_status, queue_detail, complete_queue, active_queue
+from .views import (api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr, 
+                   user_appointments, appointment_detail, get_or_create_appointment, generate_demo_appointments, 
+                   delete_appointment, list_services, queue_status, queue_detail, complete_queue, active_queue,
+                   service_detail, available_appointment_times, create_appointment)
 from django.http import JsonResponse
 
 def test_view(request):
@@ -19,9 +22,12 @@ urlpatterns = [
     path('validate-qr/', validate_qr, name='validate-qr'),
     path('appointments/<int:user_id>/', user_appointments, name='user-appointments'),
     path('appointment/<str:order_id>/', appointment_detail, name='appointment-detail'),
-    path('appointment/', get_or_create_appointment, name='get_or_create_appointment'),
+    path('appointment/add-existing/', get_or_create_appointment, name='get_or_create_appointment'),
     path('generate-demo/', generate_demo_appointments, name='generate-demo'),
     path('appointment/delete/<str:order_id>/', delete_appointment, name='delete-appointment'),
     path('list_services/', list_services, name='list_services'),
     path('queue-status/<int:queue_id>/', queue_status, name='queue-status'),
+    path('service/<int:service_id>/', service_detail, name='service-detail'),
+    path('available-times/<int:service_id>/', available_appointment_times, name='available-times'),
+    path('create-appointment/', create_appointment, name='create-appointment'),
 ]

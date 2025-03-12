@@ -23,6 +23,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import FBCloudMessaging from './hooks/FBCloudMessaging';
+import BookAppointment from './pages/BookAppointment';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -80,6 +81,7 @@ const App: React.FC = () => {
                   <Route path="/input-order" element={<OrderIDInput />} />
                   <Route path="/add-appointment" element={<AddAppointment />} />
                   <Route path="/services" element={<ServiceSelection />} />
+                  <Route path="/book-appointment/:serviceId" element={<BookAppointment />} />
                 </Routes>
               </PrivateRoute>
             }

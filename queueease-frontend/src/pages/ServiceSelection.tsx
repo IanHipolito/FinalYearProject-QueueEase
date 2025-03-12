@@ -25,9 +25,9 @@ import {
   InputLabel
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
 import AddIcon from '@mui/icons-material/Add';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 interface Service {
   id: number;
@@ -36,6 +36,13 @@ interface Service {
   wait_time: number;
   queue_length: number;
   category: string | null;
+  service_type: string;
+  requires_sequence?: boolean;
+}
+
+interface QueueSequenceItem {
+  serviceId: number;
+  position: number;
 }
 
 const ServiceSelection: React.FC = () => {
@@ -49,29 +56,55 @@ const ServiceSelection: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const servicesPerPage = 6; // Show 6 services per page (2 rows of 3 on desktop, or more rows on mobile)
-
+  const servicesPerPage = 6;
+  // const [sequenceMode, setSequenceMode] = useState<boolean>(false);
+  // const [queueSequence, setQueueSequence] = useState<QueueSequenceItem[]>([]);
   const { user } = useAuth();
   const loggedInUserId = user?.id;
 
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await axios.get<Service[]>(
-          "http://127.0.0.1:8000/api/list_services/"
-        );
-        console.log(response.data); // Log services data to check category values
-        setServices(response.data);
-        setFilteredServices(response.data);
-        setTotalPages(Math.ceil(response.data.length / servicesPerPage));
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+  
+        const response = await fetch("http://127.0.0.1:8000/api/list_services/", {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+  
+        clearTimeout(timeoutId);
+  
+        if (!response.ok) {
+          if (response.status === 500) {
+            throw new Error("Server error: The backend API encountered an issue. Please check the Django server logs.");
+          }
+          throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
+        }
+  
+        const data = await response.json();
+        console.log("Services loaded:", data.length);
+  
+        setServices(data);
+        setFilteredServices(data);
+        setTotalPages(Math.ceil(data.length / servicesPerPage));
         setLoading(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching services", error);
-        setError("Failed to fetch services.");
+        
+        if (error.name === 'AbortError') {
+          setError("Request timed out. Server might be unavailable or processing too many requests. Please try again.");
+        } else {
+          setError(error.message || "Failed to fetch services. Please check your connection and try again.");
+        }
+        
         setLoading(false);
       }
     };
-
+  
     fetchServices();
   }, []);
 
@@ -126,19 +159,53 @@ const ServiceSelection: React.FC = () => {
       return;
     }
     try {
-      const response = await axios.post<{ queue_id: number }>(
-        "http://127.0.0.1:8000/api/create-queue/",
-        {
+      const response = await fetch("http://127.0.0.1:8000/api/create-queue/", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           user_id: loggedInUserId,
           service_id: serviceId,
-        }
-      );
-      const { queue_id } = response.data;
-      navigate(`/qrcodescreen/${queue_id}`);
-    } catch (error) {
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create queue: ${response.status}`);
+      }
+
+      const data = await response.json();
+      navigate(`/qrcodescreen/${data.queue_id}`);
+    } catch (error: any) {
       console.error("Error creating queue", error);
-      setError("Failed to create queue.");
+      setError(error.message || "Failed to create queue.");
     }
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    const fetchServices = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/list_services/");
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch services: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setServices(data);
+        setFilteredServices(data);
+        setTotalPages(Math.ceil(data.length / servicesPerPage));
+        setLoading(false);
+      } catch (error: any) {
+        console.error("Error fetching services", error);
+        setError(error.message || "Failed to fetch services. Please try again.");
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
   };
 
   return (
@@ -204,6 +271,11 @@ const ServiceSelection: React.FC = () => {
             severity="error"
             onClose={() => setError(null)}
             sx={{ mb: 3, borderRadius: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={handleRetry}>
+                Retry
+              </Button>
+            }
           >
             {error}
           </Alert>
@@ -234,6 +306,7 @@ const ServiceSelection: React.FC = () => {
                         }}
                       >
                         <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                          {/* Common service information */}
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                             <Typography variant="h6" fontWeight="600">
                               {service.name}
@@ -258,34 +331,42 @@ const ServiceSelection: React.FC = () => {
                           </Typography>
 
                           <Divider sx={{ my: 2 }} />
-
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <AccessTimeIcon sx={{ color: 'text.secondary', mr: 1, fontSize: '0.9rem' }} />
-                            <Typography variant="body2" fontWeight="500" color="text.secondary">
-                              Estimated Wait: <Box component="span" sx={{ color: service.wait_time > 30 ? '#c62828' : '#2e7d32' }}>
-                                {service.wait_time} mins
-                              </Box>
-                            </Typography>
-                          </Box>
                         </CardContent>
+
                         <CardActions sx={{ p: 2, pt: 0 }}>
-                          <Button
-                            fullWidth
-                            variant="contained"
-                            color="primary"
-                            onClick={() => handleServiceSelect(service.id)}
-                            endIcon={<AddIcon />}
-                            sx={{
-                              borderRadius: 2,
-                              bgcolor: '#6f42c1',
-                              '&:hover': {
-                                bgcolor: '#8551d9'
-                              },
-                              mt: 2
-                            }}
-                          >
-                            Join Queue
-                          </Button>
+                          {(service.service_type === 'immediate' || !service.service_type) ? (
+                            <Button
+                              fullWidth
+                              variant="contained"
+                              color="primary"
+                              onClick={() => handleServiceSelect(service.id)}
+                              endIcon={<AddIcon />}
+                              sx={{
+                                borderRadius: 2,
+                                bgcolor: '#6f42c1',
+                                '&:hover': { bgcolor: '#8551d9' },
+                                mt: 2
+                              }}
+                            >
+                              Join Queue
+                            </Button>
+                          ) : (
+                            <Button
+                              fullWidth
+                              variant="contained"
+                              color="primary"
+                              onClick={() => navigate(`/book-appointment/${service.id}`)}
+                              endIcon={<CalendarTodayIcon />}
+                              sx={{
+                                borderRadius: 2,
+                                bgcolor: '#0d6efd',
+                                '&:hover': { bgcolor: '#3d8bfd' },
+                                mt: 2
+                              }}
+                            >
+                              Book Appointment
+                            </Button>
+                          )}
                         </CardActions>
                       </Card>
                     </Grid>

@@ -21,6 +21,17 @@ class QRCodeAdmin(admin.ModelAdmin):
 
 admin.site.register(QRCode, QRCodeAdmin)
 
+# @admin.register(Service)
+# class ServiceAdmin(admin.ModelAdmin):
+#     list_display = ('name', 'description', 'is_active', 'date_created')
+
+def update_to_appointment_based(modeladmin, request, queryset):
+    queryset.update(service_type='appointment')
+update_to_appointment_based.short_description = "Mark selected services as appointment-based"
+
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'is_active', 'date_created')
+    list_display = ('name', 'category', 'service_type', 'is_active')
+    list_filter = ('service_type', 'category', 'is_active')
+    search_fields = ('name', 'description', 'category')
+    actions = [update_to_appointment_based]

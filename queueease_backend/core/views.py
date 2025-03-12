@@ -3,11 +3,13 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime
+from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
 from django.contrib.auth.hashers import make_password
+from rest_framework import status
+from django.db import models
 from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password
 import json
@@ -103,44 +105,28 @@ def api_overview(request):
     return Response({"message": "Welcome to the API!"})
 
 def compute_expected_ready_time(service, position, historical_data=None):
-    """
-    Calculate expected time by combining a base formula with historical data.
-    For services like fast food that normally have short wait times (e.g. McDonald's),
-    use the historical average directly.
-    """
-    # Basic parameters:
     parallel_capacity = service.parallel_capacity or 1
     default_avg_duration = service.average_duration or 15
     minimal_prep = service.minimal_prep_time or 3
-
-    # Calculate base wait time as in waves.
     wave_number = (position - 1) // parallel_capacity
     base_wait = wave_number * default_avg_duration
 
     if service.requires_prep_time and wave_number == 0:
         base_wait = max(base_wait, minimal_prep)
 
-    # Get historical average if available
     if historical_data:
         avg_historical_wait = np.mean(historical_data)
     else:
         avg_historical_wait = base_wait
 
-    # For fast food services use a cap based on historical data:
     fast_food_services = ["McDonald's", "Burger King"]
     if service.name in fast_food_services:
-        # Instead of adding a multiple of default_avg_duration,
-        # use historical average wait time if it is lower than the computed base.
         estimated_wait = min(avg_historical_wait, base_wait)
-        # In fast food, we may ignore position multiplication beyond a limit.
         if position > 1:
             estimated_wait = avg_historical_wait
     else:
-        # For services like doctors or surgeries, use full computed wait.
         estimated_wait = base_wait
-        # You could also blend in the historical average for healthcare.
         if historical_data:
-            # For example, blend 50/50 between computed and historical for healthcare.
             estimated_wait = (estimated_wait + avg_historical_wait) / 2
 
     now = datetime.now()
@@ -448,7 +434,6 @@ def get_or_create_appointment(request):
 
 
 def generate_order_id(user_id):
-    """Generate a unique order ID using user ID and timestamp."""
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
     return f"{user_id}-{timestamp}-{random_str}"
@@ -515,11 +500,53 @@ def delete_appointment(request, order_id):
 #     data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
 #     return Response(data)
 
+# @api_view(['GET'])
+# def list_services(request):
+#     services = Service.objects.all()
+#     serializer = ServiceSerializer(services, many=True)
+#     return Response(serializer.data)
+
 @api_view(['GET'])
 def list_services(request):
-    services = Service.objects.all()
-    serializer = ServiceSerializer(services, many=True)
-    return Response(serializer.data)
+    try:
+        services = Service.objects.filter(is_active=True)
+        
+        service_data = []
+        for service in services:
+            try:
+                queue_count = Queue.objects.filter(
+                    service=service,
+                    status='pending',
+                    is_active=True
+                ).count()
+                
+                avg_wait_time = ServiceWaitTime.objects.filter(
+                    service=service
+                ).order_by('-date_recorded')[:5].aggregate(
+                    avg_time=models.Avg('wait_time')
+                )['avg_time'] or 10
+                
+                service_dict = {
+                    'id': service.id,
+                    'name': service.name,
+                    'description': service.description,
+                    'category': service.category,
+                    'service_type': service.service_type,
+                    'queue_length': queue_count,
+                    'wait_time': avg_wait_time
+                }
+                service_data.append(service_dict)
+            except Exception as service_error:
+                print(f"Error processing service {service.name}: {str(service_error)}")
+                continue
+        
+        return Response(service_data)
+    except Exception as e:
+        print(f"Error in list_services: {str(e)}")
+        return Response(
+            {"error": "An unexpected error occurred"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['GET'])
 def queue_status(request, queue_id):
@@ -554,10 +581,9 @@ def queue_status(request, queue_id):
 @api_view(['POST'])
 def update_queue_position(request, queue_id):
     queue_item = Queue.objects.get(id=queue_id)
-    new_position = queue_item.sequence_number  # updated user position
-    estimated_wait = ...  # recalc estimated wait time
+    new_position = queue_item.sequence_number
+    estimated_wait = ...
 
-    # Retrieve the user's FCM token from the user profile
     fcm_token = queue_item.user.fcm_token
     if fcm_token:
         title = "Queue Update"
@@ -565,3 +591,208 @@ def update_queue_position(request, queue_id):
         send_push_notification(fcm_token, title, body)
     
     return Response({"message": "Queue updated and notification sent."})
+
+@api_view(['POST'])
+def create_queue_sequence(request):
+    try:
+        user_id = request.data.get('user_id')
+        service_ids = request.data.get('service_ids', [])
+        user = get_object_or_404(User, id=user_id)
+        sequence = QueueSequence.objects.create(user=user)
+        
+        for position, service_id in enumerate(service_ids, 1):
+            service = get_object_or_404(Service, id=service_id)
+            QueueSequenceItem.objects.create(
+                queue_sequence=sequence,
+                service=service,
+                position=position
+            )
+        
+        first_item = sequence.items.first()
+        if first_item:
+            queue = create_queue_for_service(user, first_item.service)
+            first_item.queue = queue
+            first_item.save()
+            
+        return Response({
+            "message": "Queue sequence created",
+            "sequence_id": sequence.id,
+            "first_queue_id": first_item.queue.id if first_item else None
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def process_next_queue_in_sequence(request, sequence_id):
+    sequence = get_object_or_404(QueueSequence, id=sequence_id)
+    
+    current_item = sequence.items.filter(completed=False).first()
+    if current_item:
+        current_item.completed = True
+        current_item.save()
+    
+    next_item = sequence.items.filter(completed=False).first()
+    if next_item:
+        queue = create_queue_for_service(sequence.user, next_item.service)
+        next_item.queue = queue
+        next_item.save()
+        return Response({
+            "message": "Next queue created",
+            "queue_id": queue.id
+        })
+    else:
+        sequence.is_active = False
+        sequence.save()
+        return Response({
+            "message": "All queues in sequence completed"
+        })
+
+def create_queue_for_service(user, service):
+    pending_queues = Queue.objects.filter(
+        service=service,
+        status='pending',
+        is_active=True
+    ).order_by('date_created')
+    
+    position = pending_queues.count() + 1
+    historical_data = fetch_historical_data(service.id)
+    
+    queue_item = Queue.objects.create(
+        user=user,
+        service=service,
+        sequence_number=position,
+        status='pending'
+    )
+    
+    queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
+    queue_item.save()
+    
+    qr_data = f"Queue ID: {queue_item.id}"
+    QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
+    
+    return queue_item
+
+@api_view(['GET'])
+def service_detail(request, service_id):
+    """
+    Fetch details for a specific service
+    """
+    try:
+        service = get_object_or_404(Service, pk=service_id)
+        serializer = ServiceSerializer(service)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def available_appointment_times(request, service_id):
+    """
+    Get available appointment times for a specific service on a specific date
+    """
+    try:
+        service = get_object_or_404(Service, pk=service_id)
+        date_str = request.GET.get('date')
+        
+        if not date_str:
+            return Response({"error": "Date parameter is required"}, status=400)
+        
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+        
+        existing_appointments = AppointmentDetails.objects.filter(
+            service=service,
+            appointment_date=date,
+            status='pending'
+        ).values_list('appointment_time', flat=True)
+        
+        start_time = datetime.combine(date, datetime.min.time()).replace(hour=9, minute=0)
+        end_time = datetime.combine(date, datetime.min.time()).replace(hour=17, minute=0)
+        duration = service.average_duration if service.average_duration else 30
+        
+        available_times = []
+        current_time = start_time
+        
+        while current_time < end_time:
+            time_str = current_time.strftime('%H:%M')
+            
+            if time_str not in [t.strftime('%H:%M') for t in existing_appointments]:
+                available_times.append(time_str)
+            
+            current_time += timedelta(minutes=duration)
+        
+        return Response({"available_times": available_times})
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def create_appointment(request):
+    if request.method != 'POST':
+        return Response({"detail": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    
+    try:
+        data = request.data
+        user_id = data.get('user_id')
+        service_id = data.get('service_id')
+        appointment_date = data.get('appointment_date')
+        appointment_time = data.get('appointment_time')
+        
+        if not all([user_id, service_id, appointment_date, appointment_time]):
+            return Response({
+                "error": "Missing required fields",
+                "required": ["user_id", "service_id", "appointment_date", "appointment_time"],
+                "received": data
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response({"error": f"Service with ID {service_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            if ':' in appointment_time:
+                time_obj = datetime.strptime(appointment_time, '%H:%M').time()
+            else:
+                time_obj = datetime.strptime(appointment_time, '%H%M').time()
+        except ValueError:
+            return Response({
+                "error": "Invalid time format",
+                "received": appointment_time,
+                "expected": "HH:MM (e.g., 14:30)"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        order_id = generate_order_id(user_id)
+        
+        appointment = AppointmentDetails.objects.create(
+            order_id=order_id,
+            user=user,
+            service=service,
+            appointment_date=appointment_date,
+            appointment_time=time_obj,
+            duration_minutes=service.average_duration or 30,
+            status='pending',
+            queue_status='not_started',
+            is_active=True
+        )
+        
+        return Response({
+            "message": "Appointment created successfully",
+            "order_id": str(order_id)
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        import traceback
+        print(f"Error creating appointment: {str(e)}")
+        print(traceback.format_exc())
+        
+        return Response({
+            "error": "Failed to create appointment",
+            "detail": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

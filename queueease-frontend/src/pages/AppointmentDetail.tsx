@@ -6,22 +6,22 @@ import {
   Typography,
   Paper,
   Grid,
-  IconButton,
   Chip,
   LinearProgress,
   Card,
   CardContent,
   Divider,
   Skeleton,
-  useTheme
+  useTheme,
+  Button
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EventIcon from '@mui/icons-material/Event';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import QueueIcon from '@mui/icons-material/Queue';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 
 interface AppointmentDetail {
   order_id: string;
@@ -111,18 +111,8 @@ const AppointmentDetail: React.FC = () => {
       }}
     >
       <Container maxWidth="md">
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
-          <IconButton 
-            onClick={() => navigate(-1)} 
-            sx={{ 
-              mr: 2,
-              color: theme.palette.primary.main,
-              '&:hover': { bgcolor: 'rgba(111, 66, 193, 0.08)' }
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" fontWeight={700} color="text.primary">
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center' }}>
+          <Typography variant="h4" fontWeight={700} color="text.primary" align="center">
             Appointment Details
           </Typography>
         </Box>
@@ -277,6 +267,32 @@ const AppointmentDetail: React.FC = () => {
                     {formatTime(remainingTime)} remaining
                   </Typography>
                 </Box>
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+              
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<ListAltIcon />}
+                  onClick={() => navigate('/appointments')}
+                  sx={{
+                    borderRadius: 2,
+                    py: 1.5,
+                    px: 3,
+                    bgcolor: theme.palette.primary.main,
+                    '&:hover': {
+                      bgcolor: theme.palette.primary.dark,
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 5px 15px rgba(111, 66, 193, 0.3)'
+                    },
+                    transition: 'all 0.2s ease',
+                    fontWeight: 600,
+                  }}
+                >
+                  Back to Appointments List
+                </Button>
               </Box>
             </CardContent>
           </Card>

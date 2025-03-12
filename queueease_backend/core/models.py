@@ -94,6 +94,16 @@ class Service(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     details = models.JSONField(null=True, blank=True)
 
+    SERVICE_TYPE_CHOICES = [
+        ('immediate', 'Immediate Queuing'),
+        ('appointment', 'Appointment Based'),
+    ]
+    service_type = models.CharField(
+        max_length=20,
+        choices=SERVICE_TYPE_CHOICES,
+        default='immediate'
+    )
+
     def __str__(self):
         return self.name
 
@@ -165,7 +175,7 @@ class AppointmentDetails(models.Model):
     duration_minutes = models.IntegerField(default=30)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     queue_status = models.CharField(max_length=50, choices=QUEUE_STATUS_CHOICES, default='not_started')
-    is_active = models.BooleanField(default=True)  # Track whether the appointment is active
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return f"Appointment {self.order_id} - {self.user.username}"
@@ -177,3 +187,24 @@ class ServiceWaitTime(models.Model):
 
     def __str__(self):
         return f"{self.service.name} - {self.wait_time} minutes"
+    
+class QueueSequence(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Queue Sequence for {self.user.name}"
+
+class QueueSequenceItem(models.Model):
+    queue_sequence = models.ForeignKey(QueueSequence, on_delete=models.CASCADE, related_name='items')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    position = models.IntegerField()
+    completed = models.BooleanField(default=False)
+    queue = models.ForeignKey(Queue, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['position']
+        
+    def __str__(self):
+        return f"Sequence Item {self.position}: {self.service.name}"
