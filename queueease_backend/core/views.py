@@ -533,7 +533,9 @@ def list_services(request):
                     'category': service.category,
                     'service_type': service.service_type,
                     'queue_length': queue_count,
-                    'wait_time': avg_wait_time
+                    'wait_time': avg_wait_time,
+                    'latitude': getattr(service, 'latitude'),
+                    'longitude': getattr(service, 'longitude')
                 }
                 service_data.append(service_dict)
             except Exception as service_error:
