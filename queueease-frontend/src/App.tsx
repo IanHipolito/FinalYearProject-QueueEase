@@ -17,6 +17,7 @@ import ServiceSelection from './pages/ServiceSelection';
 import AdminLayout from './components/AdminLayout';
 import FBCloudMessaging from './hooks/FBCloudMessaging';
 import BookAppointment from './pages/BookAppointment';
+import QueueHistory from 'pages/QueueHistory';
 import AdminLogin from './pages/AdminLogin';
 import AdminSignup from './pages/AdminSignup';
 import { AuthProvider } from './pages/AuthContext';
@@ -51,6 +52,7 @@ const App: React.FC = () => {
           } />
           <Route path="/success/:queueId" element={<SuccessPage />} />
           <Route path="/mapproximity" element={<MapProximity />} />
+          <Route path="/history" element={<QueueHistory />} />
           <Route path="/appointments" element={
             <PrivateRoute>
               <AppointmentsList />

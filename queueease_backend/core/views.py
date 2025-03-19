@@ -406,11 +406,26 @@ def validate_qr(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+# @api_view(['GET'])
+# def user_appointments(request, user_id):
+#     appointments = AppointmentDetails.objects.filter(user_id=user_id).order_by('-appointment_date')
+#     serializer = AppointmentDetailsSerializer(appointments, many=True)
+#     return Response(serializer.data)
+
 @api_view(['GET'])
 def user_appointments(request, user_id):
     appointments = AppointmentDetails.objects.filter(user_id=user_id).order_by('-appointment_date')
     serializer = AppointmentDetailsSerializer(appointments, many=True)
-    return Response(serializer.data)
+    data = serializer.data
+    
+    enhanced_data = []
+    for item, appointment in zip(data, appointments):
+        item['service_name'] = appointment.service.name
+        item['category'] = appointment.service.category
+        item['appointment_title'] = f"{appointment.service.name} Appointment" 
+        enhanced_data.append(item)
+    
+    return Response(enhanced_data)
 
 @api_view(['GET'])
 def appointment_detail(request, order_id):
@@ -903,7 +918,6 @@ def admin_services(request, user_id):
                 'description': sa.service.description,
                 'category': sa.service.category,
                 'is_owner': sa.is_owner,
-                # Add additional service stats here
                 'queue_length': Queue.objects.filter(
                     service=sa.service, 
                     status='pending',
@@ -926,31 +940,25 @@ def admin_dashboard_data(request):
         if not service_id:
             return Response({'error': 'Service ID is required'}, status=400)
             
-        # Get service
         try:
             service = Service.objects.get(id=service_id)
         except Service.DoesNotExist:
             return Response({'error': 'Service not found'}, status=404)
             
-        # Get dashboard data using models that actually exist
-        # Current customers in queue
         customer_count = Queue.objects.filter(
             service=service, 
             status='pending', 
             is_active=True
         ).count()
         
-        # Number of active queue lines
         queue_count = QueueSequence.objects.filter(
             items__service=service, 
             is_active=True
         ).distinct().count()
         
-        # Get latest orders based on service type
         latest_orders = []
         
         if service.service_type == 'immediate':
-            # For immediate services, get recent queue entries as "orders"
             latest_queue_entries = Queue.objects.filter(
                 service=service
             ).order_by('-date_created')[:5]
@@ -965,11 +973,9 @@ def admin_dashboard_data(request):
                     'time': queue.date_created.strftime('%H:%M')
                 })
             
-            # Total queue entries for this service
             order_count = Queue.objects.filter(service=service).count()
             
         else:
-            # For appointment services, get appointments
             latest_appointments = AppointmentDetails.objects.filter(
                 service=service
             ).order_by('-appointment_date', '-appointment_time')[:5]
@@ -984,11 +990,8 @@ def admin_dashboard_data(request):
                     'time': appt.appointment_time.strftime('%H:%M') if appt.appointment_time else None
                 })
             
-            # Total appointments for this service
             order_count = AppointmentDetails.objects.filter(service=service).count()
         
-        # Calculate growth based on historical data
-        # Compare last 7 days with previous 7 days
         today = datetime.now().date()
         last_week_start = today - timedelta(days=7)
         previous_week_start = last_week_start - timedelta(days=7)
@@ -1010,7 +1013,6 @@ def admin_dashboard_data(request):
             growth_percentage = ((current_week_count - previous_week_count) / previous_week_count) * 100
             growth = round(growth_percentage, 2)
         
-        # Calculate customer stats (queue length over past 5 days)
         customer_stats = []
         
         for i in range(5):
@@ -1020,21 +1022,19 @@ def admin_dashboard_data(request):
                 date_created__date=day
             ).count()
             
-            # Scale the counts to fit in a nice chart (10-80 range)
             scaled_count = min(80, max(10, day_count * 10)) if day_count else 20
             customer_stats.append(scaled_count)
         
-        # Reverse to show oldest to newest
         customer_stats.reverse()
         
         return Response({
             'customer_count': customer_count,
-            'queue_count': queue_count or 1,  # Ensure at least 1 for UI purposes
+            'queue_count': queue_count or 1,
             'order_count': order_count,
             'growth': growth,
             'latest_orders': latest_orders,
             'customer_stats': customer_stats,
-            'service_type': service.service_type  # Include service_type in the response
+            'service_type': service.service_type
         })
     except Exception as e:
         import traceback
@@ -1047,8 +1047,6 @@ def list_services_with_status(request):
     """List all services with information about whether they already have an admin"""
     try:
         services = Service.objects.all()
-        
-        # Get services that already have admins
         services_with_admins = ServiceAdmin.objects.values_list('service', flat=True).distinct()
         
         result = []
@@ -1065,5 +1063,137 @@ def list_services_with_status(request):
             result.append(service_data)
             
         return Response(result)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+    
+@api_view(['GET'])
+def queue_history(request, user_id):
+    try:
+        from .models import Queue, User, Service
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=404)
+        
+        queue_items = Queue.objects.filter(user_id=user_id).order_by('-date_created')
+        
+        if not queue_items.exists():
+            return Response([])
+        
+        serialized_data = []
+        for queue in queue_items:
+            try:
+                queue_data = {
+                    "id": queue.id,
+                    "service_name": queue.service.name if hasattr(queue, 'service') and queue.service else "Unknown Service",
+                    "category": queue.service.category if hasattr(queue, 'service') and queue.service else "uncategorized",
+                    "date_created": queue.date_created.isoformat() if hasattr(queue, 'date_created') else "",
+                    "status": queue.status if hasattr(queue, 'status') else "unknown",
+                    "waiting_time": queue.waiting_time if hasattr(queue, 'waiting_time') else 0,
+                    "position": queue.position if hasattr(queue, 'position') else None
+                }
+                serialized_data.append(queue_data)
+            except Exception as e:
+                print(f"Error serializing queue {queue.id}: {str(e)}")
+                continue
+        
+        return Response(serialized_data)
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in queue_history: {str(e)}")
+        print(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+def admin_customers(request):
+    try:
+        service_id = request.query_params.get('service_id')
+        if not service_id:
+            return Response({'error': 'Service ID is required'}, status=400)
+            
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response({'error': 'Service not found'}, status=404)
+            
+        user_ids = Queue.objects.filter(service=service).values_list('user', flat=True).distinct()
+        users = User.objects.filter(id__in=user_ids)
+        
+        customers_data = []
+        for user in users:
+            order_count = Queue.objects.filter(user=user, service=service).count()
+            
+            last_visit = Queue.objects.filter(
+                user=user, 
+                service=service
+            ).order_by('-date_created').first()
+            
+            is_active = False
+            if last_visit:
+                from django.utils import timezone
+                thirty_days_ago = timezone.now() - timedelta(days=30)
+                is_active = last_visit.date_created > thirty_days_ago
+            
+            customers_data.append({
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.mobile_number,
+                'is_active': is_active,
+                'order_count': order_count,
+                'last_visit': last_visit.date_created.isoformat() if last_visit else None
+            })
+            
+        return Response(customers_data)
+    except Exception as e:
+        import traceback
+        print(f"Error in admin_customers: {str(e)}")
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+def admin_create_customer(request):
+    try:
+        data = request.data
+        service_id = data.get('service_id')
+        name = data.get('name')
+        email = data.get('email')
+        phone = data.get('phone')
+        
+        if not all([service_id, name, email]):
+            return Response({'error': 'Service ID, name, and email are required'}, status=400)
+            
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response({'error': 'Service not found'}, status=404)
+            
+        if User.objects.filter(email=email).exists():
+            return Response({'error': 'Email already exists'}, status=400)
+            
+        user = User.objects.create(
+            name=name,
+            email=email,
+            mobile_number=phone,
+            user_type='customer',
+            signup_type='regular'
+        )
+        
+        Queue.objects.create(
+            user=user,
+            service=service,
+            sequence_number=0,
+            status='completed'
+        )
+        
+        return Response({
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'phone': user.mobile_number,
+            'is_active': True
+        }, status=201)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
