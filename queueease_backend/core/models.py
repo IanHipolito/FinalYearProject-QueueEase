@@ -5,6 +5,7 @@ class User(models.Model):
     USER_TYPE_CHOICES = [
         ('customer', 'Customer'),
         ('employee', 'Employee'),
+        ('admin', 'Admin'),
     ]
     SIGNUP_TYPE_CHOICES = [
         ('regular', 'Regular'),
@@ -208,3 +209,17 @@ class QueueSequenceItem(models.Model):
         
     def __str__(self):
         return f"Sequence Item {self.position}: {self.service.name}"
+
+class ServiceAdmin(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_services')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='admins')
+    is_owner = models.BooleanField(default=False)
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'service')
+        verbose_name = 'Service Administrator'
+        verbose_name_plural = 'Service Administrators'
+
+    def __str__(self):
+        return f"{self.user.name} - {self.service.name}"

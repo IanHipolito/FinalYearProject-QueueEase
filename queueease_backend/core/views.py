@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem
+from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
@@ -33,6 +33,39 @@ SERVICE_OPTIONS = {
     "Burger King": 7,
 }
 
+# @csrf_exempt
+# def login_view(request):
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             email = data.get('email', '').strip()
+#             password = data.get('password', '').strip()
+
+#             if not email or not password:
+#                 return JsonResponse({'error': 'Email and password are required.'}, status=400)
+
+#             try:
+#                 user = User.objects.get(email=email)
+#             except User.DoesNotExist:
+#                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
+
+#             # Verify password
+#             if not check_password(password, user.password):
+#                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
+
+#             return JsonResponse({
+#                 'message': 'Login successful!',
+#                 'user_id': user.id,
+#                 'name': user.name,
+#                 'email': user.email,
+#                 'user_type': user.user_type
+#             }, status=200)
+#         except json.JSONDecodeError:
+#             return JsonResponse({'error': 'Invalid request body.'}, status=400)
+#         except Exception as e:
+#             return JsonResponse({'error': str(e)}, status=500)
+#     return JsonResponse({'error': 'Invalid request method. Only POST is allowed.'}, status=405)
+
 @csrf_exempt
 def login_view(request):
     if request.method == 'POST':
@@ -53,18 +86,31 @@ def login_view(request):
             if not check_password(password, user.password):
                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
 
+            # Check if user is an admin
+            is_admin = user.user_type == 'admin'
+            
+            # Get services this admin manages (empty list if not admin)
+            managed_services = []
+            if is_admin:
+                service_admins = ServiceAdmin.objects.filter(user=user).select_related('service')
+                managed_services = [{
+                    'id': sa.service.id,
+                    'name': sa.service.name,
+                    'is_owner': sa.is_owner,
+                    'description': sa.service.description
+                } for sa in service_admins]
+
             return JsonResponse({
                 'message': 'Login successful!',
                 'user_id': user.id,
                 'name': user.name,
                 'email': user.email,
-                'user_type': user.user_type
+                'user_type': user.user_type,
+                'is_admin': is_admin,
+                'managed_services': managed_services
             }, status=200)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid request body.'}, status=400)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Invalid request method. Only POST is allowed.'}, status=405)
 
 @api_view(['POST'])
 def signup_view(request):
@@ -798,3 +844,226 @@ def create_appointment(request):
             "error": "Failed to create appointment",
             "detail": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def admin_signup(request):
+    try:
+        data = request.data
+        name = data.get('name')
+        email = data.get('email')
+        password = data.get('password')
+        phone_number = data.get('phoneNumber')
+        service_id = data.get('serviceId')
+        
+        if not all([name, email, password, phone_number, service_id]):
+            return Response({'error': 'All fields are required.'}, status=400)
+            
+        if User.objects.filter(email=email).exists():
+            return Response({'error': 'Email already registered.'}, status=400)
+            
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response({'error': 'Service not found.'}, status=404)
+            
+        user = User.objects.create(
+            name=name,
+            email=email,
+            mobile_number=phone_number,
+            password=make_password(password),
+            user_type='admin'
+        )
+        
+        ServiceAdmin.objects.create(
+            user=user,
+            service=service,
+            is_owner=True
+        )
+        
+        return Response({
+            'message': 'Admin account created successfully.',
+            'user_id': user.id
+        }, status=201)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+    
+@api_view(['GET'])
+def admin_services(request, user_id):
+    """Get all services an admin can manage"""
+    try:
+        user = User.objects.get(id=user_id, user_type='admin')
+        service_admins = ServiceAdmin.objects.filter(user=user)
+        
+        services = []
+        for sa in service_admins:
+            service_data = {
+                'id': sa.service.id,
+                'name': sa.service.name,
+                'description': sa.service.description,
+                'category': sa.service.category,
+                'is_owner': sa.is_owner,
+                # Add additional service stats here
+                'queue_length': Queue.objects.filter(
+                    service=sa.service, 
+                    status='pending',
+                    is_active=True
+                ).count()
+            }
+            services.append(service_data)
+            
+        return Response(services)
+    except User.DoesNotExist:
+        return Response({'error': 'Admin not found'}, status=404)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+    
+@api_view(['GET'])
+def admin_dashboard_data(request):
+    """Get dashboard data for a specific service"""
+    try:
+        service_id = request.query_params.get('service_id')
+        if not service_id:
+            return Response({'error': 'Service ID is required'}, status=400)
+            
+        # Get service
+        try:
+            service = Service.objects.get(id=service_id)
+        except Service.DoesNotExist:
+            return Response({'error': 'Service not found'}, status=404)
+            
+        # Get dashboard data using models that actually exist
+        # Current customers in queue
+        customer_count = Queue.objects.filter(
+            service=service, 
+            status='pending', 
+            is_active=True
+        ).count()
+        
+        # Number of active queue lines
+        queue_count = QueueSequence.objects.filter(
+            items__service=service, 
+            is_active=True
+        ).distinct().count()
+        
+        # Get latest orders based on service type
+        latest_orders = []
+        
+        if service.service_type == 'immediate':
+            # For immediate services, get recent queue entries as "orders"
+            latest_queue_entries = Queue.objects.filter(
+                service=service
+            ).order_by('-date_created')[:5]
+            
+            for queue in latest_queue_entries:
+                latest_orders.append({
+                    'id': queue.id,
+                    'service_name': service.name,
+                    'status': queue.status,
+                    'date': queue.date_created.strftime('%Y-%m-%d'),
+                    'customer_name': queue.user.name if hasattr(queue, 'user') else 'Customer',
+                    'time': queue.date_created.strftime('%H:%M')
+                })
+            
+            # Total queue entries for this service
+            order_count = Queue.objects.filter(service=service).count()
+            
+        else:
+            # For appointment services, get appointments
+            latest_appointments = AppointmentDetails.objects.filter(
+                service=service
+            ).order_by('-appointment_date', '-appointment_time')[:5]
+            
+            for appt in latest_appointments:
+                latest_orders.append({
+                    'id': appt.order_id,
+                    'service_name': service.name,
+                    'status': appt.status,
+                    'date': appt.appointment_date.strftime('%Y-%m-%d'),
+                    'customer_name': appt.user.name if hasattr(appt, 'user') else 'Customer',
+                    'time': appt.appointment_time.strftime('%H:%M') if appt.appointment_time else None
+                })
+            
+            # Total appointments for this service
+            order_count = AppointmentDetails.objects.filter(service=service).count()
+        
+        # Calculate growth based on historical data
+        # Compare last 7 days with previous 7 days
+        today = datetime.now().date()
+        last_week_start = today - timedelta(days=7)
+        previous_week_start = last_week_start - timedelta(days=7)
+        
+        current_week_count = Queue.objects.filter(
+            service=service,
+            date_created__gte=last_week_start,
+            date_created__lt=today
+        ).count()
+        
+        previous_week_count = Queue.objects.filter(
+            service=service,
+            date_created__gte=previous_week_start,
+            date_created__lt=last_week_start
+        ).count()
+        
+        growth = 0
+        if previous_week_count > 0:
+            growth_percentage = ((current_week_count - previous_week_count) / previous_week_count) * 100
+            growth = round(growth_percentage, 2)
+        
+        # Calculate customer stats (queue length over past 5 days)
+        customer_stats = []
+        
+        for i in range(5):
+            day = today - timedelta(days=i)
+            day_count = Queue.objects.filter(
+                service=service,
+                date_created__date=day
+            ).count()
+            
+            # Scale the counts to fit in a nice chart (10-80 range)
+            scaled_count = min(80, max(10, day_count * 10)) if day_count else 20
+            customer_stats.append(scaled_count)
+        
+        # Reverse to show oldest to newest
+        customer_stats.reverse()
+        
+        return Response({
+            'customer_count': customer_count,
+            'queue_count': queue_count or 1,  # Ensure at least 1 for UI purposes
+            'order_count': order_count,
+            'growth': growth,
+            'latest_orders': latest_orders,
+            'customer_stats': customer_stats,
+            'service_type': service.service_type  # Include service_type in the response
+        })
+    except Exception as e:
+        import traceback
+        print(f"Dashboard data error: {str(e)}")
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+    
+@api_view(['GET'])
+def list_services_with_status(request):
+    """List all services with information about whether they already have an admin"""
+    try:
+        services = Service.objects.all()
+        
+        # Get services that already have admins
+        services_with_admins = ServiceAdmin.objects.values_list('service', flat=True).distinct()
+        
+        result = []
+        for service in services:
+            service_data = {
+                'id': service.id,
+                'name': service.name,
+                'description': service.description,
+                'category': service.category,
+                'location': service.location if hasattr(service, 'location') else None,
+                'business_hours': service.business_hours if hasattr(service, 'business_hours') else None,
+                'has_admin': service.id in services_with_admins
+            }
+            result.append(service_data)
+            
+        return Response(result)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

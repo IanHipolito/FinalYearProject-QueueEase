@@ -1,4 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { API } from '../services/api';
+import ErrorDisplay from '../components/common/ErrorDisplay';
+import LoadingIndicator from '../components/common/LoadingIndicator';
 import {
   Box,
   Grid,
@@ -20,7 +24,8 @@ import {
   Avatar,
   Divider,
   Chip,
-  Rating
+  Rating,
+  SelectChangeEvent
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import InsightsIcon from '@mui/icons-material/Insights';
@@ -28,64 +33,133 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import ChatIcon from '@mui/icons-material/Chat';
 
+interface FeedbackCategory {
+  id: number;
+  category: string;
+  satisfied: number;
+  neutral: number;
+  dissatisfied: number;
+  total?: number;
+}
+
+interface CustomerComment {
+  id: number;
+  name: string;
+  date: string;
+  queue: string;
+  rating: number;
+  comment: string;
+  avatar?: string;
+}
+
+interface AnalyticsData {
+  feedback_distribution: FeedbackCategory[];
+  customer_comments: CustomerComment[];
+  total_reports: number;
+  satisfaction_rate: number;
+  average_wait_time: number;
+  wait_time_trend: number[];
+  satisfaction_trend: number[];
+}
+
 const AnalyticsPage: React.FC = () => {
-  // Mock data for analytics
-  const feedbackData = [
-    { id: 1, category: 'Wait Time', satisfied: 65, neutral: 20, dissatisfied: 15 },
-    { id: 2, category: 'Staff Service', satisfied: 80, neutral: 10, dissatisfied: 10 },
-    { id: 3, category: 'Queue Management', satisfied: 70, neutral: 15, dissatisfied: 15 },
-    { id: 4, category: 'Facilities', satisfied: 75, neutral: 20, dissatisfied: 5 },
-  ];
+  const { currentService } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [analyticsTimeRange, setAnalyticsTimeRange] = useState('month');
+  const [commentFilter, setCommentFilter] = useState('recent');
   
-  // Mock data for customer feedback comments
-  const customerFeedback = [
-    { 
-      id: 1, 
-      name: 'John Doe', 
-      date: '2025-04-15', 
-      queue: 'General Queue',
-      rating: 5,
-      comment: 'The staff was very professional and the queue moved quickly. Great experience overall!' 
-    },
-    { 
-      id: 2, 
-      name: 'Maria Garcia', 
-      date: '2025-04-14', 
-      queue: 'Technical Support',
-      rating: 4,
-      comment: 'The wait was reasonable but the seating area could be improved. Otherwise good service.' 
-    },
-    { 
-      id: 3, 
-      name: 'Robert Johnson', 
-      date: '2025-04-14', 
-      queue: 'VIP Service',
-      rating: 2,
-      comment: 'Despite being in the VIP queue, I had to wait nearly 20 minutes. Not what I expected from premium service.' 
-    },
-    { 
-      id: 4, 
-      name: 'Emily Chen', 
-      date: '2025-04-13', 
-      queue: 'Cashier Queue',
-      rating: 5,
-      comment: 'Very efficient service! The new digital queue system is a great improvement.' 
-    },
-    { 
-      id: 5, 
-      name: 'Michael Brown', 
-      date: '2025-04-12', 
-      queue: 'Returns',
-      rating: 3,
-      comment: 'Process was okay but staff seemed unsure about the return policy. More training needed.' 
-    },
-  ];
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+    feedback_distribution: [],
+    customer_comments: [],
+    total_reports: 0,
+    satisfaction_rate: 0,
+    average_wait_time: 0,
+    wait_time_trend: [],
+    satisfaction_trend: []
+  });
+
+  // Extract data for easier access
+  const { 
+    feedback_distribution: feedbackData,
+    customer_comments: customerFeedback,
+    total_reports: totalReports,
+    satisfaction_rate: satisfactionRate,
+    average_wait_time: averageWaitTime
+  } = analyticsData;
+  
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      if (!currentService?.id) return;
+      
+      setLoading(true);
+      setError('');
+      
+      try {
+        const response = await API.admin.getAnalytics(
+          currentService.id, 
+          analyticsTimeRange
+        );
+        const data = await API.handleResponse(response);
+        
+        setAnalyticsData({
+          feedback_distribution: data.feedback_distribution || [],
+          customer_comments: data.customer_comments || [],
+          total_reports: data.total_reports || 0,
+          satisfaction_rate: data.satisfaction_rate || 0,
+          average_wait_time: data.average_wait_time || 0,
+          wait_time_trend: data.wait_time_trend || [],
+          satisfaction_trend: data.satisfaction_trend || []
+        });
+        
+      } catch (err: any) {
+        console.error('Error fetching analytics data:', err);
+        setError(err.message || 'Failed to load analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAnalytics();
+  }, [currentService?.id, analyticsTimeRange]);
+
+  // Handle time range change
+  const handleTimeRangeChange = (event: SelectChangeEvent) => {
+    setAnalyticsTimeRange(event.target.value);
+  };
+
+  // Handle comment filter change
+  const handleCommentFilterChange = (event: SelectChangeEvent) => {
+    setCommentFilter(event.target.value);
+  };
+
+  // Filter comments based on selected filter
+  const filteredComments = customerFeedback.filter(comment => {
+    if (commentFilter === 'recent') return true;
+    if (commentFilter === 'positive' && comment.rating >= 4) return true;
+    if (commentFilter === 'negative' && comment.rating <= 2) return true;
+    return commentFilter === 'recent';
+  });
+
+  // If still loading data
+  if (loading && !feedbackData.length) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <LoadingIndicator open={true} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
       <Typography variant="h5" fontWeight="500" gutterBottom>
         Analytics
       </Typography>
+      
+      {error && <ErrorDisplay error={error} onRetry={() => {
+        setAnalyticsTimeRange(analyticsTimeRange);  // Trigger a re-fetch
+      }} />}
 
       {/* Top Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -110,7 +184,7 @@ const AnalyticsPage: React.FC = () => {
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h3" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center' }}>
-                  123
+                  {totalReports}
                   <Box component="span" sx={{ 
                     bgcolor: 'rgba(255,255,255,0.2)', 
                     fontSize: '0.5em', 
@@ -149,14 +223,14 @@ const AnalyticsPage: React.FC = () => {
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h3" fontWeight="bold">
-                  78%
+                  {satisfactionRate}%
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
                   Customer Satisfaction
                 </Typography>
               </Box>
               <Box sx={{ mt: 2, height: 40 }}>
-                {/* Simple line chart placeholder */}
+                {/* Simple line chart placeholder - we could use a real chart library here */}
                 <svg width="100%" height="40" viewBox="0 0 200 40">
                   <path d="M0,30 Q40,15 80,25 T160,10 T200,20" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
                 </svg>
@@ -184,7 +258,7 @@ const AnalyticsPage: React.FC = () => {
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h3" fontWeight="bold">
-                  12 min
+                  {averageWaitTime} min
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
                   Average Wait Time
@@ -207,7 +281,8 @@ const AnalyticsPage: React.FC = () => {
                 </Typography>
                 <FormControl size="small" sx={{ width: 120 }}>
                   <Select
-                    value="month"
+                    value={analyticsTimeRange}
+                    onChange={handleTimeRangeChange}
                     sx={{ borderRadius: 2 }}
                   >
                     <MenuItem value="week">This Week</MenuItem>
@@ -283,7 +358,7 @@ const AnalyticsPage: React.FC = () => {
                 position: 'relative',
                 mt: 2
               }}>
-                {/* SVG Donut Chart */}
+                {/* SVG Donut Chart - would use a proper chart library in production */}
                 <svg width="200" height="200" viewBox="0 0 200 200">
                   <circle cx="100" cy="100" r="70" fill="none" stroke="#e8f5e9" strokeWidth="30" />
                   <circle cx="100" cy="100" r="70" fill="none" stroke="#ffebee" strokeWidth="30" strokeDasharray="440" strokeDashoffset="374" />
@@ -299,7 +374,7 @@ const AnalyticsPage: React.FC = () => {
                   textAlign: 'center'
                 }}>
                   <Typography variant="h4" fontWeight="bold" color="text.primary">
-                    85%
+                    {satisfactionRate}%
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Satisfied
@@ -415,7 +490,8 @@ const AnalyticsPage: React.FC = () => {
             </Box>
             <FormControl size="small" sx={{ width: 120 }}>
               <Select
-                value="recent"
+                value={commentFilter}
+                onChange={handleCommentFilterChange}
                 sx={{ borderRadius: 2 }}
               >
                 <MenuItem value="recent">Most Recent</MenuItem>
@@ -427,54 +503,63 @@ const AnalyticsPage: React.FC = () => {
           
           <Divider sx={{ mb: 2 }} />
           
-          {customerFeedback.map((feedback, index) => (
-            <React.Fragment key={feedback.id}>
-              <Box sx={{ py: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: `hsl(${feedback.id * 60}, 70%, 65%)`,
-                        width: 40, 
-                        height: 40,
-                        mr: 1.5
-                      }}
-                    >
-                      {feedback.name.charAt(0)}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight="500">
-                        {feedback.name}
-                        <Chip 
-                          label={feedback.queue} 
-                          size="small" 
-                          sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
-                        />
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {feedback.date}
-                      </Typography>
+          {filteredComments.length > 0 ? (
+            filteredComments.map((feedback, index) => (
+              <React.Fragment key={feedback.id}>
+                <Box sx={{ py: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar 
+                        src={feedback.avatar}
+                        sx={{ 
+                          bgcolor: !feedback.avatar ? `hsl(${feedback.id * 60}, 70%, 65%)` : undefined,
+                          width: 40, 
+                          height: 40,
+                          mr: 1.5
+                        }}
+                      >
+                        {!feedback.avatar && feedback.name.charAt(0)}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight="500">
+                          {feedback.name}
+                          <Chip 
+                            label={feedback.queue} 
+                            size="small" 
+                            sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                          />
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {feedback.date}
+                        </Typography>
+                      </Box>
                     </Box>
+                    <Rating value={feedback.rating} readOnly size="small" />
                   </Box>
-                  <Rating value={feedback.rating} readOnly size="small" />
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      ml: 7, 
+                      bgcolor: 'background.paper', 
+                      p: 1.5, 
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider'
+                    }}
+                  >
+                    {feedback.comment}
+                  </Typography>
                 </Box>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    ml: 7, 
-                    bgcolor: 'background.paper', 
-                    p: 1.5, 
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  {feedback.comment}
-                </Typography>
-              </Box>
-              {index < customerFeedback.length - 1 && <Divider />}
-            </React.Fragment>
-          ))}
+                {index < filteredComments.length - 1 && <Divider />}
+              </React.Fragment>
+            ))
+          ) : (
+            <Box sx={{ py: 4, textAlign: 'center' }}>
+              <Typography variant="body1" color="text.secondary">
+                No feedback comments available for the selected filter.
+              </Typography>
+            </Box>
+          )}
         </CardContent>
       </Card>
     </Box>

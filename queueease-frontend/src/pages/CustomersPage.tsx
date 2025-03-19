@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { API } from '../services/api';
 import {
   Box,
   Typography,
@@ -26,15 +28,58 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import AddIcon from '@mui/icons-material/Add';
 
+interface Customer {
+  id: number;
+  name: string;
+  email: string;
+  status: string;
+  orders: number;
+  avatar?: string;
+}
+
 const CustomersPage: React.FC = () => {
-  // Mock data for customers
-  const customers = [
-    { id: 1, name: 'John Doe', email: 'john@example.com', status: 'Active', orders: 5 },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', status: 'Active', orders: 3 },
-    { id: 3, name: 'Robert Johnson', email: 'robert@example.com', status: 'Inactive', orders: 0 },
-    { id: 4, name: 'Emily Davis', email: 'emily@example.com', status: 'Active', orders: 7 },
-    { id: 5, name: 'Michael Wilson', email: 'michael@example.com', status: 'Active', orders: 2 },
-  ];
+  const { currentService } = useAuth();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      if (!currentService?.id) {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      setError('');
+      
+      try {
+        const response = await API.admin.getCustomers(currentService.id);
+        const data = await API.handleResponse(response);
+        
+        setCustomers(data.map((customer: any) => ({
+          id: customer.id,
+          name: customer.name,
+          email: customer.email,
+          status: customer.is_active ? 'Active' : 'Inactive',
+          orders: customer.order_count || 0
+        })));
+      } catch (err: any) {
+        console.error('Error fetching customers:', err);
+        setError(err.message || 'Failed to load customer data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCustomers();
+  }, [currentService?.id]);
+  
+  const filteredCustomers = customers.filter(customer => 
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>

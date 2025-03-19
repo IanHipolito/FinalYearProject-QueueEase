@@ -13,23 +13,14 @@ import AppointmentsList from './pages/AppointmentsList';
 import AppointmentDetail from './pages/AppointmentDetail';
 import OrderIDInput from './pages/OrderIDInput';
 import AddAppointment from './pages/AddAppointment';
-import { AuthProvider, useAuth } from './pages/AuthContext';
 import ServiceSelection from './pages/ServiceSelection';
 import AdminLayout from './components/AdminLayout';
-import DashboardPage from './pages/DashboardPage';
-import CustomersPage from './pages/CustomersPage';
-import QueuesPage from './pages/QueuesPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import NotificationsPage from './pages/NotificationsPage';
-import SettingsPage from './pages/SettingsPage';
 import FBCloudMessaging from './hooks/FBCloudMessaging';
 import BookAppointment from './pages/BookAppointment';
-
-const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div>Loading...</div>;
-  return user ? <>{children}</> : <Navigate to="/login" />;
-};
+import AdminLogin from './pages/AdminLogin';
+import AdminSignup from './pages/AdminSignup';
+import { AuthProvider } from './pages/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
 
 const App: React.FC = () => {
   return (
@@ -43,49 +34,53 @@ const App: React.FC = () => {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/guest" element={<GuestSignup />} />
           <Route path="/main" element={<MainPage />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/admin-signup" element={<AdminSignup />} />
+          <Route path="/" element={<Navigate to="/main" />} />
 
-          {/* Admin routes: Wrapped in AdminLayout */}
-          <Route
-            path="/admin/*"
-            element={
-              <PrivateRoute>
-                <AdminLayout>
-                  <Routes>
-                    <Route path="dashboard" element={<DashboardPage />} />
-                    <Route path="customers" element={<CustomersPage />} />
-                    <Route path="queues" element={<QueuesPage />} />
-                    <Route path="analytics" element={<AnalyticsPage />} />
-                    <Route path="notifications" element={<NotificationsPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route path="*" element={<Navigate to="dashboard" replace />} />
-                  </Routes>
-                </AdminLayout>
-              </PrivateRoute>
-            }
-          />
+          {/* Protected routes */}
+          <Route path="/usermainpage" element={
+            <PrivateRoute>
+              <UserMainPage />
+            </PrivateRoute>
+          } />
+          <Route path="/qrscanner" element={
+            <PrivateRoute>
+              <QRScanner />
+            </PrivateRoute>
+          } />
+          <Route path="/success/:queueId" element={<SuccessPage />} />
+          <Route path="/mapproximity" element={<MapProximity />} />
+          <Route path="/appointments" element={
+            <PrivateRoute>
+              <AppointmentsList />
+            </PrivateRoute>
+          } />
+          <Route path="/appointment/:orderId" element={
+            <PrivateRoute>
+              <AppointmentDetail />
+            </PrivateRoute>
+          } />
+          <Route path="/orderid" element={<OrderIDInput />} />
+          <Route path="/add-appointment" element={
+            <PrivateRoute>
+              <AddAppointment />
+            </PrivateRoute>
+          } />
+          <Route path="/services" element={<ServiceSelection />} />
+          <Route path="/book-appointment/:serviceId" element={
+            <PrivateRoute>
+              <BookAppointment />
+            </PrivateRoute>
+          } />
+          <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />
 
-          {/* Regular authenticated user routes */}
-          <Route
-            path="/*"
-            element={
-              <PrivateRoute>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/main" replace />} />
-                  <Route path="/usermainpage" element={<UserMainPage />} />
-                  <Route path="/qrscanner" element={<QRScanner />} />
-                  <Route path="/qrcodescreen/:queueId" element={<QRCodeScreenWrapper />} />
-                  <Route path="/success/:queueId" element={<SuccessPage />} />
-                  <Route path="/MapProximity" element={<MapProximity />} />
-                  <Route path="/appointments" element={<AppointmentsList />} />
-                  <Route path="/appointment/:orderId" element={<AppointmentDetail />} />
-                  <Route path="/input-order" element={<OrderIDInput />} />
-                  <Route path="/add-appointment" element={<AddAppointment />} />
-                  <Route path="/services" element={<ServiceSelection />} />
-                  <Route path="/book-appointment/:serviceId" element={<BookAppointment />} />
-                </Routes>
-              </PrivateRoute>
-            }
-          />
+          {/* Admin routes */}
+          <Route path="/admin/*" element={
+            <PrivateRoute adminOnly>
+              <AdminLayout />
+            </PrivateRoute>
+          } />
         </Routes>
       </Router>
     </AuthProvider>

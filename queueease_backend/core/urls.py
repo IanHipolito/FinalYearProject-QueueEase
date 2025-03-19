@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (api_overview, create_queue, get_qr_code, signup_view, login_view, validate_qr, 
                    user_appointments, appointment_detail, get_or_create_appointment, generate_demo_appointments, 
                    delete_appointment, list_services, queue_status, queue_detail, complete_queue, active_queue,
-                   service_detail, available_appointment_times, create_appointment)
+                   service_detail, available_appointment_times, create_appointment, admin_signup, admin_services,
+                   admin_dashboard_data, list_services_with_status)	
 from django.http import JsonResponse
 
 def test_view(request):
@@ -30,4 +31,8 @@ urlpatterns = [
     path('service/<int:service_id>/', service_detail, name='service-detail'),
     path('available-times/<int:service_id>/', available_appointment_times, name='available-times'),
     path('create-appointment/', create_appointment, name='create-appointment'),
+    path('admin-signup/', admin_signup, name='admin-signup'),
+    path('admin-services/<int:user_id>/', admin_services, name='admin-services'),
+    path('admin/dashboard-data/', admin_dashboard_data, name='admin-dashboard-data'),
+    path('list_services_with_status/', list_services_with_status, name='list_services_with_status'),
 ]

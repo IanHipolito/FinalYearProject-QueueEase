@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@types/lodash": "^4.17.16",
     "@types/mapbox__mapbox-gl-geocoder": "^5.0.0",
     "@types/react-window": "^1.8.8",
     "cross-env": "^7.0.3"

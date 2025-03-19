@@ -7,7 +7,7 @@ import { useAuth } from './AuthContext';
 import {
   Box, Typography, TextField, InputAdornment, Select, MenuItem, Button,
   Paper, IconButton, Chip, useTheme, useMediaQuery, CircularProgress,
-  Alert, Fade, Collapse, Snackbar, Divider
+  Alert, Fade, Collapse, Snackbar, Divider,
 } from '@mui/material';
 import { SelectChangeEvent } from '@mui/material/Select';
 import SearchIcon from '@mui/icons-material/Search';
@@ -43,6 +43,7 @@ interface Service {
   latitude: number;
   longitude: number;
   subcategory?: string;
+  service_type?: 'immediate' | 'appointment';
 }
 
 interface MapProximityProps {
@@ -193,7 +194,7 @@ const ServiceCard = React.memo(({
               }
             }}
           >
-            Join Queue
+            {service.service_type === 'appointment' ? 'Book' : 'Join Queue'}
           </Button>
         </Box>
       </Box>
@@ -260,6 +261,19 @@ const getCategoryColor = (category: string): string => {
   }
 };
 
+const MARKER_COLORS = {
+  default: '#00757F',
+  restaurant: '#FF5722',
+  fast_food: '#E91E63',
+  cafe: '#FF9800',
+  bar: '#9C27B0',
+  shop: '#795548',
+  bank: '#DB9A00',
+  attraction: '#4CAF50',
+  hotel: '#2196F3',
+  healthcare: '#F44336',
+};
+
 const generateRandomDublinCoordinates = () => {
   return {
     latitude: DUBLIN_BOUNDS.south + Math.random() * (DUBLIN_BOUNDS.north - DUBLIN_BOUNDS.south),
@@ -280,70 +294,60 @@ const CATEGORIES = [
   { id: "healthcare", label: "Healthcare" },
 ];
 
-const createMarkerElement = (service: Service, isSelected: boolean = false) => {
-  const el = document.createElement('div');
-  el.className = 'queueease-marker';
-  if (isSelected) {
-    el.classList.add('queueease-marker-selected');
+const getServicePointLayer = (selectedService: Service | null): mapboxgl.CircleLayer => ({
+  id: 'service-points',
+  type: 'circle' as const,
+  source: 'services',
+  filter: ['!', ['has', 'point_count']],
+  paint: {
+    'circle-radius': [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      10, 6,
+      14, 12,
+      16, 16
+    ],
+    'circle-color': [
+      'match',
+      ['get', 'category'],
+      'restaurant', MARKER_COLORS.restaurant,
+      'fast_food', MARKER_COLORS.fast_food,
+      'cafe', MARKER_COLORS.cafe,
+      'bar', MARKER_COLORS.bar,
+      'shop', MARKER_COLORS.shop,
+      'bank', MARKER_COLORS.bank,
+      'attraction', MARKER_COLORS.attraction,
+      'hotel', MARKER_COLORS.hotel,
+      'healthcare', MARKER_COLORS.healthcare,
+      MARKER_COLORS.default
+    ],
+    'circle-stroke-width': [
+      'case',
+      ['==', ['get', 'id'], ['literal', selectedService ? selectedService.id : -1]],
+      3,
+      1.5
+    ],
+    'circle-stroke-color': 'white',
+    'circle-opacity': 0.9
   }
+});
 
-  const color = getCategoryColor(service.category);
-  el.style.backgroundColor = color;
-  el.setAttribute('data-service-id', service.id.toString());
-  el.setAttribute('data-category', service.category.toLowerCase());
-
-  const iconContainer = document.createElement('div');
-  iconContainer.className = 'queueease-marker-icon';
-
-  let iconSvg = '';
-  const category = service.category.toLowerCase();
-
-  switch (category) {
-    case 'restaurant':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>';
-      break;
-    case 'fast_food':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zm-1.06-8.99c0-2.7-.82-3.85-2.34-5.38-1.5-1.5-3.63-2.51-5.66-2.51s-4.14 1.01-5.64 2.5c-1.5 1.5-2.36 2.67-2.36 5.39v9h16v-9c0 .01 0-.01 0 0z"/></svg>';
-      break;
-    case 'cafe':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg>';
-      break;
-    case 'bar':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M21 5V3H3v2l8 9v5H6v2h12v-2h-5v-5l8-9zM5.23 5h13.54l-1.81 2H7.04L5.23 5z"/></svg>';
-      break;
-    case 'hotel':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>';
-      break;
-    case 'bank':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M4 10v7h3v-7H4zm6 0v7h3v-7h-3zM2 22h19v-3H2v3zm14-12v7h3v-7h-3zm-4.5-9L2 6v2h19V6l-9.5-5z"/></svg>';
-      break;
-    case 'shop':
-    case 'storefront':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M18.36 9l.6 3H5.04l.6-3h12.72M20 4H4v2h16V4zm0 3H4l-1 5v2h1v6h10v-6h4v6h2v-6h1v-2l-1-5zM6 18v-4h6v4H6z"/></svg>';
-      break;
-    case 'attraction':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
-      break;
-    case 'healthcare':
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M19 3H5c-1.1 0-1.99.9-1.99 2L3 19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/></svg>';
-      break;
-    default:
-      iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>';
+const getServiceSymbolLayer = (): mapboxgl.SymbolLayer => ({
+  id: 'service-symbols',
+  type: 'symbol' as const,
+  source: 'services',
+  filter: ['!', ['has', 'point_count']],
+  layout: {
+    'text-field': ['get', 'initial'],
+    'text-size': 10,
+    'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+    'text-allow-overlap': true
+  },
+  paint: {
+    'text-color': 'white'
   }
-
-  iconContainer.innerHTML = iconSvg;
-  el.appendChild(iconContainer);
-
-  if (service.queue_length && service.queue_length > 0) {
-    const badge = document.createElement('div');
-    badge.className = 'queueease-marker-badge';
-    badge.textContent = service.queue_length > 9 ? '9+' : service.queue_length.toString();
-    badge.style.backgroundColor = service.queue_length > 10 ? '#f44336' : '#4caf50';
-    el.appendChild(badge);
-  }
-
-  return el;
-};
+});
 
 const MapProximity: React.FC<MapProximityProps> = ({
   apiUrl = 'http://127.0.0.1:8000/api/list_services/',
@@ -371,6 +375,7 @@ const MapProximity: React.FC<MapProximityProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [showFilters, setShowFilters] = useState(!isMobile);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [snackbarState, setSnackbarState] = useState<{
     open: boolean,
     message: string,
@@ -378,28 +383,142 @@ const MapProximity: React.FC<MapProximityProps> = ({
   }>({ open: false, message: "", severity: "success" });
   const [sheetHeight, setSheetHeight] = useState<'collapsed' | 'partial' | 'full'>('partial');
 
-  const filteredServices = useMemo(() => {
-    let filtered = services.filter(service =>
-      service.latitude >= DUBLIN_BOUNDS.south &&
-      service.latitude <= DUBLIN_BOUNDS.north &&
-      service.longitude >= DUBLIN_BOUNDS.west &&
-      service.longitude <= DUBLIN_BOUNDS.east
-    );
+  const createServicePopupContent = (service: Service) => `
+    <div style="padding: 12px;">
+      <h3 style="margin: 0 0 8px; font-size: 16px; font-weight: 600;">${service.name}</h3>
+      <div style="font-size: 13px; color: #666; margin-bottom: 8px;">
+        ${service.category || ''}
+        ${service.wait_time ? ` • ${service.wait_time} min wait` : ''}
+        ${service.queue_length ? ` • ${service.queue_length} in queue` : ''}
+      </div>
+    </div>
+  `;
 
-    if (debouncedFilterText.trim() !== "") {
-      const lowerFilter = debouncedFilterText.toLowerCase();
-      filtered = filtered.filter(
-        (service) =>
-          service.name.toLowerCase().includes(lowerFilter) ||
-          (service.description?.toLowerCase().includes(lowerFilter) || false)
-      );
+  const handleMarkerClick = useCallback((service: Service) => {
+    setSelectedService(service);
+
+    if (map.current) {
+      // Limit animation duration for better performance
+      map.current.flyTo({
+        center: [service.longitude, service.latitude],
+        zoom: Math.max(map.current.getZoom(), 14),
+        duration: 500, // Shorter animation
+        essential: true // Mark as essential for performance
+      });
+
+      // Reuse popup if possible
+      if (!popupRef.current) {
+        popupRef.current = new mapboxgl.Popup({
+          closeButton: true,
+          closeOnClick: false,
+          maxWidth: '300px',
+          offset: 15
+        });
+      } else {
+        popupRef.current.remove();
+      }
+
+      // Set content and add to map
+      popupRef.current
+        .setLngLat([service.longitude, service.latitude])
+        .setHTML(createServicePopupContent(service))
+        .addTo(map.current);
     }
 
-    if (selectedCategory !== "All") {
-      filtered = filtered.filter((service) => {
-        const serviceCategory = service.category?.toLowerCase() || '';
-        const serviceSubcategory = service.subcategory?.toLowerCase() || '';
-        const serviceName = service.name?.toLowerCase() || '';
+    if (isMobile) setSheetHeight('partial');
+  }, [isMobile]);
+
+  const handleJoinQueue = useCallback(async (serviceId: number) => {
+    if (!user) {
+      navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
+      return;
+    }
+
+    try {
+      const service = serviceMapRef.current.get(serviceId);
+      if (!service) {
+        throw new Error('Service not found');
+      }
+
+      // Check if this is a service that requires appointments
+      if (service.service_type === 'appointment') {
+        // Route to booking page for appointment-based services
+        navigate(`/book-appointment/${serviceId}`);
+        return;
+      }
+
+      // For immediate services, create a queue entry
+      setSnackbarState({
+        open: true,
+        message: "Creating your queue entry...",
+        severity: "info"
+      });
+
+      const response = await fetch("http://127.0.0.1:8000/api/create-queue/", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          service_id: serviceId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to create queue: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setSnackbarState({
+        open: true,
+        message: "Successfully joined queue!",
+        severity: "success"
+      });
+
+      // Navigate to QR code screen with the queue ID
+      navigate(`/qrcodescreen/${data.queue_id}`);
+    } catch (err) {
+      console.error('Error joining queue:', err);
+      setSnackbarState({
+        open: true,
+        message: `Failed to join queue: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        severity: 'error'
+      });
+    }
+  }, [navigate, user]);
+
+  const filteredServices = useMemo(() => {
+    if (!debouncedFilterText && selectedCategory === "All") {
+      return services;
+    }
+
+    return services.filter(service => {
+      // Location filter - always apply
+      if (service.latitude < DUBLIN_BOUNDS.south ||
+        service.latitude > DUBLIN_BOUNDS.north ||
+        service.longitude < DUBLIN_BOUNDS.west ||
+        service.longitude > DUBLIN_BOUNDS.east) {
+        return false;
+      }
+
+      // Text filter
+      if (debouncedFilterText) {
+        const lowerFilter = debouncedFilterText.toLowerCase();
+        const nameMatch = service.name.toLowerCase().includes(lowerFilter);
+        const descMatch = service.description?.toLowerCase().includes(lowerFilter) || false;
+
+        if (!nameMatch && !descMatch) {
+          return false;
+        }
+      }
+
+      // Category filter
+      if (selectedCategory !== "All") {
+        const serviceCategory = (service.category || '').toLowerCase();
+        const serviceSubcategory = (service.subcategory || '').toLowerCase();
+        const serviceName = (service.name || '').toLowerCase();
 
         if (selectedCategory === "fast_food") {
           return serviceCategory === "fast_food" ||
@@ -418,35 +537,77 @@ const MapProximity: React.FC<MapProximityProps> = ({
         }
 
         return serviceCategory === selectedCategory.toLowerCase();
-      });
-    }
+      }
 
-    return filtered;
+      return true;
+    });
   }, [services, debouncedFilterText, selectedCategory]);
 
-  const geojsonData = useMemo<FeatureCollection<Point>>(() => ({
-    type: 'FeatureCollection',
-    features: filteredServices.map((service): Feature<Point> => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [service.longitude, service.latitude]
-      },
-      properties: {
-        id: service.id,
-        name: service.name,
-        category: service.category,
-        wait_time: service.wait_time || 0,
-        queue_length: service.queue_length || 0
-      }
-    }))
-  }), [filteredServices]);
+  const visibleServices = useMemo(() => {
+    if (sheetHeight === 'collapsed') return [];
+    const MAX_VISIBLE_SERVICES = 20;
+    return filteredServices.slice(0, MAX_VISIBLE_SERVICES);
+  }, [filteredServices, sheetHeight]);
+
+  const prepareGeoJSON = useCallback((services: Service[]): FeatureCollection<Point> => {
+    return {
+      type: 'FeatureCollection',
+      features: services.map((service): Feature<Point> => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [service.longitude, service.latitude]
+        },
+        properties: {
+          id: service.id,
+          name: service.name,
+          category: service.category,
+          initial: service.name.charAt(0),
+          wait_time: service.wait_time || 0,
+          queue_length: service.queue_length || 0,
+          selected: selectedService?.id === service.id
+        }
+      }))
+    };
+  }, [selectedService?.id]);
+
+  const getViewportServices = useCallback(() => {
+    if (!map.current) return filteredServices;
+
+    // Get current viewport bounds with a buffer
+    const bounds = map.current.getBounds();
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+
+    // Add a 20% buffer around the viewport
+    const latBuffer = (ne.lat - sw.lat) * 0.2;
+    const lngBuffer = (ne.lng - sw.lng) * 0.2;
+
+    return filteredServices.filter(service =>
+      service.latitude >= sw.lat - latBuffer &&
+      service.latitude <= ne.lat + latBuffer &&
+      service.longitude >= sw.lng - lngBuffer &&
+      service.longitude <= ne.lng + lngBuffer
+    );
+  }, [filteredServices, map.current]);
+
+  const geojsonData = useMemo(() =>
+    prepareGeoJSON(getViewportServices()),
+    [getViewportServices, prepareGeoJSON]
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedFilterText(filterText);
     }, 300);
-    return () => clearTimeout(timer);
+
+    return () => {
+      clearTimeout(timer);
+      if (debounceTimerRef.current) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
   }, [filterText]);
 
   useEffect(() => {
@@ -542,7 +703,11 @@ const MapProximity: React.FC<MapProximityProps> = ({
           maxBounds: [
             [DUBLIN_BOUNDS.west - 0.1, DUBLIN_BOUNDS.south - 0.1],
             [DUBLIN_BOUNDS.east + 0.1, DUBLIN_BOUNDS.north + 0.1]
-          ]
+          ],
+          refreshExpiredTiles: false,
+          trackResize: false,
+          pitchWithRotate: false,
+          logoPosition: 'bottom-left'
         });
 
         map.current = newMap;
@@ -574,13 +739,13 @@ const MapProximity: React.FC<MapProximityProps> = ({
 
         newMap.on('moveend', () => {
           isMapMovingRef.current = false;
-          updateVisibleMarkers();
+          updateMapData();
         });
 
         newMap.on('load', () => {
           console.log('Map loaded');
           addMapStyles();
-          initializeMarkerLayers();
+          initializeMapLayers();
         });
 
         newMap.on('error', (e) => {
@@ -691,9 +856,10 @@ const MapProximity: React.FC<MapProximityProps> = ({
       document.head.appendChild(style);
     };
 
-    const initializeMarkerLayers = () => {
+    const initializeMapLayers = () => {
       if (!map.current) return;
 
+      // Add source for services
       map.current.addSource('services', {
         type: 'geojson',
         data: {
@@ -702,23 +868,17 @@ const MapProximity: React.FC<MapProximityProps> = ({
         },
         cluster: true,
         clusterMaxZoom: 14,
-        clusterRadius: 50,
-        clusterProperties: {
-          restaurant_count: ['+', ['case', ['==', ['get', 'category'], 'restaurant'], 1, 0]],
-          fast_food_count: ['+', ['case', ['==', ['get', 'category'], 'fast_food'], 1, 0]],
-          cafe_count: ['+', ['case', ['==', ['get', 'category'], 'cafe'], 1, 0]],
-          bar_count: ['+', ['case', ['==', ['get', 'category'], 'bar'], 1, 0]],
-          shop_count: ['+', ['case', ['==', ['get', 'category'], 'shop'], 1, 0]],
-          bank_count: ['+', ['case', ['==', ['get', 'category'], 'bank'], 1, 0]],
-          hotel_count: ['+', ['case', ['==', ['get', 'category'], 'hotel'], 1, 0]],
-          healthcare_count: ['+', ['case', ['==', ['get', 'category'], 'healthcare'], 1, 0]],
-          attraction_count: ['+', ['case', ['==', ['get', 'category'], 'attraction'], 1, 0]]
-        }
+        clusterRadius: 60,
+        generateId: true,
+        maxzoom: 17,
+        buffer: 128,
+        tolerance: 0.5
       });
 
+      // Add clustering layers
       map.current.addLayer({
         id: 'clusters',
-        type: 'circle',
+        type: 'circle' as const,
         source: 'services',
         filter: ['has', 'point_count'],
         paint: {
@@ -731,15 +891,14 @@ const MapProximity: React.FC<MapProximityProps> = ({
           ],
           'circle-radius': [
             'interpolate',
-            ['exponential', 1.5],
+            ['linear'],
             ['get', 'point_count'],
-            3, 25,
-            10, 30,
-            50, 40,
-            100, 45,
-            500, 55
+            3, 20,
+            10, 25,
+            50, 35,
+            100, 40
           ],
-          'circle-stroke-width': 3,
+          'circle-stroke-width': 2,
           'circle-stroke-color': 'white',
           'circle-opacity': 0.9
         }
@@ -747,12 +906,12 @@ const MapProximity: React.FC<MapProximityProps> = ({
 
       map.current.addLayer({
         id: 'cluster-count',
-        type: 'symbol',
+        type: 'symbol' as const,
         source: 'services',
         filter: ['has', 'point_count'],
         layout: {
           'text-field': '{point_count_abbreviated}',
-          'text-size': 14,
+          'text-size': 12,
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
           'text-allow-overlap': true
         },
@@ -761,6 +920,11 @@ const MapProximity: React.FC<MapProximityProps> = ({
         }
       });
 
+      // Add individual service layers
+      map.current.addLayer(getServicePointLayer(selectedService));
+      map.current.addLayer(getServiceSymbolLayer());
+
+      // Handle clicks on clusters
       map.current.on('click', 'clusters', (e) => {
         if (!map.current || !e.features || e.features.length === 0) return;
 
@@ -775,12 +939,41 @@ const MapProximity: React.FC<MapProximityProps> = ({
           const coordinates = (feature.geometry as Point).coordinates.slice() as [number, number];
           map.current.easeTo({
             center: coordinates,
-            zoom: Math.min((zoom || 0) + 0.5, 18)
+            zoom: Math.min((zoom || 0) + 1, 17)
           });
         });
       });
 
-      markerClusterRef.current = true;
+      // Handle clicks on individual points
+      map.current.on('click', 'service-points', (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const feature = e.features[0];
+        const serviceId = feature.properties?.id;
+        if (!serviceId) return;
+
+        const service = serviceMapRef.current.get(Number(serviceId));
+        if (service) {
+          handleMarkerClick(service);
+        }
+      });
+
+      // Change cursor on hover
+      map.current.on('mouseenter', 'service-points', () => {
+        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.current.on('mouseleave', 'service-points', () => {
+        if (map.current) map.current.getCanvas().style.cursor = '';
+      });
+
+      map.current.on('mouseenter', 'clusters', () => {
+        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.current.on('mouseleave', 'clusters', () => {
+        if (map.current) map.current.getCanvas().style.cursor = '';
+      });
     };
 
     initMap();
@@ -793,92 +986,49 @@ const MapProximity: React.FC<MapProximityProps> = ({
       if (map.current) map.current.remove();
       map.current = null;
     };
-  }, [isMobile, theme.palette.primary.main]);
+  }, [isMobile, theme.palette.primary.light, theme.palette.primary.main, theme.palette.primary.dark, handleMarkerClick, selectedService]);
 
-  const updateVisibleMarkers = useCallback(() => {
-    if (!map.current || isMapMovingRef.current) return;
-    const bounds = map.current.getBounds();
+  const updateMapData = useCallback(() => {
+    if (!map.current) return;
+    if (isMapMovingRef.current) return; // Skip updates during map movements
+
     const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
-    if (source) {
+    if (!source) return;
+
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
+      // Update the GeoJSON data
       source.setData(geojsonData);
-    }
 
-    const currentZoom = map.current.getZoom();
-    const shouldShowClusters = currentZoom < 14;
-    const MAX_VISIBLE_MARKERS = shouldShowClusters ? 30 : 75;
-
-    const visibleServices = filteredServices.filter(service =>
-      service.longitude >= bounds.getWest() &&
-      service.longitude <= bounds.getEast() &&
-      service.latitude >= bounds.getSouth() &&
-      service.latitude <= bounds.getNorth()
-    );
-
-    const servicesToShow = visibleServices.slice(0, MAX_VISIBLE_MARKERS);
-    const currentServiceIds = new Set(servicesToShow.map(s => s.id));
-    const existingServiceIds = new Set(Object.keys(markersRef.current).map(Number));
-
-    existingServiceIds.forEach(id => {
-      if (!currentServiceIds.has(id)) {
-        if (markersRef.current[id]) {
-          markersRef.current[id].remove();
-          delete markersRef.current[id];
-        }
+      // Only update the selected marker if absolutely necessary
+      if (map.current?.getLayer('service-points')) {
+        map.current.setPaintProperty(
+          'service-points',
+          'circle-stroke-width',
+          [
+            'case',
+            ['==', ['get', 'id'], ['literal', selectedService ? selectedService.id : -1]],
+            3,
+            1.5
+          ]
+        );
       }
     });
-
-    servicesToShow.forEach(service => {
-      if (markersRef.current[service.id]) {
-        markersRef.current[service.id].setLngLat([service.longitude, service.latitude]);
-        return;
-      }
-
-      const isSelected = selectedService?.id === service.id;
-      const el = createMarkerElement(service, isSelected);
-
-      el.addEventListener('click', () => {
-        if (debounceTimerRef.current) {
-          window.clearTimeout(debounceTimerRef.current);
-        }
-
-        debounceTimerRef.current = window.setTimeout(() => {
-          handleMarkerClick(service);
-        }, 100);
-      });
-
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([service.longitude, service.latitude])
-        .addTo(map.current!);
-
-      markersRef.current[service.id] = marker;
-    });
-  }, [filteredServices, geojsonData, selectedService]);
+  }, [geojsonData, selectedService]);
 
   useEffect(() => {
     if (!map.current || loading) return;
 
-    try {
-      const source = map.current.getSource('services');
-      if (source) {
-        (source as mapboxgl.GeoJSONSource).setData(geojsonData);
-        if (Object.keys(markersRef.current).length > 0) {
-          Object.values(markersRef.current).forEach(marker => marker.remove());
-          markersRef.current = {};
-        }
-      }
-
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
-
-      debounceTimerRef.current = window.setTimeout(() => {
-        updateVisibleMarkers();
-        debounceTimerRef.current = null;
-      }, 100);
-    } catch (err) {
-      console.error('Error updating map data:', err);
+    if (debounceTimerRef.current) {
+      window.clearTimeout(debounceTimerRef.current);
     }
-  }, [geojsonData, loading, updateVisibleMarkers]);
+
+    debounceTimerRef.current = window.setTimeout(() => {
+      updateMapData();
+      debounceTimerRef.current = null;
+    }, 100);
+
+  }, [geojsonData, loading, updateMapData]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -896,21 +1046,24 @@ const MapProximity: React.FC<MapProximityProps> = ({
     });
   }, [selectedService]);
 
-  const handleMarkerClick = useCallback((service: Service) => {
-    setSelectedService(service);
+  useEffect(() => {
+    // Reset visible count when filters change
+    setVisibleCount(10);
 
-    if (map.current) {
-      map.current.easeTo({
-        center: [service.longitude, service.latitude],
-        zoom: 15,
-        duration: 800
-      });
-    }
+    // Setup scroll listener for the service list container
+    const container = document.querySelector('.service-list-container');
+    if (container) {
+      const handleScroll = (e: Event) => {
+        const target = e.target as HTMLElement;
+        if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
+          setVisibleCount(prev => Math.min(prev + 5, filteredServices.length));
+        }
+      };
 
-    if (sheetHeight === 'collapsed') {
-      setSheetHeight('partial');
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, []);
+  }, [filteredServices.length]);
 
   const toggleSheetHeight = useCallback(() => {
     setSheetHeight(prev => {
@@ -924,35 +1077,6 @@ const MapProximity: React.FC<MapProximityProps> = ({
   const collapseSheet = useCallback(() => {
     setSheetHeight('collapsed');
   }, []);
-
-  const handleJoinQueue = useCallback(async (serviceId: number) => {
-    if (!user) {
-      navigate('/login', { state: { from: '/map', service: serviceId } });
-      return;
-    }
-
-    try {
-      const service = serviceMapRef.current.get(serviceId);
-      if (!service) {
-        throw new Error('Service not found');
-      }
-
-      navigate(`/book/${serviceId}`, {
-        state: {
-          serviceName: service.name,
-          serviceCategory: service.category,
-          waitTime: service.wait_time || 10
-        }
-      });
-    } catch (err) {
-      console.error('Error joining queue:', err);
-      setSnackbarState({
-        open: true,
-        message: `Failed to join queue: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        severity: 'error'
-      });
-    }
-  }, [navigate, user]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFilterText(e.target.value);
@@ -979,13 +1103,24 @@ const MapProximity: React.FC<MapProximityProps> = ({
     setSnackbarState(prev => ({ ...prev, open: false }));
   }, []);
 
+  const renderServiceRow = useCallback((service: Service) => {
+    const isSelected = selectedService?.id === service.id;
+    return (
+      <ServiceCard
+        key={service.id}
+        service={service}
+        isSelected={isSelected}
+        onCardClick={handleMarkerClick}
+        onJoinClick={handleJoinQueue}
+        theme={theme}
+      />
+    );
+  }, [handleJoinQueue, handleMarkerClick, selectedService?.id, theme]);
+
+
   const renderServiceList = useCallback(() => {
     if (loading) {
-      return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
-        </Box>
-      );
+      return <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>;
     }
 
     if (filteredServices.length === 0) {
@@ -1005,20 +1140,8 @@ const MapProximity: React.FC<MapProximityProps> = ({
       );
     }
 
-    const MAX_VISIBLE_SERVICES = 20;
-    const visibleServices = filteredServices.slice(0, MAX_VISIBLE_SERVICES);
-
-    return visibleServices.map(service => (
-      <ServiceCard
-        key={service.id}
-        service={service}
-        isSelected={selectedService?.id === service.id}
-        onCardClick={handleMarkerClick}
-        onJoinClick={handleJoinQueue}
-        theme={theme}
-      />
-    ));
-  }, [filteredServices, handleJoinQueue, handleMarkerClick, handleResetFilters, loading, selectedService, theme]);
+    return visibleServices.map(renderServiceRow);
+  }, [filteredServices.length, handleResetFilters, loading, renderServiceRow, visibleServices]);
 
   return (
     <Box
@@ -1046,6 +1169,8 @@ const MapProximity: React.FC<MapProximityProps> = ({
           zIndex: 1,
           transform: 'translateZ(0)',
           willChange: 'transform',
+          WebkitBackfaceVisibility: 'hidden',
+          WebkitPerspective: 1000,
         }}
       />
 
@@ -1255,6 +1380,7 @@ const MapProximity: React.FC<MapProximityProps> = ({
         {/* Services list - only rendered when not collapsed */}
         {sheetHeight !== 'collapsed' && (
           <Box
+            className="service-list-container"
             sx={{
               overflow: 'auto',
               flexGrow: 1,
@@ -1363,7 +1489,7 @@ const MapProximity: React.FC<MapProximityProps> = ({
                     startIcon={<AddIcon />}
                     onClick={() => handleJoinQueue(selectedService.id)}
                   >
-                    Join Queue
+                    {selectedService.service_type === 'appointment' ? 'Book Appointment' : 'Join Queue'}
                   </Button>
 
                   <Button
