@@ -3,7 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin
+from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 import random
 from .serializers import ServiceSerializer
 import numpy as np
-from .services.notifications import send_push_notification
+from .services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -32,39 +32,6 @@ SERVICE_OPTIONS = {
     "McDonald's": 5,
     "Burger King": 7,
 }
-
-# @csrf_exempt
-# def login_view(request):
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             email = data.get('email', '').strip()
-#             password = data.get('password', '').strip()
-
-#             if not email or not password:
-#                 return JsonResponse({'error': 'Email and password are required.'}, status=400)
-
-#             try:
-#                 user = User.objects.get(email=email)
-#             except User.DoesNotExist:
-#                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
-
-#             # Verify password
-#             if not check_password(password, user.password):
-#                 return JsonResponse({'error': 'Invalid email or password.'}, status=401)
-
-#             return JsonResponse({
-#                 'message': 'Login successful!',
-#                 'user_id': user.id,
-#                 'name': user.name,
-#                 'email': user.email,
-#                 'user_type': user.user_type
-#             }, status=200)
-#         except json.JSONDecodeError:
-#             return JsonResponse({'error': 'Invalid request body.'}, status=400)
-#         except Exception as e:
-#             return JsonResponse({'error': str(e)}, status=500)
-#     return JsonResponse({'error': 'Invalid request method. Only POST is allowed.'}, status=405)
 
 @csrf_exempt
 def login_view(request):
@@ -301,72 +268,6 @@ def active_queue(request, user_id):
     }
     return Response(data)
 
-# @csrf_exempt
-# @api_view(['POST'])
-# def create_queue(request):
-#     if request.method == 'POST':
-#         try:
-#             # Extract data from the request
-#             user_id = request.data.get('user_id')
-#             service_id = request.data.get('service_id')
-#             employee_id = request.data.get('employee_id')  # optional
-
-#             if not all([user_id, service_id]):
-#                 return JsonResponse({"error": "user_id and service_id are required."}, status=400)
-
-#             user = get_object_or_404(User, id=user_id)
-#             service = get_object_or_404(Service, id=service_id)
-#             employee = None
-#             if employee_id:
-#                 employee = get_object_or_404(EmployeeDetails, id=employee_id)
-            
-#             # Check for an existing active queue for this service on the current day
-#             existing_queue = Queue.objects.filter(
-#                 service=service,
-#                 status='pending',
-#                 is_active=True,
-#                 date_created__date=datetime.now().date()
-#             ).first()
-#             if existing_queue:
-#                 qr_code = QRCode.objects.filter(queue=existing_queue).first()
-#                 return JsonResponse({
-#                     "queue_id": existing_queue.id,
-#                     "user": user.name,
-#                     "service": service.name,
-#                     "sequence_number": existing_queue.sequence_number,
-#                     "qr_hash": qr_code.qr_hash if qr_code else None,
-#                     "message": "Existing queue entry used."
-#                 })
-
-#             # Create a new queue entry if none exists
-#             sequence_number = Queue.objects.filter(service=service, status='pending', is_active=True).count() + 1
-#             queue = Queue.objects.create(
-#                 user=user,
-#                 service=service,
-#                 employee=employee,
-#                 sequence_number=sequence_number
-#             )
-
-#             qr_data = f"Queue ID: {queue.id}"
-#             qr_code = QRCode.objects.create(queue=queue, qr_hash=qr_data)
-
-#             return JsonResponse({
-#                 "queue_id": queue.id,
-#                 "user": user.name,
-#                 "service": service.name,
-#                 "sequence_number": sequence_number,
-#                 "qr_hash": qr_code.qr_hash,
-#                 "message": "New queue entry created."
-#             })
-
-#         except Exception as e:
-#             logger.error(f"Error in create_queue: {str(e)}")
-#             return JsonResponse({"error": "An error occurred while creating the queue.", "details": str(e)}, status=500)
-
-#     return JsonResponse({"error": "Invalid request method. Only POST is allowed."}, status=400)
-
-
-
 def get_qr_code(request, queue_id):
     try:
         qr_code = QRCode.objects.get(queue_id=queue_id)
@@ -405,12 +306,6 @@ def validate_qr(request):
         return JsonResponse({"error": "Invalid JSON format."}, status=400)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-# @api_view(['GET'])
-# def user_appointments(request, user_id):
-#     appointments = AppointmentDetails.objects.filter(user_id=user_id).order_by('-appointment_date')
-#     serializer = AppointmentDetailsSerializer(appointments, many=True)
-#     return Response(serializer.data)
 
 @api_view(['GET'])
 def user_appointments(request, user_id):
@@ -555,18 +450,6 @@ def delete_appointment(request, order_id):
     appointment.delete()
     return Response({"message": "Appointment deleted successfully."}, status=200)
 
-# @api_view(['GET'])
-# def list_services(request):
-#     services = Service.objects.filter(is_active=True)
-#     data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
-#     return Response(data)
-
-# @api_view(['GET'])
-# def list_services(request):
-#     services = Service.objects.all()
-#     serializer = ServiceSerializer(services, many=True)
-#     return Response(serializer.data)
-
 @api_view(['GET'])
 def list_services(request):
     try:
@@ -643,17 +526,63 @@ def queue_status(request, queue_id):
 
 @api_view(['POST'])
 def update_queue_position(request, queue_id):
-    queue_item = Queue.objects.get(id=queue_id)
-    new_position = queue_item.sequence_number
-    estimated_wait = ...
-
-    fcm_token = queue_item.user.fcm_token
-    if fcm_token:
-        title = "Queue Update"
-        body = f"Your position is now {new_position}. Estimated wait time: {estimated_wait} minutes."
-        send_push_notification(fcm_token, title, body)
-    
-    return Response({"message": "Queue updated and notification sent."})
+    """Update queue position and notify user"""
+    try:
+        queue = Queue.objects.get(id=queue_id)
+        
+        # Calculate current position
+        position = Queue.objects.filter(
+            service=queue.service,
+            status='pending',
+            is_active=True,
+            date_created__lt=queue.date_created
+        ).count() + 1
+        
+        # Only notify if position changed significantly (e.g., every 2 positions)
+        if hasattr(queue, '_prev_position') and abs(queue._prev_position - position) < 2:
+            return Response({"success": True, "notification": "skipped"})
+            
+        # Store current position for next comparison
+        queue._prev_position = position
+        
+        # Get user's FCM token
+        try:
+            fcm_token = FCMToken.objects.filter(user=queue.user, is_active=True).latest('updated_at')
+            token = fcm_token.token
+            
+            # Calculate estimated wait time
+            wait_time = 5  # Default
+            if queue.expected_ready_time:
+                import datetime
+                now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+                wait_time = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
+            
+            # Send notification
+            send_queue_update_notification(
+                token=token,
+                queue_id=queue_id,
+                position=position,
+                wait_time=wait_time,
+                service_name=queue.service.name
+            )
+            
+            return Response({
+                "success": True,
+                "position": position,
+                "notification": "sent"
+            })
+            
+        except FCMToken.DoesNotExist:
+            return Response({
+                "success": True,
+                "position": position,
+                "notification": "no token found"
+            })
+            
+    except Queue.DoesNotExist:
+        return Response({"error": "Queue not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['POST'])
 def create_queue_sequence(request):
@@ -1197,3 +1126,203 @@ def admin_create_customer(request):
         }, status=201)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
+def save_fcm_token(request):
+    """Save a FCM token for a user"""
+    try:
+        user_id = request.data.get('user_id')
+        fcm_token = request.data.get('fcm_token')
+        
+        if not user_id or not fcm_token:
+            return Response({"error": "User ID and FCM token are required"}, status=400)
+        
+        user = User.objects.get(id=user_id)
+        
+        # Save or update the token
+        FCMToken.objects.update_or_create(
+            user=user,
+            token=fcm_token,
+            defaults={'is_active': True}
+        )
+        
+        return Response({"success": True, "message": "FCM token saved successfully"})
+    
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=404)
+    
+    except Exception as e:
+        logger.error(f"Error saving FCM token: {str(e)}")
+        return Response({"error": str(e)}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
+def test_notification(request):
+    """Test sending a notification to a user"""
+    try:
+        user_id = request.data.get('user_id')
+        title = request.data.get('title', 'QueueEase Notification')
+        body = request.data.get('body', 'This is a test notification')
+        notification_type = request.data.get('notification_type', 'custom')
+        data = request.data.get('data', {})
+        
+        if not user_id:
+            return Response({"error": "User ID is required"}, status=400)
+        
+        # Get FCM token for the user
+        try:
+            token_obj = FCMToken.objects.filter(user_id=user_id, is_active=True).latest('updated_at')
+            token = token_obj.token
+        except FCMToken.DoesNotExist:
+            return Response({
+                "error": "FCM token not found for this user"
+            }, status=400)
+        
+        # Send different types of notifications based on the type
+        if notification_type == 'queue_update':
+            queue_id = data.get('queue_id', '1')
+            position = 3  # Example position
+            wait_time = 15  # Example wait time in minutes
+            service_name = "Test Service"
+            
+            result = send_queue_update_notification(
+                token=token,
+                queue_id=queue_id,
+                position=position,
+                wait_time=wait_time,
+                service_name=service_name
+            )
+        else:
+            # Generic notification
+            result = send_push_notification(
+                token=token,
+                title=title,
+                body=body,
+                data=data
+            )
+        
+        if result.get('success'):
+            return Response({
+                "success": True,
+                "message": "Notification sent successfully",
+                "details": result
+            })
+        else:
+            return Response({
+                "success": False,
+                "error": "Failed to send notification",
+                "details": result
+            }, status=500)
+    
+    except Exception as e:
+        logger.error(f"Error sending test notification: {str(e)}")
+        return Response({"error": str(e)}, status=500)
+    
+def process_queues(service_id):
+    """Process queues for a service and send appropriate notifications"""
+    queues = Queue.objects.filter(
+        service_id=service_id,
+        status='pending',
+        is_active=True
+    ).order_by('date_created')
+    
+    # Update positions and notify users
+    for index, queue in enumerate(queues):
+        position = index + 1
+        
+        # Decide when to notify
+        should_notify = False
+        
+        # Always notify for position 1-3
+        if position <= 3:
+            should_notify = True
+        # Notify every 5 positions for higher numbers
+        elif position % 5 == 0:
+            should_notify = True
+        # Notify on significant wait time changes
+        elif queue.expected_ready_time and hasattr(queue, '_last_notified_wait_time'):
+            import datetime
+            now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+            current_wait = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
+            last_wait = getattr(queue, '_last_notified_wait_time', 0)
+            
+            # Notify if wait time changed by more than 10 minutes
+            if abs(current_wait - last_wait) >= 10:
+                should_notify = True
+                queue._last_notified_wait_time = current_wait
+        
+        if should_notify:
+            # Get user's token
+            try:
+                fcm_token = FCMToken.objects.filter(user=queue.user, is_active=True).latest('updated_at')
+                
+                # Calculate wait time
+                wait_time = 5  # Default
+                if queue.expected_ready_time:
+                    import datetime
+                    now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+                    wait_time = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
+                
+                send_queue_update_notification(
+                    token=fcm_token.token,
+                    queue_id=queue.id,
+                    position=position,
+                    wait_time=wait_time,
+                    service_name=queue.service.name
+                )
+                
+            except FCMToken.DoesNotExist:
+                # No token for this user - cannot send notification
+                pass
+
+def send_appointment_reminders():
+    """Check for upcoming appointments and send reminders"""
+    # Current time
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    
+    # Get appointments coming up in the next hour
+    one_hour_from_now = now + timedelta(hours=1)
+    
+    # Find appointments in the time range
+    upcoming_appointments = AppointmentDetails.objects.filter(
+        appointment_date=now.date(),
+        status='pending',
+        is_active=True
+    )
+    
+    for appointment in upcoming_appointments:
+        # Convert appointment time to datetime
+        appointment_datetime = datetime.combine(
+            appointment.appointment_date,
+            appointment.appointment_time
+        )
+        
+        # Calculate minutes until appointment
+        time_delta = appointment_datetime - now
+        minutes_until = max(0, int(time_delta.total_seconds() / 60))
+        
+        # Send notifications at strategic times:
+        # 1 hour before, 30 minutes before, and 10 minutes before
+        should_notify = minutes_until in [60, 30, 10]
+        
+        if should_notify:
+            # Get user's token
+            try:
+                fcm_token = FCMToken.objects.filter(
+                    user=appointment.user, 
+                    is_active=True
+                ).latest('updated_at')
+                
+                # Send reminder
+                send_appointment_reminder(
+                    token=fcm_token.token,
+                    appointment_id=appointment.order_id,
+                    service_name=appointment.service.name,
+                    time_until=minutes_until
+                )
+                
+            except FCMToken.DoesNotExist:
+                # No token for this user - cannot send notification
+                pass

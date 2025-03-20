@@ -3,7 +3,8 @@ from .views import (api_overview, create_queue, get_qr_code, signup_view, login_
                    user_appointments, appointment_detail, get_or_create_appointment, generate_demo_appointments, 
                    delete_appointment, list_services, queue_status, queue_detail, complete_queue, active_queue,
                    service_detail, available_appointment_times, create_appointment, admin_signup, admin_services,
-                   admin_dashboard_data, list_services_with_status, queue_history, admin_customers, admin_create_customer)	
+                   admin_dashboard_data, list_services_with_status, queue_history, admin_customers, admin_create_customer,
+                   save_fcm_token, test_notification, update_queue_position)	
 from django.http import JsonResponse
 
 def test_view(request):
@@ -38,4 +39,7 @@ urlpatterns = [
     path('user-queues/<int:user_id>/', queue_history, name='user-queues'),
     path('admin/customers/', admin_customers, name='admin-customers'),
     path('admin/customers/create/', admin_create_customer, name='admin-create-customer'),
+    path('save-fcm-token/', save_fcm_token, name='save-fcm-token'),
+    path('test-notification/', test_notification, name='test-notification'),
+    path('update-queue-position/<int:queue_id>/', update_queue_position, name='update-queue-position'),
 ]

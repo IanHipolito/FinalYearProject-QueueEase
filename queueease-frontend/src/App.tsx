@@ -22,12 +22,14 @@ import AdminLogin from './pages/AdminLogin';
 import AdminSignup from './pages/AdminSignup';
 import { AuthProvider } from './pages/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import IOSInstallGuide from './components/IOSInstallGuide';
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
       {/* Include FCM component so notifications are initialized */}
       <FBCloudMessaging />
+      <IOSInstallGuide />
       <Router>
         <Routes>
           {/* Public routes */}

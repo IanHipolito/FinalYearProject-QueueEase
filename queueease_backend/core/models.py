@@ -223,3 +223,17 @@ class ServiceAdmin(models.Model):
 
     def __str__(self):
         return f"{self.user.name} - {self.service.name}"
+
+class FCMToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='fcm_tokens')
+    token = models.TextField()
+    device_info = models.JSONField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('user', 'token')
+        
+    def __str__(self):
+        return f"FCM Token for {self.user.name}"
