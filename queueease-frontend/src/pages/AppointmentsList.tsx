@@ -3,30 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import {
   Box,
-  Container,
-  Typography,
-  Button,
-  Card,
-  CardContent,
-  CardActions,
-  Divider,
   Grid,
-  IconButton,
-  Stack,
   Alert,
   Snackbar,
-  Paper,
-  Chip,
+  Typography,
+  Stack,
   useTheme
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import EventIcon from '@mui/icons-material/Event';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import DeleteIcon from '@mui/icons-material/Delete';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
+// Import components
+import PageContainer from '../components/common/PageContainer';
+import PageHeader from '../components/common/PageHeader';
+import StyledCard from '../components/common/StyledCard';
+import StyledButton from '../components/common/StyledButton';
+import AppointmentCard from '../components/appointments/AppointmentCard';
+import { formatDate } from '../utils/formatters';
+import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
 
 interface Appointment {
   order_id: string;
@@ -39,6 +33,7 @@ interface Appointment {
 const AppointmentsList: React.FC = () => {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState<{open: boolean, message: string, severity: 'success' | 'error'}>({
     open: false,
     message: '',
@@ -49,10 +44,17 @@ const AppointmentsList: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      setLoading(true);
       fetch(`http://localhost:8000/api/appointments/${user.id}/`)
         .then(response => response.json())
-        .then(data => setAppointments(data))
-        .catch(error => console.error('Error fetching appointments:', error));
+        .then(data => {
+          setAppointments(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching appointments:', error);
+          setLoading(false);
+        });
     }
   }, [user]);
 
@@ -127,217 +129,68 @@ const AppointmentsList: React.FC = () => {
     setAlert({...alert, open: false});
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      weekday: 'long',
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric'
-    });
-  };
-
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        backgroundColor: '#f5f7fb',
-        py: 4,
-        px: 2
-      }}
-    >
-      <Container maxWidth="md">
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
-          <IconButton 
-            onClick={() => navigate('/usermainpage')} 
-            sx={{ 
-              mr: 2,
-              color: theme.palette.primary.main,
-              '&:hover': { bgcolor: 'rgba(111, 66, 193, 0.08)' }
-            }}
+    <PageContainer maxWidth="md">
+      <PageHeader title="Your Appointments" backUrl="/usermainpage" />
+      
+      <StyledCard sx={{ p: 2, mb: 3, bgcolor: 'white', border: `1px solid ${theme.palette.divider}` }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          spacing={2} 
+          sx={{ width: '100%' }}
+        >
+          <StyledButton
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/add-appointment')}
+            sx={{ flex: { xs: '1', sm: '0 0 auto' } }}
           >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" fontWeight={700} color="text.primary">
-            Your Appointments
-          </Typography>
-        </Box>
+            Add Appointment
+          </StyledButton>
+          <StyledButton
+            variant="outlined"
+            startIcon={<AutoAwesomeIcon />}
+            onClick={generateDemoAppointments}
+            sx={{ flex: { xs: '1', sm: '0 0 auto' } }}
+          >
+            Generate Demo Appointments
+          </StyledButton>
+        </Stack>
+      </StyledCard>
 
-        <Paper 
-          elevation={0}
-          sx={{
-            borderRadius: 3,
-            p: 2,
-            mb: 3,
-            bgcolor: 'white',
-            border: `1px solid ${theme.palette.divider}`
+      {loading ? (
+        <LoadingSkeleton variant="list" />
+      ) : appointments.length === 0 ? (
+        <StyledCard 
+          sx={{ 
+            textAlign: 'center',
+            py: 4,
+            px: 2,
+            bgcolor: 'rgba(111, 66, 193, 0.05)',
+            border: '1px dashed',
+            borderColor: 'divider'
           }}
         >
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={2} 
-            sx={{ width: '100%' }}
-          >
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate('/add-appointment')}
-              sx={{ 
-                borderRadius: 2,
-                bgcolor: theme.palette.primary.main,
-                '&:hover': { bgcolor: theme.palette.primary.dark },
-                py: 1.5,
-                flex: { xs: '1', sm: '0 0 auto' }
-              }}
-            >
-              Add Appointment
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<AutoAwesomeIcon />}
-              onClick={generateDemoAppointments}
-              sx={{ 
-                borderRadius: 2,
-                color: theme.palette.primary.main,
-                borderColor: theme.palette.primary.main,
-                '&:hover': { 
-                  bgcolor: 'rgba(111, 66, 193, 0.08)',
-                  borderColor: theme.palette.primary.dark
-                },
-                py: 1.5,
-                flex: { xs: '1', sm: '0 0 auto' }
-              }}
-            >
-              Generate Demo Appointments
-            </Button>
-          </Stack>
-        </Paper>
-
-        {appointments.length === 0 ? (
-          <Card 
-            sx={{ 
-              borderRadius: 3,
-              textAlign: 'center',
-              py: 4,
-              px: 2,
-              bgcolor: 'rgba(111, 66, 193, 0.05)',
-              border: '1px dashed',
-              borderColor: 'divider'
-            }}
-          >
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              No appointments found
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Add a new appointment or generate demo appointments to get started.
-            </Typography>
-          </Card>
-        ) : (
-          <Grid container spacing={3}>
-            {appointments.map(appointment => (
-              <Grid item xs={12} key={appointment.order_id}>
-                <Card 
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-                    overflow: 'hidden',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
-                    }
-                  }}
-                >
-                  <CardContent sx={{ p: 3 }}>
-                    <Typography 
-                      variant="h5" 
-                      fontWeight={600} 
-                      sx={{ mb: 2, color: theme.palette.primary.main }}
-                    >
-                      {appointment.appointment_title}
-                    </Typography>
-                    
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: { xs: 'column', sm: 'row' },
-                      gap: 2,
-                      mb: 2
-                    }}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: 'text.secondary'
-                      }}>
-                        <StorefrontIcon sx={{ mr: 1, fontSize: 18 }} />
-                        <Typography variant="body1">
-                          {appointment.service_name}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: 'text.secondary'
-                      }}>
-                        <EventIcon sx={{ mr: 1, fontSize: 18 }} />
-                        <Typography variant="body1">
-                          {formatDate(appointment.appointment_date)}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        color: 'text.secondary'
-                      }}>
-                        <AccessTimeIcon sx={{ mr: 1, fontSize: 18 }} />
-                        <Typography variant="body1">
-                          {appointment.appointment_time}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                  
-                  <Divider />
-                  
-                  <CardActions sx={{ p: 2, justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<VisibilityIcon />}
-                      onClick={() => handleViewDetails(appointment.order_id)}
-                      sx={{ 
-                        borderRadius: 2,
-                        borderColor: theme.palette.primary.main,
-                        color: theme.palette.primary.main,
-                        mr: 1,
-                        '&:hover': { 
-                          bgcolor: 'rgba(111, 66, 193, 0.08)',
-                          borderColor: theme.palette.primary.dark
-                        },
-                      }}
-                    >
-                      View Details
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => handleRemoveAppointment(appointment.order_id)}
-                      sx={{ 
-                        borderRadius: 2, 
-                        '&:hover': { 
-                          bgcolor: 'rgba(211, 47, 47, 0.08)'
-                        }
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </CardActions>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        )}
-      </Container>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No appointments found
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Add a new appointment or generate demo appointments to get started.
+          </Typography>
+        </StyledCard>
+      ) : (
+        <Grid container spacing={3}>
+          {appointments.map(appointment => (
+            <Grid item xs={12} key={appointment.order_id}>
+              <AppointmentCard
+                appointment={appointment}
+                onView={handleViewDetails}
+                onRemove={handleRemoveAppointment}
+                formatDate={formatDate}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      )}
       
       <Snackbar 
         open={alert.open} 
@@ -352,7 +205,7 @@ const AppointmentsList: React.FC = () => {
           {alert.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </PageContainer>
   );
 };
 

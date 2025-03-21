@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import {
-  Box, Container, Typography, Paper, Grid, TextField, Button,
-  FormControl, InputLabel, Select, MenuItem, Alert, IconButton,
-  useTheme, CircularProgress, Stack
+  Box, Container, Typography, Paper, Grid, FormControl,
+  InputLabel, Select, MenuItem, Alert, IconButton,
+  useTheme, CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -12,6 +12,12 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+
+// Import custom components
+import PageHeader from '../components/common/PageHeader';
+import ActionButton from '../components/common/ActionButton';
+import InfoItem from '../components/common/InfoItem';
+import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
 
 const BookAppointment: React.FC = () => {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -127,21 +133,10 @@ const BookAppointment: React.FC = () => {
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', py: 4, px: 2 }}>
       <Container maxWidth="md">
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
-          <IconButton 
-            onClick={() => navigate('/services')} 
-            sx={{ 
-              mr: 2,
-              color: theme.palette.primary.main,
-              '&:hover': { bgcolor: 'rgba(111, 66, 193, 0.08)' }
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" fontWeight={700} color="text.primary">
-            Book Appointment
-          </Typography>
-        </Box>
+        <PageHeader
+          title="Book Appointment"
+          backUrl="/services"
+        />
         
         <Paper
           elevation={2}
@@ -213,9 +208,7 @@ const BookAppointment: React.FC = () => {
                       label="Appointment Time"
                       onChange={(e) => setSelectedTime(e.target.value as string)}
                       disabled={!selectedDate || availableTimes.length === 0}
-                      sx={{ 
-                        borderRadius: 2
-                      }}
+                      sx={{ borderRadius: 2 }}
                     >
                       {availableTimes.map((time) => (
                         <MenuItem key={time} value={time}>
@@ -230,31 +223,17 @@ const BookAppointment: React.FC = () => {
           </LocalizationProvider>
           
           <Box sx={{ mt: 4 }}>
-            <Button
-              variant="contained"
-              size="large"
+            <ActionButton
               fullWidth
               disabled={!selectedDate || !selectedTime || submitting}
               onClick={handleSubmit}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                bgcolor: theme.palette.primary.main,
-                '&:hover': {
-                  bgcolor: theme.palette.primary.dark,
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 5px 15px rgba(111, 66, 193, 0.3)'
-                },
-                transition: 'all 0.2s ease',
-                fontWeight: 600
-              }}
             >
               {submitting ? (
                 <CircularProgress size={24} sx={{ color: '#fff' }} />
               ) : (
                 "Book Appointment"
               )}
-            </Button>
+            </ActionButton>
           </Box>
         </Paper>
       </Container>

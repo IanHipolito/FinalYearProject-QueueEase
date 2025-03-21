@@ -1,65 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import {
-    Box,
-    Container,
-    Typography,
-    Paper,
-    Grid,
-    Card,
-    CardContent,
-    Divider,
-    Chip,
-    IconButton,
-    TextField,
-    InputAdornment,
-    MenuItem,
-    FormControl,
-    InputLabel,
-    Select,
-    Tab,
-    Tabs,
-    CircularProgress,
-    Alert,
-    Button,
-    useTheme
-} from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import dayjs from 'dayjs';
-
-// Icons
-import SearchIcon from '@mui/icons-material/Search';
+import { Box, Container, Typography, Paper, IconButton, Tab, Tabs, CircularProgress, Alert, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import EventIcon from '@mui/icons-material/Event';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import CategoryIcon from '@mui/icons-material/Category';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import PersonIcon from '@mui/icons-material/Person';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import PendingIcon from '@mui/icons-material/Pending';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import SortIcon from '@mui/icons-material/Sort';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
-interface HistoryEntry {
-    id: number;
-    service_name: string;
-    service_type: 'immediate' | 'appointment';
-    category?: string;
-    date_created: string;
-    status: 'completed' | 'pending' | 'cancelled';
-    waiting_time?: number;
-    position?: number;
-    order_id?: string;
-    appointment_date?: string;
-    appointment_time?: string;
-}
+// Import custom components
+import HistoryFilterBar from '../components/history/HistoryFilterBar';
+import AdvancedFilters from '../components/history/AdvancedFilters';
+import HistoryList from '../components/history/HistoryList';
+
+// Import types
+import { HistoryEntry } from '../types/historyTypes';
 
 const QueueHistory: React.FC = () => {
     const { user } = useAuth();
@@ -328,43 +279,6 @@ const QueueHistory: React.FC = () => {
         return `${formattedHours}:${minutes} ${period}`;
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'completed':
-                return theme.palette.success.main;
-            case 'pending':
-                return theme.palette.warning.main;
-            case 'cancelled':
-                return theme.palette.error.main;
-            default:
-                return theme.palette.grey[500];
-        }
-    };
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'completed':
-                return <CheckCircleIcon sx={{ fontSize: 16 }} />;
-            case 'pending':
-                return <PendingIcon sx={{ fontSize: 16 }} />;
-            case 'cancelled':
-                return <CancelIcon sx={{ fontSize: 16 }} />;
-            default:
-                return null;
-        }
-    };
-
-    const getCategoryIcon = (category?: string) => {
-        switch (category?.toLowerCase()) {
-            case 'restaurant':
-            case 'fast_food':
-            case 'cafe':
-                return <StorefrontIcon fontSize="small" />;
-            default:
-                return <CategoryIcon fontSize="small" />;
-        }
-    };
-
     // Generate date groups for the filtered history
     const dateGroups = React.useMemo(() => {
         if (filteredHistory.length === 0) return {};
@@ -445,179 +359,32 @@ const QueueHistory: React.FC = () => {
 
                 {/* Search and filters */}
                 <Box sx={{ mb: 3 }}>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                fullWidth
-                                variant="outlined"
-                                placeholder="Search by service name..."
-                                value={searchQuery}
-                                onChange={handleSearch}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon color="action" />
-                                        </InputAdornment>
-                                    ),
-                                    sx: {
-                                        bgcolor: 'white',
-                                        borderRadius: 2
-                                    }
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={6} md={3}>
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<FilterListIcon />}
-                                onClick={toggleFilters}
-                                sx={{ borderRadius: 2, height: '100%' }}
-                            >
-                                {showFilters ? 'Hide Filters' : 'Show Filters'}
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6} md={3}>
-                            <Button
-                                fullWidth
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<SortIcon />}
-                                onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                                sx={{ borderRadius: 2, height: '100%' }}
-                            >
-                                {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
-                            </Button>
-                        </Grid>
-                    </Grid>
+                    <HistoryFilterBar
+                        searchQuery={searchQuery}
+                        handleSearch={handleSearch}
+                        showFilters={showFilters}
+                        toggleFilters={toggleFilters}
+                        sortOrder={sortOrder}
+                        setSortOrder={setSortOrder}
+                    />
                 </Box>
 
                 {/* Advanced filters */}
                 {showFilters && (
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            borderRadius: 3,
-                            p: 3,
-                            mb: 3,
-                            bgcolor: 'white',
-                            border: `1px solid ${theme.palette.divider}`
-                        }}
-                    >
-                        <Typography variant="h6" fontWeight={600} gutterBottom>
-                            Filters
-                        </Typography>
-
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={4}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                    <DatePicker
-                                        label="From Date"
-                                        value={startDate}
-                                        onChange={setStartDate}
-                                        slotProps={{
-                                            textField: {
-                                                fullWidth: true,
-                                                variant: 'outlined',
-                                                sx: {
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2
-                                                    }
-                                                }
-                                            }
-                                        }}
-                                    />
-                                </LocalizationProvider>
-                            </Grid>
-
-                            <Grid item xs={12} md={4}>
-                                <LocalizationProvider dateAdapter={AdapterDateFns}>
-                                    <DatePicker
-                                        label="To Date"
-                                        value={endDate}
-                                        onChange={setEndDate}
-                                        slotProps={{
-                                            textField: {
-                                                fullWidth: true,
-                                                variant: 'outlined',
-                                                sx: {
-                                                    '& .MuiOutlinedInput-root': {
-                                                        borderRadius: 2
-                                                    }
-                                                }
-                                            }
-                                        }}
-                                    />
-                                </LocalizationProvider>
-                            </Grid>
-
-                            <Grid item xs={12} md={4}>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Status</InputLabel>
-                                    <Select
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                        label="Status"
-                                        sx={{ borderRadius: 2 }}
-                                    >
-                                        <MenuItem value="all">All Statuses</MenuItem>
-                                        <MenuItem value="completed">Completed</MenuItem>
-                                        <MenuItem value="pending">Pending</MenuItem>
-                                        <MenuItem value="cancelled">Cancelled</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} md={6}>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Category</InputLabel>
-                                    <Select
-                                        value={categoryFilter}
-                                        onChange={(e) => setCategoryFilter(e.target.value)}
-                                        label="Category"
-                                        sx={{ borderRadius: 2 }}
-                                    >
-                                        <MenuItem value="all">All Categories</MenuItem>
-                                        {categories.map(category => (
-                                            <MenuItem key={category} value={category}>
-                                                {category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' ')}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12} md={6}>
-                                <FormControl fullWidth variant="outlined">
-                                    <InputLabel>Service Type</InputLabel>
-                                    <Select
-                                        value={serviceTypeFilter}
-                                        onChange={(e) => setServiceTypeFilter(e.target.value)}
-                                        label="Service Type"
-                                        sx={{ borderRadius: 2 }}
-                                    >
-                                        <MenuItem value="all">All Types</MenuItem>
-                                        <MenuItem value="immediate">Queue (Immediate)</MenuItem>
-                                        <MenuItem value="appointment">Appointment</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-
-                            <Grid item xs={12}>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                                    <Button
-                                        variant="outlined"
-                                        color="primary"
-                                        onClick={clearFilters}
-                                        sx={{ borderRadius: 2 }}
-                                    >
-                                        Clear Filters
-                                    </Button>
-                                </Box>
-                            </Grid>
-                        </Grid>
-                    </Paper>
+                    <AdvancedFilters
+                        startDate={startDate}
+                        setStartDate={setStartDate}
+                        endDate={endDate}
+                        setEndDate={setEndDate}
+                        statusFilter={statusFilter}
+                        setStatusFilter={setStatusFilter}
+                        categoryFilter={categoryFilter}
+                        setCategoryFilter={setCategoryFilter}
+                        serviceTypeFilter={serviceTypeFilter}
+                        setServiceTypeFilter={setServiceTypeFilter}
+                        categories={categories}
+                        clearFilters={clearFilters}
+                    />
                 )}
 
                 {/* Loading indicator */}
@@ -645,248 +412,17 @@ const QueueHistory: React.FC = () => {
                         </Typography>
                     </Paper>
                 ) : (
-                    /* History entries organized by date */
-                    <Box>
-                        {Object.entries(dateGroups).map(([date, entries]) => (
-                            <Box key={date} sx={{ mb: 4 }}>
-                                <Typography
-                                    variant="h6"
-                                    sx={{
-                                        mb: 2,
-                                        color: theme.palette.text.secondary,
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    {new Date(date).toLocaleDateString(undefined, {
-                                        weekday: 'long',
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric'
-                                    })}
-                                </Typography>
-
-                                <Grid container spacing={2}>
-                                    {entries.map(entry => (
-                                        <Grid item xs={12} key={`${entry.service_type}-${entry.id}`}>
-                                            <Card
-                                                sx={{
-                                                    borderRadius: 3,
-                                                    boxShadow: 'none',
-                                                    border: '1px solid',
-                                                    borderColor: theme.palette.divider,
-                                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                                    '&:hover': {
-                                                        transform: 'translateY(-2px)',
-                                                        boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent sx={{ p: 3 }}>
-                                                    <Grid container spacing={2}>
-                                                        <Grid item xs={12} sm={8}>
-                                                            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                                                <Box
-                                                                    sx={{
-                                                                        mr: 2,
-                                                                        bgcolor: entry.service_type === 'immediate' ?
-                                                                            'rgba(111, 66, 193, 0.12)' : 'rgba(13, 110, 253, 0.12)',
-                                                                        color: entry.service_type === 'immediate' ?
-                                                                            theme.palette.primary.main : '#0d6efd',
-                                                                        borderRadius: '50%',
-                                                                        p: 1.5,
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center'
-                                                                    }}
-                                                                >
-                                                                    {entry.service_type === 'immediate' ?
-                                                                        <QrCodeIcon fontSize="medium" /> :
-                                                                        <CalendarTodayIcon fontSize="medium" />
-                                                                    }
-                                                                </Box>
-
-                                                                <Box>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                                                        <Typography variant="h6" fontWeight={600}>
-                                                                            {entry.service_name}
-                                                                        </Typography>
-                                                                        <Chip
-                                                                            label={entry.service_type === 'immediate' ? 'Queue' : 'Appointment'}
-                                                                            size="small"
-                                                                            sx={{
-                                                                                ml: 2,
-                                                                                bgcolor: entry.service_type === 'immediate' ?
-                                                                                    'rgba(111, 66, 193, 0.12)' : 'rgba(13, 110, 253, 0.12)',
-                                                                                color: entry.service_type === 'immediate' ?
-                                                                                    theme.palette.primary.main : '#0d6efd',
-                                                                                fontWeight: 500,
-                                                                            }}
-                                                                        />
-                                                                        <Chip
-                                                                            icon={getStatusIcon(entry.status) || <></>}
-                                                                            label={entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
-                                                                            size="small"
-                                                                            sx={{
-                                                                                ml: 1,
-                                                                                bgcolor: `${getStatusColor(entry.status)}20`,
-                                                                                color: getStatusColor(entry.status),
-                                                                                fontWeight: 500,
-                                                                            }}
-                                                                        />
-                                                                    </Box>
-
-                                                                    {entry.category && (
-                                                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                                            <CategoryIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                            <Typography variant="body2" color="text.secondary">
-                                                                                {entry.category.charAt(0).toUpperCase() + entry.category.slice(1).replace('_', ' ')}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    )}
-
-                                                                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                                                                        {entry.service_type === 'immediate' ? (
-                                                                            <>
-                                                                                <Grid item xs={6} sm={4}>
-                                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                        <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                                        <Typography variant="body2" color="text.secondary">
-                                                                                            Wait time: {entry.waiting_time || '–'} min
-                                                                                        </Typography>
-                                                                                    </Box>
-                                                                                </Grid>
-                                                                                <Grid item xs={6} sm={4}>
-                                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                        <PersonIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                                        <Typography variant="body2" color="text.secondary">
-                                                                                            Position: {entry.position || '–'}
-                                                                                        </Typography>
-                                                                                    </Box>
-                                                                                </Grid>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <Grid item xs={6} sm={4}>
-                                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                        <EventIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                                        <Typography variant="body2" color="text.secondary">
-                                                                                            Date: {entry.appointment_date ? formatDate(entry.appointment_date) : '–'}
-                                                                                        </Typography>
-                                                                                    </Box>
-                                                                                </Grid>
-                                                                                <Grid item xs={6} sm={4}>
-                                                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                        <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                                        <Typography variant="body2" color="text.secondary">
-                                                                                            Time: {entry.appointment_time ? formatTime(entry.appointment_time) : '–'}
-                                                                                        </Typography>
-                                                                                    </Box>
-                                                                                </Grid>
-                                                                            </>
-                                                                        )}
-                                                                        <Grid item xs={12} sm={4}>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                <EventIcon sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
-                                                                                <Typography variant="body2" color="text.secondary">
-                                                                                    Created: {new Date(entry.date_created).toLocaleTimeString()}
-                                                                                </Typography>
-                                                                            </Box>
-                                                                        </Grid>
-                                                                    </Grid>
-                                                                </Box>
-                                                            </Box>
-                                                        </Grid>
-
-                                                        {/* Action buttons */}
-                                                        <Grid item xs={12} sm={4} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                                                            <Button
-                                                                variant="outlined"
-                                                                startIcon={<VisibilityIcon />}
-                                                                onClick={() => handleViewDetails(entry)}
-                                                                sx={{
-                                                                    borderRadius: 2,
-                                                                    borderColor: theme.palette.primary.main,
-                                                                    color: theme.palette.primary.main,
-                                                                    '&:hover': {
-                                                                        bgcolor: 'rgba(111, 66, 193, 0.08)',
-                                                                        borderColor: theme.palette.primary.dark
-                                                                    },
-                                                                }}
-                                                            >
-                                                                View Details
-                                                            </Button>
-                                                        </Grid>
-                                                    </Grid>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
-                                    ))}
-                                </Grid>
-                            </Box>
-                        ))}
-
-                        {/* Summary stats */}
-                        <Paper
-                            elevation={0}
-                            sx={{
-                                mt: 4,
-                                p: 3,
-                                borderRadius: 3,
-                                bgcolor: 'white',
-                                border: `1px solid ${theme.palette.divider}`
-                            }}
-                        >
-                            <Typography variant="h6" fontWeight={600} gutterBottom>
-                                Summary
-                            </Typography>
-                            <Grid container spacing={3}>
-                                <Grid item xs={6} md={3}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Total Entries
-                                        </Typography>
-                                        <Typography variant="h5" fontWeight={700}>
-                                            {filteredHistory.length}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={6} md={3}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Queue Entries
-                                        </Typography>
-                                        <Typography variant="h5" fontWeight={700}>
-                                            {filteredHistory.filter(entry => entry.service_type === 'immediate').length}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={6} md={3}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Appointments
-                                        </Typography>
-                                        <Typography variant="h5" fontWeight={700}>
-                                            {filteredHistory.filter(entry => entry.service_type === 'appointment').length}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={6} md={3}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            Completed
-                                        </Typography>
-                                        <Typography variant="h5" fontWeight={700}>
-                                            {filteredHistory.filter(entry => entry.status === 'completed').length}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                            </Grid>
-                        </Paper>
-                    </Box>
+                    <HistoryList
+                        dateGroups={dateGroups}
+                        handleViewDetails={handleViewDetails}
+                        formatDate={formatDate}
+                        formatTime={formatTime}
+                        filteredHistory={filteredHistory}
+                    />
                 )}
             </Container>
         </Box>
     );
-}
+};
 
 export default QueueHistory;
