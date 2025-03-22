@@ -237,3 +237,20 @@ class FCMToken(models.Model):
         
     def __str__(self):
         return f"FCM Token for {self.user.name}"
+    
+class Feedback(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks')
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='feedbacks')
+    queue = models.ForeignKey(Queue, on_delete=models.CASCADE, related_name='feedbacks', null=True, blank=True)
+    rating = models.IntegerField()
+    comment = models.TextField(blank=True, null=True)
+    categories = models.JSONField(default=list)
+    sentiment = models.CharField(max_length=20, default='neutral')
+    created_at = models.DateTimeField(auto_now_add=True)
+    total_wait = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['user', 'service', 'queue']
+        
+    def __str__(self):
+        return f"Feedback from {self.user.name} for {self.service.name}"

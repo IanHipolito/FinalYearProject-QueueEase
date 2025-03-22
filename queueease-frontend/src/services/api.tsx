@@ -37,7 +37,13 @@ export const API = {
         getAppointments: (serviceId: number) =>
             fetch(`${API_BASE}/admin/appointments/?service_id=${serviceId}`),
         getAnalytics: (serviceId: number, period: string = 'month') =>
-            fetch(`${API_BASE}/admin/analytics/?service_id=${serviceId}&period=${period}`),
+            fetch(`${API_BASE}/admin-get-analytics/?service_id=${serviceId}&period=${period}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                method: 'GET'
+            }),
         createQueue: (serviceId: number, queueData: any) =>
             fetch(`${API_BASE}/admin/queues/create/`, {
                 method: 'POST',
@@ -122,13 +128,44 @@ export const API = {
             fetch(`${API_BASE}/appointment/${appointmentId}/cancel/`, { method: 'POST' }),
     },
 
+    // Feedback management
+    feedback: {
+        getCategories: () => 
+            fetch(`${API_BASE}/feedback/categories/`),
+        
+        submitFeedback: (feedbackData: any) =>
+            fetch(`${API_BASE}/feedback/submit/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(feedbackData),
+            }),
+        
+        getUserFeedbackHistory: (userId: number) =>
+            fetch(`${API_BASE}/feedback/user/${userId}/`),
+        
+        getUserEligibleServices: (userId: number) =>
+            fetch(`${API_BASE}/feedback/eligible-services/${userId}/`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            }),
+        
+        checkFeedbackEligibility: (userId: number, serviceId: number, orderId: number) =>
+            fetch(`${API_BASE}/feedback/check-eligibility/?user_id=${userId}&service_id=${serviceId}&order_id=${orderId}`),
+    },
+
     // Helper methods for common operations
     async handleResponse(response: Response) {
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(
-                errorData.error || errorData.detail || `API Error: ${response.status} ${response.statusText}`
-            );
+            try {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(
+                    errorData.error || errorData.detail || `API Error: ${response.status} ${response.statusText}`
+                );
+            } catch (e) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
         }
         return await response.json();
     },

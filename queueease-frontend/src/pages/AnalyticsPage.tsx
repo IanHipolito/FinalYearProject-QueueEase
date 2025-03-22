@@ -12,16 +12,14 @@ import {
 import InsightsIcon from '@mui/icons-material/Insights';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';
-
-// Import types
 import { AnalyticsData } from '../types/analyticsTypes';
-
-// Import components
 import StatisticCard from '../components/analytics/StatisticCard';
 import FeedbackDistributionChart from '../components/analytics/FeedbackDistributionChart';
 import SatisfactionDonutChart from '../components/analytics/SatisfactionDonutChart';
 import FeedbackTable from '../components/analytics/FeedbackTable';
 import CustomerComments from '../components/analytics/CustomerComments';
+import SentimentTrendChart from '../components/analytics/SentimentTrendChart';
+import FeedbackKeywordCloud from '../components/analytics/FeedbackKeywordCloud';
 
 const AnalyticsPage: React.FC = () => {
   const { currentService } = useAuth();
@@ -29,7 +27,7 @@ const AnalyticsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState('month');
   const [commentFilter, setCommentFilter] = useState('recent');
-  
+
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     feedback_distribution: [],
     customer_comments: [],
@@ -37,33 +35,86 @@ const AnalyticsPage: React.FC = () => {
     satisfaction_rate: 0,
     average_wait_time: 0,
     wait_time_trend: [],
-    satisfaction_trend: []
+    satisfaction_trend: [],
+    feedback_keywords: []
   });
 
-  // Extract data for easier access
-  const { 
+  const {
     feedback_distribution: feedbackData,
     customer_comments: customerFeedback,
     total_reports: totalReports,
     satisfaction_rate: satisfactionRate,
-    average_wait_time: averageWaitTime
+    average_wait_time: averageWaitTime,
+    satisfaction_trend: sentimentTrendData,
+    feedback_keywords: keywordData
   } = analyticsData;
-  
-  // Fetch analytics data
+
   useEffect(() => {
     const fetchAnalytics = async () => {
       if (!currentService?.id) return;
-      
+
       setLoading(true);
       setError('');
-      
+
       try {
-        const response = await API.admin.getAnalytics(
-          currentService.id, 
-          analyticsTimeRange
-        );
-        const data = await API.handleResponse(response);
+        const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
         
+        if (!response.ok) {
+          let errorMessage = 'Failed to load analytics data';
+          let errorData;
+          
+          try {
+            errorData = await response.json();
+            console.error('API response error:', errorData);
+            
+            if (errorData.error && errorData.error.includes('Resource punkt_tab not found')) {
+              console.log("NLTK dependency missing on the server, using fallback approach...");
+              
+              setAnalyticsData({
+                feedback_distribution: [], 
+                customer_comments: [],
+                total_reports: 0,
+                satisfaction_rate: 0,
+                average_wait_time: 0,
+                wait_time_trend: Array(12).fill(0),
+                satisfaction_trend: Array(12).fill(0),
+                feedback_keywords: []
+              });
+              
+              setError("Natural Language Processing features are unavailable. The server is missing required NLTK packages. Please contact the administrator.");
+              setLoading(false);
+              return;
+            }
+            
+            if (errorData.error && errorData.error.includes("'Queue' object has no attribute 'total_wait'")) {
+              console.log("Queue total_wait attribute missing, using fallback approach...");
+              
+              setAnalyticsData({
+                feedback_distribution: errorData.feedback_distribution || [],
+                customer_comments: errorData.customer_comments || [],
+                total_reports: errorData.total_reports || 0,
+                satisfaction_rate: errorData.satisfaction_rate || 0,
+                average_wait_time: 0,
+                wait_time_trend: Array(12).fill(0),
+                satisfaction_trend: errorData.satisfaction_trend || Array(12).fill(0),
+                feedback_keywords: errorData.feedback_keywords || []
+              });
+              
+              setError("Note: Wait time analysis is currently unavailable. Other analytics are still accessible.");
+              setLoading(false);
+              return;
+            }
+            
+            errorMessage = errorData.error || errorMessage;
+          } catch (err) {
+            const errorText = await response.text().catch(() => '');
+            console.error('API response error:', errorText);
+          }
+          throw new Error(`Failed to load analytics data: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
         setAnalyticsData({
           feedback_distribution: data.feedback_distribution || [],
           customer_comments: data.customer_comments || [],
@@ -71,31 +122,39 @@ const AnalyticsPage: React.FC = () => {
           satisfaction_rate: data.satisfaction_rate || 0,
           average_wait_time: data.average_wait_time || 0,
           wait_time_trend: data.wait_time_trend || [],
-          satisfaction_trend: data.satisfaction_trend || []
+          satisfaction_trend: data.satisfaction_trend || [],
+          feedback_keywords: data.feedback_keywords || []
         });
-        
+
       } catch (err: any) {
         console.error('Error fetching analytics data:', err);
         setError(err.message || 'Failed to load analytics data');
+        setAnalyticsData({
+          feedback_distribution: [],
+          customer_comments: [],
+          total_reports: 0,
+          satisfaction_rate: 0,
+          average_wait_time: 0,
+          wait_time_trend: [],
+          satisfaction_trend: [],
+          feedback_keywords: []
+        });
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchAnalytics();
   }, [currentService?.id, analyticsTimeRange]);
 
-  // Handle time range change
   const handleTimeRangeChange = (event: SelectChangeEvent) => {
     setAnalyticsTimeRange(event.target.value);
   };
 
-  // Handle comment filter change
   const handleCommentFilterChange = (event: SelectChangeEvent) => {
     setCommentFilter(event.target.value);
   };
 
-  // Filter comments based on selected filter
   const filteredComments = customerFeedback.filter(comment => {
     if (commentFilter === 'recent') return true;
     if (commentFilter === 'positive' && comment.rating >= 4) return true;
@@ -103,14 +162,24 @@ const AnalyticsPage: React.FC = () => {
     return commentFilter === 'recent';
   });
 
-  // Simple line chart for card visualization
   const lineChart = (
     <svg width="100%" height="40" viewBox="0 0 200 40">
       <path d="M0,30 Q40,15 80,25 T160,10 T200,20" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
     </svg>
   );
 
-  // If still loading data
+  const generateTimeLabels = (timeRange: string): string[] => {
+    if (timeRange === 'week') {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return days;
+    } else if (timeRange === 'month') {
+      return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return months;
+    }
+  };
+
   if (loading && !feedbackData.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -124,9 +193,9 @@ const AnalyticsPage: React.FC = () => {
       <Typography variant="h5" fontWeight="500" gutterBottom>
         Analytics
       </Typography>
-      
+
       {error && <ErrorDisplay error={error} onRetry={() => {
-        setAnalyticsTimeRange(analyticsTimeRange);  // Trigger a re-fetch
+        setAnalyticsTimeRange(analyticsTimeRange);
       }} />}
 
       {/* Top Stats Cards */}
@@ -164,25 +233,38 @@ const AnalyticsPage: React.FC = () => {
       {/* Charts Row */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={8}>
-          <FeedbackDistributionChart 
-            data={feedbackData} 
-            timeRange={analyticsTimeRange} 
-            onTimeRangeChange={handleTimeRangeChange} 
+          <FeedbackDistributionChart
+            data={feedbackData}
+            timeRange={analyticsTimeRange}
+            onTimeRangeChange={handleTimeRangeChange}
           />
         </Grid>
-        
+
         <Grid item xs={12} md={4}>
           <SatisfactionDonutChart satisfactionRate={satisfactionRate} />
         </Grid>
+
+        <Grid item xs={12} md={8}>
+          <SentimentTrendChart
+            data={sentimentTrendData}
+            timeLabels={generateTimeLabels(analyticsTimeRange)}
+            timeRange={analyticsTimeRange}
+            onTimeRangeChange={handleTimeRangeChange}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <FeedbackKeywordCloud keywords={keywordData} />
+        </Grid>
       </Grid>
-      
+
       {/* Feedback Data Table */}
       <FeedbackTable data={feedbackData} />
-      
+
       {/* Customer Feedback Comments */}
-      <CustomerComments 
-        comments={filteredComments} 
-        filter={commentFilter} 
+      <CustomerComments
+        comments={filteredComments}
+        filter={commentFilter}
         onFilterChange={handleCommentFilterChange}
       />
     </Box>

@@ -23,6 +23,7 @@ import AdminSignup from './pages/AdminSignup';
 import { AuthProvider } from './pages/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import IOSInstallGuide from './components/IOSInstallGuide';
+import FeedbackPage from './pages/FeedbackPage';
 
 const App: React.FC = () => {
   return (
@@ -55,6 +56,7 @@ const App: React.FC = () => {
           <Route path="/success/:queueId" element={<SuccessPage />} />
           <Route path="/mapproximity" element={<MapProximity />} />
           <Route path="/history" element={<QueueHistory />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/appointments" element={
             <PrivateRoute>
               <AppointmentsList />

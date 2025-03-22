@@ -4,7 +4,8 @@ from .views import (api_overview, create_queue, get_qr_code, signup_view, login_
                    delete_appointment, list_services, queue_status, queue_detail, complete_queue, active_queue,
                    service_detail, available_appointment_times, create_appointment, admin_signup, admin_services,
                    admin_dashboard_data, list_services_with_status, queue_history, admin_customers, admin_create_customer,
-                   save_fcm_token, test_notification, update_queue_position)	
+                   save_fcm_token, test_notification, update_queue_position, submit_feedback, get_feedback_categories,
+                   get_user_feedback_history, get_eligible_services, check_feedback_eligibility, admin_get_analytics)	
 from django.http import JsonResponse
 
 def test_view(request):
@@ -42,4 +43,10 @@ urlpatterns = [
     path('save-fcm-token/', save_fcm_token, name='save-fcm-token'),
     path('test-notification/', test_notification, name='test-notification'),
     path('update-queue-position/<int:queue_id>/', update_queue_position, name='update-queue-position'),
+    path('feedback/submit/', submit_feedback, name='submit_feedback'),
+    path('feedback/categories/', get_feedback_categories, name='get_feedback_categories'),
+    path('feedback/user/<int:user_id>/', get_user_feedback_history, name='get_user_feedback_history'),
+    path('feedback/eligible-services/<int:user_id>/', get_eligible_services, name='get_eligible_services'),
+    path('feedback/check-eligibility/', check_feedback_eligibility, name='check_feedback_eligibility'),
+    path('admin-get-analytics/', admin_get_analytics, name='admin-get-analytics'),
 ]

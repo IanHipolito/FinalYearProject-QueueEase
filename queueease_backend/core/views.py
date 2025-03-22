@@ -3,14 +3,13 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, EmployeeDetails, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken
+from .models import Queue, QRCode, User, Service, Feedback, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 from django.db import models
-from django.contrib.auth import authenticate
 from django.contrib.auth.hashers import check_password
 import json
 from .serializers import AppointmentDetailsSerializer
@@ -19,6 +18,10 @@ import random
 from .serializers import ServiceSerializer
 import numpy as np
 from .services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
+from .utils.sentiment_analyzer import SentimentAnalyzer
+from .utils.keyword_extractor import KeywordExtractor
+from django.utils import timezone
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -601,7 +604,7 @@ def create_queue_sequence(request):
             )
         
         first_item = sequence.items.first()
-        if first_item:
+        if (first_item):
             queue = create_queue_for_service(user, first_item.service)
             first_item.queue = queue
             first_item.save()
@@ -1273,19 +1276,14 @@ def process_queues(service_id):
                 )
                 
             except FCMToken.DoesNotExist:
-                # No token for this user - cannot send notification
                 pass
 
 def send_appointment_reminders():
-    """Check for upcoming appointments and send reminders"""
-    # Current time
     from datetime import datetime, timedelta
     now = datetime.now()
     
-    # Get appointments coming up in the next hour
     one_hour_from_now = now + timedelta(hours=1)
     
-    # Find appointments in the time range
     upcoming_appointments = AppointmentDetails.objects.filter(
         appointment_date=now.date(),
         status='pending',
@@ -1293,29 +1291,22 @@ def send_appointment_reminders():
     )
     
     for appointment in upcoming_appointments:
-        # Convert appointment time to datetime
         appointment_datetime = datetime.combine(
             appointment.appointment_date,
             appointment.appointment_time
         )
         
-        # Calculate minutes until appointment
         time_delta = appointment_datetime - now
         minutes_until = max(0, int(time_delta.total_seconds() / 60))
-        
-        # Send notifications at strategic times:
-        # 1 hour before, 30 minutes before, and 10 minutes before
         should_notify = minutes_until in [60, 30, 10]
         
         if should_notify:
-            # Get user's token
             try:
                 fcm_token = FCMToken.objects.filter(
                     user=appointment.user, 
                     is_active=True
                 ).latest('updated_at')
                 
-                # Send reminder
                 send_appointment_reminder(
                     token=fcm_token.token,
                     appointment_id=appointment.order_id,
@@ -1324,5 +1315,404 @@ def send_appointment_reminders():
                 )
                 
             except FCMToken.DoesNotExist:
-                # No token for this user - cannot send notification
                 pass
+
+@api_view(['POST'])
+def submit_feedback(request):
+    try:
+        data = request.data
+        required_fields = ['service_id', 'rating', 'user_id', 'categories']
+        
+        for field in required_fields:
+            if field not in data:
+                return Response({'error': f'Missing required field: {field}'}, status=400)
+        
+        service = get_object_or_404(Service, id=data['service_id'])
+        user = get_object_or_404(User, id=data['user_id'])
+        order_id = data.get('order_id')
+        queue = None
+        if order_id:
+            queue = Queue.objects.filter(id=order_id).first()
+        
+        existing_feedback = Feedback.objects.filter(
+            user=user,
+            service=service,
+            queue=queue
+        ).exists()
+        
+        if existing_feedback:
+            return Response({'error': 'You have already submitted feedback for this service'}, status=400)
+        
+        comment = data.get('comment', '')
+        sentiment_result = SentimentAnalyzer.analyze(comment)
+        
+        feedback = Feedback.objects.create(
+            user=user,
+            service=service,
+            queue=queue,
+            rating=data['rating'],
+            comment=comment,
+            categories=data.get('categories', []),
+            sentiment=sentiment_result['sentiment']
+        )
+        
+        return Response({
+            'id': feedback.id,
+            'message': 'Feedback submitted successfully',
+            'sentiment': sentiment_result['sentiment']
+        }, status=201)
+    
+    except Exception as e:
+        print(f"Error in submit_feedback: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+def get_feedback_categories(request):
+    categories = [
+        {"id": "wait_time", "name": "Wait Time"},
+        {"id": "staff", "name": "Staff Service"},
+        {"id": "cleanliness", "name": "Cleanliness"},
+        {"id": "communication", "name": "Communication"},
+        {"id": "app_experience", "name": "App Experience"},
+        {"id": "value", "name": "Value for Money"},
+        {"id": "product_quality", "name": "Product Quality"},
+        {"id": "atmosphere", "name": "Atmosphere"}
+    ]
+    return Response(categories)
+
+@api_view(['GET'])
+def get_user_feedback_history(request, user_id):
+    try:
+        user = get_object_or_404(User, id=user_id)
+        feedbacks = Feedback.objects.filter(user=user).order_by('-created_at')
+        
+        result = []
+        for fb in feedbacks:
+            order_details = "General Service"
+            if fb.queue:
+                order_details = f"Queue #{fb.queue.id}"
+            
+            result.append({
+                "id": fb.id,
+                "service_name": fb.service.name,
+                "order_details": order_details,
+                "rating": fb.rating,
+                "date": fb.created_at.isoformat(),
+                "comment": fb.comment,
+                "categories": fb.categories,
+                "sentiment": fb.sentiment
+            })
+        
+        return Response(result)
+    
+    except Exception as e:
+        print(f"Error in get_user_feedback_history: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+def get_eligible_services(request, user_id):
+    try:
+        user = get_object_or_404(User, id=user_id)
+        
+        queues = Queue.objects.filter(user=user).order_by('-date_created')
+        
+        result = []
+        for queue in queues:
+            has_feedback = Feedback.objects.filter(
+                user=user,
+                service=queue.service,
+                queue=queue
+            ).exists()
+            
+            result.append({
+                "id": queue.service.id,
+                "name": queue.service.name,
+                "order_id": queue.id,
+                "order_details": f"Queue #{queue.id}",
+                "date": queue.date_created.isoformat(),
+                "has_feedback": has_feedback
+            })
+        
+        return Response(result)
+    
+    except Exception as e:
+        print(f"Error in get_eligible_services: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+    
+@api_view(['GET'])
+def admin_get_analytics(request):
+    try:
+        service_id = request.GET.get('service_id')
+        period = request.GET.get('period', 'month')
+        
+        if not service_id:
+            return Response({'error': 'service_id is required'}, status=400)
+            
+        service = get_object_or_404(Service, id=service_id)
+        
+        today = timezone.now()
+        if period == 'week':
+            start_date = today - timezone.timedelta(days=7)
+        elif period == 'month':
+            start_date = today - timezone.timedelta(days=30)
+        else:
+            start_date = today - timezone.timedelta(days=365)
+            
+        feedbacks = Feedback.objects.filter(
+            service=service,
+            created_at__gte=start_date
+        ).order_by('-created_at')
+        
+        total_feedbacks = feedbacks.count()
+        if total_feedbacks > 0:
+            positive_feedbacks = feedbacks.filter(sentiment='positive').count()
+            satisfaction_rate = int((positive_feedbacks / total_feedbacks) * 100)
+        else:
+            satisfaction_rate = 0
+            
+        category_distribution = {}
+        for feedback in feedbacks:
+            for category in feedback.categories:
+                if category not in category_distribution:
+                    category_distribution[category] = {
+                        'satisfied': 0,
+                        'neutral': 0,
+                        'dissatisfied': 0,
+                        'total': 0
+                    }
+                
+                if feedback.rating >= 4:
+                    category_distribution[category]['satisfied'] += 1
+                elif feedback.rating <= 2:
+                    category_distribution[category]['dissatisfied'] += 1
+                else:
+                    category_distribution[category]['neutral'] += 1
+                    
+                category_distribution[category]['total'] += 1
+                
+        feedback_distribution = []
+        for category, counts in category_distribution.items():
+            total = counts['total']
+            if total > 0:
+                feedback_distribution.append({
+                    'id': len(feedback_distribution) + 1,
+                    'category': category,
+                    'satisfied': int((counts['satisfied'] / total) * 100),
+                    'neutral': int((counts['neutral'] / total) * 100),
+                    'dissatisfied': int((counts['dissatisfied'] / total) * 100),
+                    'total': total
+                })
+                
+        comments = []
+        comment_texts = []
+        comment_sentiments = {}
+        
+        for feedback in feedbacks[:10]:
+            user = feedback.user
+            queue_name = f"Queue #{feedback.queue.id}" if feedback.queue else "General"
+            
+            comment_data = {
+                'id': feedback.id,
+                'name': user.name,
+                'date': feedback.created_at.strftime("%b %d, %Y"),
+                'queue': queue_name,
+                'rating': feedback.rating,
+                'comment': feedback.comment,
+                'sentiment': feedback.sentiment
+            }
+            comments.append(comment_data)
+            
+            if feedback.comment:
+                comment_texts.append(feedback.comment)
+                comment_sentiments[feedback.comment] = feedback.sentiment
+            
+        keyword_extractor = KeywordExtractor()
+        keywords = keyword_extractor.extract_keywords(comment_texts, comment_sentiments)
+            
+        avg_wait_time = 0
+        historical_data = ServiceWaitTime.objects.filter(
+            service=service,
+            date_recorded__gte=start_date
+        )
+        
+        if historical_data.exists():
+            avg_wait_time = int(historical_data.aggregate(
+                avg_time=models.Avg('wait_time')
+            )['avg_time'] or 0)
+        else:
+            queues = Queue.objects.filter(service=service, status='completed')
+            if queues.exists():
+                total_wait_time = 0
+                count = 0
+                for queue in queues:
+                    if hasattr(queue, 'total_wait') and queue.total_wait:
+                        wait_minutes = queue.total_wait / 60 if queue.total_wait > 1000 else queue.total_wait
+                        total_wait_time += wait_minutes
+                        count += 1
+                    elif hasattr(queue, 'expected_ready_time') and queue.expected_ready_time and hasattr(queue, 'date_created'):
+                        wait_minutes = (queue.expected_ready_time - queue.date_created).total_seconds() / 60
+                        total_wait_time += wait_minutes
+                        count += 1
+                
+                if count > 0:
+                    avg_wait_time = int(total_wait_time / count)
+                
+        return Response({
+            'feedback_distribution': feedback_distribution,
+            'customer_comments': comments,
+            'total_reports': total_feedbacks,
+            'satisfaction_rate': satisfaction_rate,
+            'average_wait_time': avg_wait_time,
+            'satisfaction_trend': calculate_satisfaction_trend(feedbacks, period),
+            'wait_time_trend': calculate_wait_time_trend(service, period),
+            'feedback_keywords': keywords
+        })
+        
+    except Exception as e:
+        print(f"Error in admin_get_analytics: {str(e)}")
+        return Response({'error': str(e)}, status=500)
+
+def calculate_satisfaction_trend(feedbacks, period):
+    if not feedbacks:
+        return [0] * 12
+
+    now = timezone.now()
+    data_points = 12
+    
+    if period == 'week':
+        data_points = 7
+        interval_duration = timedelta(days=1)
+        start_date = now - timedelta(days=7)
+    elif period == 'month':
+        interval_duration = timedelta(days=2.5)
+        start_date = now - timedelta(days=30)
+    else:
+        interval_duration = timedelta(days=30.5)
+        start_date = now - timedelta(days=366)
+    
+    time_buckets = []
+    bucket_labels = []
+    
+    for i in range(data_points):
+        bucket_start = start_date + (i * interval_duration)
+        bucket_end = start_date + ((i + 1) * interval_duration)
+        time_buckets.append((bucket_start, bucket_end))
+        
+        if period == 'week':
+            bucket_labels.append(bucket_start.strftime('%a'))
+        elif period == 'month':
+            day = bucket_start.day
+            if day == 1 or i == 0:
+                bucket_labels.append(bucket_start.strftime('%d %b'))
+            else:
+                bucket_labels.append(str(day))
+        else:
+            bucket_labels.append(bucket_start.strftime('%b'))
+    
+    bucket_totals = [0] * data_points
+    bucket_positives = [0] * data_points
+    
+    for feedback in feedbacks:
+        feedback_time = feedback.created_at
+        
+        for i, (bucket_start, bucket_end) in enumerate(time_buckets):
+            if bucket_start <= feedback_time < bucket_end:
+                bucket_totals[i] += 1
+                if feedback.sentiment == 'positive':
+                    bucket_positives[i] += 1
+                break
+    
+    trend = []
+    for total, positive in zip(bucket_totals, bucket_positives):
+        if total > 0:
+            satisfaction = int((positive / total) * 100)
+            trend.append(satisfaction)
+        else:
+            trend.append(trend[-1] if trend else 0)
+    
+    return trend
+
+def calculate_wait_time_trend(service, period):
+    now = timezone.now()
+    data_points = 12
+    
+    if period == 'week':
+        data_points = 7
+        interval_duration = timedelta(days=1)
+        start_date = now - timedelta(days=7)
+    elif period == 'month':
+        interval_duration = timedelta(days=2.5)
+        start_date = now - timedelta(days=30)
+    else:
+        interval_duration = timedelta(days=30.5)
+        start_date = now - timedelta(days=366)
+    
+    time_buckets = []
+    
+    for i in range(data_points):
+        bucket_start = start_date + (i * interval_duration)
+        bucket_end = start_date + ((i + 1) * interval_duration)
+        time_buckets.append((bucket_start, bucket_end))
+    
+    bucket_wait_times = [[] for _ in range(data_points)]
+    
+    historical_data = ServiceWaitTime.objects.filter(
+        service=service,
+        date_recorded__gte=start_date
+    )
+    
+    for record in historical_data:
+        if not record.date_recorded:
+            continue
+        
+        for i, (bucket_start, bucket_end) in enumerate(time_buckets):
+            if bucket_start <= record.date_recorded < bucket_end:
+                bucket_wait_times[i].append(record.wait_time)
+                break
+    
+    trend = []
+    for wait_times in bucket_wait_times:
+        if wait_times:
+            if len(wait_times) >= 3:
+                wait_times_array = np.array(wait_times)
+                lower_bound = np.percentile(wait_times_array, 5)
+                upper_bound = np.percentile(wait_times_array, 95)
+                filtered_times = wait_times_array[(wait_times_array >= lower_bound) & (wait_times_array <= upper_bound)]
+                avg_wait = int(np.mean(filtered_times))
+            else:
+                avg_wait = int(np.mean(wait_times))
+            
+            trend.append(avg_wait)
+        else:
+            trend.append(trend[-1] if trend else 0)
+    
+    return trend
+
+@api_view(['GET'])
+def check_feedback_eligibility(request):
+    try:
+        user_id = request.GET.get('user_id')
+        service_id = request.GET.get('service_id')
+        order_id = request.GET.get('order_id')
+        
+        if not all([user_id, service_id]):
+            return Response({'error': 'User ID and Service ID are required'}, status=400)
+        
+        queue = None
+        if order_id:
+            queue = Queue.objects.filter(id=order_id).first()
+            
+        existing_feedback = Feedback.objects.filter(
+            user_id=user_id,
+            service_id=service_id,
+            queue=queue
+        ).exists()
+        
+        return Response({
+            'eligible': not existing_feedback,
+            'reason': 'Feedback already submitted' if existing_feedback else None
+        })
+        
+    except Exception as e:
+        print(f"Error in check_feedback_eligibility: {str(e)}")
+        return Response({'error': str(e)}, status=500)

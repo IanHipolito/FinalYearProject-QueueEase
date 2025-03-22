@@ -17,6 +17,12 @@ export interface CustomerComment {
   avatar?: string;
 }
 
+export interface KeywordData {
+  text: string;
+  value: number;
+  sentiment: string;
+}
+
 export interface AnalyticsData {
   feedback_distribution: FeedbackCategory[];
   customer_comments: CustomerComment[];
@@ -25,4 +31,5 @@ export interface AnalyticsData {
   average_wait_time: number;
   wait_time_trend: number[];
   satisfaction_trend: number[];
+  feedback_keywords: KeywordData[];
 }
