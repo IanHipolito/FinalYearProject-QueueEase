@@ -4,13 +4,11 @@ import {
   Box,
   Typography,
   Button,
-  IconButton,
-  Chip
+  IconButton
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import { Service } from '../../types/serviceTypes';
 
 interface BottomSheetProps {
   height: 'collapsed' | 'partial' | 'full';
@@ -35,19 +33,19 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 }) => {
   return (
     <Paper
-      elevation={8}
+      elevation={3}
       sx={{
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
         zIndex: 20,
-        height: height === 'full' ? 'calc(85vh)' :
-          height === 'partial' ? 'calc(40vh)' :
-            height === 'collapsed' ? '40px' : '64px',
-        maxHeight: 'calc(90vh)',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        height: height === 'full' ? 'calc(75vh)' :
+          height === 'partial' ? 'calc(35vh)' :
+            height === 'collapsed' ? '36px' : '64px',
+        maxHeight: 'calc(85vh)',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
         transition: 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         display: 'flex',
         flexDirection: 'column',
@@ -55,33 +53,33 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         bgcolor: '#ffffff',
         transform: 'translateZ(0)',
         willChange: 'height',
-        boxShadow: '0px -2px 10px rgba(0,0,0,0.1)'
+        boxShadow: '0px -1px 8px rgba(0,0,0,0.1)'
       }}
     >
-      {/* Handle for dragging sheet - works in all states */}
+      {/* Handle for dragging sheet */}
       <Box
         onClick={toggleHeight}
         sx={{
           display: 'flex',
           justifyContent: 'center',
-          py: 1,
+          py: 0.75,
           cursor: 'pointer',
           userSelect: 'none',
-          minHeight: height === 'collapsed' ? '40px' : 'auto',
+          minHeight: height === 'collapsed' ? '36px' : 'auto',
           alignItems: 'center'
         }}
       >
         {height === 'collapsed' ? (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" fontWeight={600} sx={{ mr: 1 }}>
-              {filteredCount} Services Available
+            <Typography variant="body2" fontWeight={500} sx={{ mr: 0.5 }}>
+              {filteredCount} {filteredCount === 1 ? 'Service' : 'Services'}
             </Typography>
             <KeyboardArrowUpIcon fontSize="small" />
           </Box>
         ) : (
           <Box
             sx={{
-              width: 40,
+              width: 36,
               height: 4,
               bgcolor: 'rgba(0,0,0,0.1)',
               borderRadius: 2
@@ -90,20 +88,20 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         )}
       </Box>
 
-      {/* Title bar - only shown when not collapsed */}
+      {/* Title bar */}
       {height !== 'collapsed' && (
-        <Box sx={{ px: 3, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" fontWeight={700}>
+        <Box sx={{ px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="subtitle1" fontWeight={600}>
             {title} ({filteredCount})
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {showResetButton && (
               <Button
-                variant="outlined"
+                variant="text"
                 size="small"
                 onClick={onReset}
                 startIcon={<RestartAltIcon />}
-                sx={{ borderRadius: 4 }}
+                sx={{ borderRadius: 4, py: 0.5, px: 1.5 }}
               >
                 Reset
               </Button>
@@ -112,19 +110,19 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
               size="small"
               onClick={height === 'full' ? toggleHeight : collapseSheet}
               sx={{
-                bgcolor: 'rgba(0,0,0,0.05)',
-                borderRadius: 2,
-                width: 32,
-                height: 32
+                bgcolor: 'rgba(0,0,0,0.04)',
+                borderRadius: 1.5,
+                width: 28,
+                height: 28
               }}
             >
-              {height === 'full' ? <KeyboardArrowDownIcon /> : <KeyboardArrowDownIcon />}
+              {height === 'full' ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
             </IconButton>
           </Box>
         </Box>
       )}
 
-      {/* Services list - only rendered when not collapsed */}
+      {/* Services list */}
       {height !== 'collapsed' && (
         <Box
           className="service-list-container"

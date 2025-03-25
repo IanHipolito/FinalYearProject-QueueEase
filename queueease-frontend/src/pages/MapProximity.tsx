@@ -2,23 +2,17 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import {
-  Box, Typography, TextField, InputAdornment, Chip, useTheme, 
-  useMediaQuery, CircularProgress, Alert, Fade, Snackbar, 
-  Divider, Paper, IconButton, Collapse, Button
+  Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 // Map and service components
 import ServiceMap from '../components/map/ServiceMap';
 import ServiceCard from '../components/serviceList/ServiceCard';
 import BottomSheet from '../components/serviceList/BottomSheet';
 import ServiceDetailPanel from '../components/serviceList/ServiceDetailPanel';
-import { getCategoryIcon } from '../components/map/mapUtils';
-
-// Utils
+import DistanceFilter from '../components/map/DistanceFilter';
+import SearchBar from '../components/map/SearchBar';
+import CategoryFilter from '../components/map/CategoryFilter';
 import { CATEGORIES, generateRandomDublinCoordinates } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
 
@@ -29,12 +23,8 @@ interface MapProximityProps {
 const MapProximity: React.FC<MapProximityProps> = ({
   apiUrl = 'http://127.0.0.1:8000/api/list_services/'
 }) => {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
-  const debounceTimerRef = useRef<number | null>(null);
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   
   // State management
@@ -44,7 +34,7 @@ const MapProximity: React.FC<MapProximityProps> = ({
   const [filterText, setFilterText] = useState("");
   const [debouncedFilterText, setDebouncedFilterText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [showFilters, setShowFilters] = useState(!isMobile);
+  const [showFilters, setShowFilters] = useState(false); // Default to hidden for less clutter
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
   const [sheetHeight, setSheetHeight] = useState<'collapsed' | 'partial' | 'full'>('partial');
@@ -53,12 +43,36 @@ const MapProximity: React.FC<MapProximityProps> = ({
     message: string,
     severity: "success" | "error" | "info"
   }>({ open: false, message: "", severity: "success" });
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [searchRadius, setSearchRadius] = useState(2); // Default 2km radius
+  const debounceTimerRef = useRef<number | null>(null);
+
+  // Calculate distance between two points (haversine formula)
+  const calculateDistance = useCallback((
+    lat1: number, 
+    lon1: number, 
+    lat2: number, 
+    lon2: number
+  ): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // in meters
+  }, []);
 
   // Handlers
   const handleMarkerClick = useCallback((service: Service) => {
     setSelectedService(service);
-    if (isMobile) setSheetHeight('partial');
-  }, [isMobile]);
+    if (window.innerWidth < 960) setSheetHeight('partial');
+  }, []);
 
   const handleJoinQueue = useCallback(async (serviceId: number) => {
     if (!user) {
@@ -120,12 +134,23 @@ const MapProximity: React.FC<MapProximityProps> = ({
     }
   }, [navigate, user, services]);
 
-  // Filter services based on search and category
-  const filteredServices = useMemo(() => {
-    if (!debouncedFilterText && selectedCategory === "All") {
-      return services;
+  // Handle user location change
+  const handleUserLocationChange = useCallback((location: { latitude: number; longitude: number } | null) => {
+    setUserLocation(location);
+    if (location) {
+      localStorage.setItem('userLocation', JSON.stringify(location));
     }
+  }, []);
 
+  // Check if there are any active filters
+  const hasActiveFilters = useMemo(() => {
+    return debouncedFilterText !== "" || selectedCategory !== "All" || searchRadius !== 2;
+  }, [debouncedFilterText, selectedCategory, searchRadius]);
+
+  // Filter services based on search, category, and distance
+  const filteredServices = useMemo(() => {
+    if (!services.length) return [];
+    
     return services.filter(service => {
       // Text filter
       if (debouncedFilterText) {
@@ -156,10 +181,25 @@ const MapProximity: React.FC<MapProximityProps> = ({
 
         return serviceCategory === selectedCategory.toLowerCase();
       }
-
+      
+      // Distance filter
+      if (userLocation && searchRadius > 0) {
+        const distanceInMeters = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          service.latitude,
+          service.longitude
+        );
+        
+        // Convert distance to kilometers and compare with searchRadius
+        if (distanceInMeters / 1000 > searchRadius) {
+          return false;
+        }
+      }
+      
       return true;
     });
-  }, [services, debouncedFilterText, selectedCategory]);
+  }, [services, debouncedFilterText, selectedCategory, userLocation, searchRadius, calculateDistance]);
 
   // Get visible services for the list
   const visibleServices = useMemo(() => {
@@ -250,6 +290,18 @@ const MapProximity: React.FC<MapProximityProps> = ({
     };
   }, [filterText]);
 
+  // Load saved user location
+  useEffect(() => {
+    const savedLocation = localStorage.getItem('userLocation');
+    if (savedLocation) {
+      try {
+        setUserLocation(JSON.parse(savedLocation));
+      } catch (e) {
+        console.error('Error parsing saved location', e);
+      }
+    }
+  }, []);
+
   // Setup scroll listener
   useEffect(() => {
     // Reset visible count when filters change
@@ -284,26 +336,20 @@ const MapProximity: React.FC<MapProximityProps> = ({
     setSheetHeight('collapsed');
   }, []);
 
-  // Event handlers
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilterText(e.target.value);
-  }, []);
-
-  const handleClearSearch = useCallback(() => {
-    setFilterText("");
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilterText("");
-    setSelectedCategory("All");
-  }, []);
-
+  // Toggle filters visibility
   const toggleFilters = useCallback(() => {
     setShowFilters(prev => !prev);
   }, []);
 
   const handleSnackbarClose = useCallback(() => {
     setSnackbarState(prev => ({ ...prev, open: false }));
+  }, []);
+
+  // Reset all filters
+  const handleResetFilters = useCallback(() => {
+    setFilterText("");
+    setSelectedCategory("All");
+    setSearchRadius(2);
   }, []);
 
   // Render service row
@@ -316,27 +362,27 @@ const MapProximity: React.FC<MapProximityProps> = ({
         isSelected={isSelected}
         onCardClick={handleMarkerClick}
         onJoinClick={handleJoinQueue}
-        theme={theme}
       />
     );
-  }, [handleJoinQueue, handleMarkerClick, selectedService?.id, theme]);
+  }, [handleJoinQueue, handleMarkerClick, selectedService?.id]);
 
   // Render service list
   const renderServiceList = useCallback(() => {
     if (loading) {
-      return <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>;
+      return <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress size={24} /></Box>;
     }
 
     if (filteredServices.length === 0) {
       return (
         <Box sx={{ textAlign: 'center', my: 4, px: 2 }}>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body2" color="text.secondary">
             No services match your criteria
           </Typography>
           <Button
-            variant="contained"
-            sx={{ mt: 2, borderRadius: 4 }}
+            variant="outlined"
+            sx={{ mt: 2, borderRadius: 2 }}
             onClick={handleResetFilters}
+            size="small"
           >
             Clear filters
           </Button>
@@ -370,223 +416,138 @@ const MapProximity: React.FC<MapProximityProps> = ({
           width: '100%',
           height: '100%',
           zIndex: 1,
-          transform: 'translateZ(0)',
-          willChange: 'transform',
-          WebkitBackfaceVisibility: 'hidden',
-          WebkitPerspective: 1000,
         }}
       >
         <ServiceMap
-          services={services}
+          services={filteredServices}
           selectedService={selectedService}
           onServiceClick={handleMarkerClick}
           height="100%"
-          isMobile={isMobile}
+          isMobile={window.innerWidth < 960}
+          maxDistance={searchRadius}
+          userLocation={userLocation}
+          onUserLocationChange={handleUserLocationChange}
         />
       </Box>
 
-      {/* Search bar at top */}
+      {/* Search and filter components */}
+      <SearchBar
+        filterText={filterText}
+        onFilterTextChange={setFilterText}
+        showFilters={showFilters}
+        toggleFilters={toggleFilters}
+        hasActiveFilters={hasActiveFilters}
+      >
+        {/* Distance Filter (only shown when user location is available) */}
+        {userLocation && (
+          <DistanceFilter
+          value={searchRadius}
+          onChange={setSearchRadius}
+          min={0.5}
+          max={10}
+          step={0.5}
+        />
+      )}
+      
+      {/* Category Filter */}
+      <CategoryFilter
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+      />
+    </SearchBar>
+
+    {/* Bottom sheet UI */}
+    <BottomSheet
+      height={sheetHeight}
+      toggleHeight={toggleSheetHeight}
+      collapseSheet={collapseSheet}
+      title="Nearby Services"
+      filteredCount={filteredServices.length}
+      showResetButton={hasActiveFilters}
+      onReset={handleResetFilters}
+    >
+      {renderServiceList()}
+    </BottomSheet>
+
+    {/* Selected service detail panel */}
+    <ServiceDetailPanel
+      service={selectedService}
+      onClose={() => setSelectedService(null)}
+      onJoinQueue={handleJoinQueue}
+      userLocation={userLocation}
+    />
+
+    {/* Loading State */}
+    {loading && (
       <Box
         sx={{
           position: 'absolute',
-          top: 16,
-          left: 16,
-          right: 16,
-          zIndex: 10,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           display: 'flex',
-          flexDirection: 'column',
-          gap: 2
+          alignItems: 'center',
+          bgcolor: 'rgba(255, 255, 255, 0.9)',
+          padding: 2,
+          borderRadius: 2,
+          zIndex: 30,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
         }}
       >
-        <Paper
-          elevation={3}
-          sx={{
-            borderRadius: 4,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          <IconButton
-            sx={{ mx: 1 }}
-            onClick={() => navigate('/usermainpage')}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search services..."
-            value={filterText}
-            onChange={handleSearchChange}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="primary" />
-                </InputAdornment>
-              ),
-              endAdornment: filterText ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={handleClearSearch}>
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ) : null,
-              sx: {
-                py: 0.5,
-                '& fieldset': { border: 'none' }
-              }
-            }}
-          />
-
-          <Divider orientation="vertical" flexItem />
-
-          <IconButton
-            color={selectedCategory !== "All" ? "primary" : "default"}
-            sx={{ mx: 1 }}
-            onClick={toggleFilters}
-          >
-            <FilterAltIcon />
-          </IconButton>
-        </Paper>
-
-        {/* Horizontal category chips */}
-        <Collapse in={showFilters}>
-          <Box
-            sx={{
-              display: 'flex',
-              overflowX: 'auto',
-              gap: 1,
-              pb: 1,
-              '&::-webkit-scrollbar': {
-                height: 4,
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: 'transparent',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: 'rgba(0,0,0,0.1)',
-                borderRadius: 4,
-              }
-            }}
-          >
-            {CATEGORIES.map((category) => (
-              <Chip
-                key={category.id}
-                icon={category.id !== "All" ? getCategoryIcon(category.id) : undefined}
-                label={category.label}
-                clickable
-                color={selectedCategory === category.id ? "primary" : "default"}
-                onClick={() => setSelectedCategory(category.id)}
-                sx={{
-                  borderRadius: 3,
-                  py: 0.5,
-                  px: 0.5,
-                  border: '1px solid',
-                  borderColor: selectedCategory === category.id ? 'primary.main' : 'rgba(0,0,0,0.1)',
-                  '&.MuiChip-colorPrimary': {
-                    bgcolor: theme.palette.primary.main,
-                  }
-                }}
-              />
-            ))}
-          </Box>
-        </Collapse>
+        <CircularProgress size={24} color="primary" sx={{ mr: 1.5 }} />
+        <Typography variant="body2" fontWeight={500}>
+          Loading services...
+        </Typography>
       </Box>
+    )}
 
-      {/* Bottom sheet UI */}
-      <BottomSheet
-        height={sheetHeight}
-        toggleHeight={toggleSheetHeight}
-        collapseSheet={collapseSheet}
-        title="Nearby Services"
-        filteredCount={filteredServices.length}
-        showResetButton={selectedCategory !== "All" || filterText !== ""}
-        onReset={handleResetFilters}
-      >
-        {renderServiceList()}
-      </BottomSheet>
-
-      {/* Selected service detail panel */}
-      <ServiceDetailPanel
-        service={selectedService}
-        onClose={() => setSelectedService(null)}
-        onJoinQueue={handleJoinQueue}
-      />
-
-      {/* Loading State */}
-      {loading && (
-        <Box
+    {/* Error Display */}
+    {error && (
+      <Fade in={!!error}>
+        <Alert
+          severity="error"
           sx={{
             position: 'absolute',
-            top: '50%',
+            top: 70,
             left: '50%',
-            transform: 'translate(-50%, -50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            bgcolor: 'rgba(255, 255, 255, 0.8)',
-            padding: 3,
-            borderRadius: 2,
-            zIndex: 30
+            transform: 'translateX(-50%)',
+            zIndex: 25,
+            maxWidth: '90%',
+            boxShadow: 2,
+            borderRadius: 1
           }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setError(null)}>
+              Dismiss
+            </Button>
+          }
         >
-          <CircularProgress size={40} color="primary" />
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Loading services...
-          </Typography>
-        </Box>
-      )}
-
-      {/* Error Display */}
-      {error && (
-        <Fade in={!!error}>
-          <Alert
-            severity="error"
-            sx={{
-              position: 'absolute',
-              top: 80,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 25,
-              maxWidth: '90%',
-              boxShadow: 3,
-              borderRadius: 2
-            }}
-            action={
-              <Button color="inherit" size="small" onClick={() => setError(null)}>
-                Dismiss
-              </Button>
-            }
-          >
-            {error}
-          </Alert>
-        </Fade>
-      )}
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbarState.open}
-        autoHideDuration={4000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'center'
-        }}
-      >
-        <Alert
-          onClose={handleSnackbarClose}
-          severity={snackbarState.severity}
-          variant="filled"
-          sx={{ width: '100%', borderRadius: 2 }}
-        >
-          {snackbarState.message}
+          {error}
         </Alert>
-      </Snackbar>
-    </Box>
-  );
+      </Fade>
+    )}
+
+    {/* Snackbar for notifications */}
+    <Snackbar
+      open={snackbarState.open}
+      autoHideDuration={4000}
+      onClose={handleSnackbarClose}
+      anchorOrigin={{
+        vertical: 'bottom',
+        horizontal: 'center'
+      }}
+    >
+      <Alert
+        onClose={handleSnackbarClose}
+        severity={snackbarState.severity}
+        variant="filled"
+        sx={{ width: '100%', borderRadius: 1 }}
+      >
+        {snackbarState.message}
+      </Alert>
+    </Snackbar>
+  </Box>
+);
 };
 
 export default React.memo(MapProximity);

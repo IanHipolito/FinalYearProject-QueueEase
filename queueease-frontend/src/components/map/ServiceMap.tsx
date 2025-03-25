@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Box, Chip, Typography, Paper, Button, CircularProgress } from '@mui/material';
-import DirectionsIcon from '@mui/icons-material/Directions';
+import { Box, Button, CircularProgress } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
-import CloseIcon from '@mui/icons-material/Close';
 import { Service } from '../../types/serviceTypes';
-import { createServicePopupContent, prepareGeoJSON, getServicePointLayer, getServiceSymbolLayer, addMapStyles } from './mapUtils';
+import { prepareGeoJSON, getServicePointLayer, getServiceSymbolLayer, addMapStyles } from './mapUtils';
 import { DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN } from '../../utils/mapUtils';
 
 // Types
@@ -16,17 +14,9 @@ interface ServiceMapProps {
   onServiceClick: (service: Service) => void;
   height?: string;
   isMobile?: boolean;
-}
-
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-}
-
-interface RouteInfo {
-  distance: number;
-  duration: number;
-  geometry: any;
+  maxDistance?: number;
+  userLocation: { latitude: number; longitude: number } | null;
+  onUserLocationChange: (location: { latitude: number; longitude: number } | null) => void;
 }
 
 const ServiceMap: React.FC<ServiceMapProps> = ({
@@ -34,260 +24,21 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   selectedService,
   onServiceClick,
   height = '100%',
-  isMobile = false
+  isMobile = false,
+  maxDistance = 10,
+  userLocation,
+  onUserLocationChange
 }) => {
-  // Refs
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
-  const isMapMovingRef = useRef<boolean>(false);
   const serviceMapRef = useRef<Map<number, Service>>(new Map());
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const routeLayerId = 'route';
+  const isMapMovingRef = useRef<boolean>(false);
   const userLayerId = 'user-location';
+  const userRadiusLayerId = 'user-radius';
+  const userRadiusOutlineId = 'user-radius-outline';
 
-  // State
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
-  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const [isDirectionsMode, setIsDirectionsMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // Memoized data transform for better performance
-  const serviceData = React.useMemo(() => prepareGeoJSON(services, selectedService?.id), 
-    [services, selectedService?.id]);
-    
-  // Initialize service map
-  useEffect(() => {
-    const serviceMap = new Map<number, Service>();
-    services.forEach(service => {
-      serviceMap.set(service.id, service);
-    });
-    serviceMapRef.current = serviceMap;
-  }, [services]);
-
-  // Format distance for display
-  const formatDistance = useCallback((meters: number): string => {
-    if (meters < 1000) {
-      return `${Math.round(meters)}m`;
-    } else {
-      return `${(meters / 1000).toFixed(1)}km`;
-    }
-  }, []);
-
-  // Format duration for display
-  const formatDuration = useCallback((seconds: number): string => {
-    if (seconds < 60) {
-      return `${Math.round(seconds)}s`;
-    } else if (seconds < 3600) {
-      return `${Math.floor(seconds / 60)}min`;
-    } else {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      return `${hours}h ${minutes}min`;
-    }
-  }, []);
-
-  // Clear route data
-  const clearRoute = useCallback(() => {
-    if (!map.current) return;
-    
-    if (map.current.getLayer(routeLayerId)) {
-      map.current.removeLayer(routeLayerId);
-    }
-    
-    if (map.current.getSource(routeLayerId)) {
-      map.current.removeSource(routeLayerId);
-    }
-    
-    setRouteInfo(null);
-    setIsDirectionsMode(false);
-  }, []);
-
-  // Get user's current location
-  const getUserLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      console.error('Geolocation is not supported by your browser');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ latitude, longitude });
-        
-        // Add or update user marker
-        if (!map.current) return;
-        
-        // Create user location source if it doesn't exist
-        if (!map.current.getSource(userLayerId)) {
-          map.current.addSource(userLayerId, {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'Point',
-                coordinates: [longitude, latitude]
-              },
-              properties: {}
-            }
-          });
-          
-          // Add user location layer
-          map.current.addLayer({
-            id: userLayerId,
-            source: userLayerId,
-            type: 'circle',
-            paint: {
-              'circle-radius': 8,
-              'circle-color': '#007bff',
-              'circle-stroke-width': 3,
-              'circle-stroke-color': '#ffffff',
-              'circle-opacity': 0.9
-            }
-          });
-          
-          // Add pulsing effect
-          map.current.addLayer({
-            id: 'user-location-pulse',
-            source: userLayerId,
-            type: 'circle',
-            paint: {
-              'circle-radius': [
-                'interpolate',
-                ['linear'],
-                ['get', 'pulse'],
-                0, 8,
-                1, 16
-              ],
-              'circle-color': '#007bff',
-              'circle-opacity': [
-                'interpolate',
-                ['linear'],
-                ['get', 'pulse'],
-                0, 0.5,
-                1, 0
-              ],
-              'circle-stroke-width': 0
-            }
-          });
-        } else {
-          // Update existing source
-          const source = map.current.getSource(userLayerId) as mapboxgl.GeoJSONSource;
-          source.setData({
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [longitude, latitude]
-            },
-            properties: {}
-          });
-        }
-        
-        // Fly to user location
-        map.current.flyTo({
-          center: [longitude, latitude],
-          zoom: 14,
-          essential: true
-        });
-      },
-      (error) => {
-        console.error('Error getting location:', error.message);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
-      }
-    );
-  }, []);
-
-  // Calculate route between two points
-  const getRoute = useCallback(async (start: [number, number], end: [number, number]) => {
-    if (!map.current || !userLocation) return;
-    
-    setIsLoadingRoute(true);
-    try {
-      const query = await fetch(
-        `https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?steps=true&geometries=geojson&access_token=${MAPBOX_TOKEN}`
-      );
-      
-      const json = await query.json();
-      if (!json.routes || json.routes.length === 0) {
-        throw new Error('No route found');
-      }
-      
-      const route = json.routes[0];
-      const { distance, duration, geometry } = route;
-      
-      setRouteInfo({
-        distance,
-        duration,
-        geometry
-      });
-      
-      // Add the route to the map
-      if (map.current.getLayer(routeLayerId)) {
-        map.current.removeLayer(routeLayerId);
-      }
-      
-      if (map.current.getSource(routeLayerId)) {
-        map.current.removeSource(routeLayerId);
-      }
-      
-      map.current.addSource(routeLayerId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: geometry
-        }
-      });
-      
-      map.current.addLayer({
-        id: routeLayerId,
-        type: 'line',
-        source: routeLayerId,
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#6f42c1',
-          'line-width': 5,
-          'line-opacity': 0.8
-        }
-      });
-      
-      // Adjust map view to show route
-      const coordinates = geometry.coordinates;
-      const bounds = coordinates.reduce((bounds: mapboxgl.LngLatBounds, coord: [number, number]) => {
-        return bounds.extend(coord);
-      }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-      
-      map.current.fitBounds(bounds, {
-        padding: 50,
-        maxZoom: 15,
-        duration: 1000
-      });
-    } catch (error) {
-      console.error('Error calculating route:', error);
-    } finally {
-      setIsLoadingRoute(false);
-    }
-  }, [userLocation]);
-
-  // Show directions to selected service
-  const showDirections = useCallback(() => {
-    if (!userLocation || !selectedService || !map.current) return;
-    
-    setIsDirectionsMode(true);
-    
-    const start: [number, number] = [userLocation.longitude, userLocation.latitude];
-    const end: [number, number] = [selectedService.longitude, selectedService.latitude];
-    
-    getRoute(start, end);
-  }, [userLocation, selectedService, getRoute]);
-
   // Calculate distance between two points (haversine formula)
   const calculateDistance = useCallback((
     lat1: number, 
@@ -309,14 +60,217 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     return R * c; // in meters
   }, []);
   
+  // Memoized data transform with distance filtering
+  const serviceData = React.useMemo(() => {
+    let filteredServices = services;
+    
+    // Filter services by distance if user location is available
+    if (userLocation && maxDistance > 0) {
+      filteredServices = services.filter(service => {
+        const distance = calculateDistance(
+          userLocation.latitude,
+          userLocation.longitude,
+          service.latitude,
+          service.longitude
+        );
+        // Convert distance to kilometers and compare with maxDistance
+        return distance / 1000 <= maxDistance;
+      });
+    }
+    
+    return prepareGeoJSON(filteredServices, selectedService?.id);
+  }, [services, selectedService?.id, userLocation, maxDistance, calculateDistance]);
+  
+  // Initialize service map
+  useEffect(() => {
+    const serviceMap = new Map<number, Service>();
+    services.forEach(service => {
+      serviceMap.set(service.id, service);
+    });
+    serviceMapRef.current = serviceMap;
+  }, [services]);
+  
+  // Get user's current location
+  const getUserLocation = useCallback(() => {
+    setIsLoading(true);
+    if (!navigator.geolocation) {
+      console.error('Geolocation is not supported by your browser');
+      setIsLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        onUserLocationChange({ latitude, longitude });
+        
+        // Add or update user location and radius on map
+        updateUserLocationOnMap(latitude, longitude, maxDistance);
+        
+        // Fly to user location
+        if (map.current) {
+          map.current.flyTo({
+            center: [longitude, latitude],
+            zoom: 14,
+            essential: true
+          });
+        }
+        
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error.message);
+        setIsLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+  }, [maxDistance, onUserLocationChange]);
+  
+  // Update user location marker and radius circle on map
+  const updateUserLocationOnMap = useCallback((latitude: number, longitude: number, radiusKm: number) => {
+    if (!map.current) return;
+    
+    // Check if the map style is fully loaded
+    if (!map.current.isStyleLoaded()) {
+      // If not loaded, wait for it to load
+      map.current.once('style.load', () => {
+        updateUserLocationOnMap(latitude, longitude, radiusKm);
+      });
+      return;
+    }
+    
+    // Create user location marker
+    const userLocationData = {
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [longitude, latitude]
+      },
+      properties: {}
+    };
+    
+    // Create radius circle
+    const radiusInMeters = radiusKm * 1000;
+    const steps = 48; // Reduced for better performance
+    const circle = {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[]]
+      },
+      properties: {}
+    };
+    
+    // Generate circle polygon points
+    for (let i = 0; i < steps; i++) {
+      const angle = (i / steps) * 2 * Math.PI;
+      const lng = longitude + (radiusInMeters / 111320 * Math.cos(angle)) * Math.cos(latitude * Math.PI / 180);
+      const lat = latitude + (radiusInMeters / 111320 * Math.sin(angle));
+      (circle.geometry as any).coordinates[0].push([lng, lat]);
+    }
+    // Close the polygon
+    (circle.geometry as any).coordinates[0].push((circle.geometry as any).coordinates[0][0]);
+    
+    // Add or update user location source
+    if (!map.current.getSource(userLayerId)) {
+      map.current.addSource(userLayerId, {
+        type: 'geojson',
+        data: userLocationData as any
+      });
+      
+      // Add user location layer
+      map.current.addLayer({
+        id: userLayerId,
+        source: userLayerId,
+        type: 'circle',
+        paint: {
+          'circle-radius': 7,
+          'circle-color': '#6f42c1',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.9
+        }
+      });
+    } else {
+      // Update existing source
+      const source = map.current.getSource(userLayerId) as mapboxgl.GeoJSONSource;
+      source.setData(userLocationData as any);
+    }
+    
+    // Add or update radius circle
+    if (!map.current.getSource(userRadiusLayerId)) {
+      map.current.addSource(userRadiusLayerId, {
+        type: 'geojson',
+        data: circle as any
+      });
+      
+      // Add radius layer with more subtle styling
+      map.current.addLayer({
+        id: userRadiusLayerId,
+        source: userRadiusLayerId,
+        type: 'fill',
+        paint: {
+          'fill-color': '#6f42c1',
+          'fill-opacity': 0.08,
+          'fill-outline-color': '#6f42c1'
+        }
+      }, 'service-points'); // Add below service points
+      
+      // Add radius outline with more subtle styling
+      map.current.addLayer({
+        id: userRadiusOutlineId,
+        source: userRadiusLayerId,
+        type: 'line',
+        paint: {
+          'line-color': '#6f42c1',
+          'line-width': 1.5,
+          'line-opacity': 0.4,
+          'line-dasharray': [2, 2]
+        }
+      });
+    } else {
+      // Update existing source
+      const source = map.current.getSource(userRadiusLayerId) as mapboxgl.GeoJSONSource;
+      source.setData(circle as any);
+    }
+  }, []);
+  
+  // Update map data
+  const updateMapData = useCallback(() => {
+    if (!map.current) return;
+    if (isMapMovingRef.current) return;
+    if (!map.current.isStyleLoaded()) return;
+
+    try {
+      const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
+      if (!source) return;
+
+      source.setData(serviceData);
+
+      if (map.current.getLayer('service-points')) {
+        map.current.setPaintProperty(
+          'service-points',
+          'circle-stroke-width',
+          [
+            'case',
+            ['==', ['get', 'id'], ['literal', selectedService ? selectedService.id : -1]],
+            3,
+            1.5
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error updating map data:', error);
+    }
+  }, [serviceData, selectedService]);
+
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
-
-    const throttledUpdateData = () => {
-      if (isMapMovingRef.current) return;
-      updateMapData();
-    };
 
     const initMap = () => {
       try {
@@ -324,7 +278,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
 
         const newMap = new mapboxgl.Map({
           container: mapContainer.current!,
-          style: 'mapbox://styles/mapbox/streets-v12',
+          style: 'mapbox://styles/mapbox/light-v11', // Use a lighter map style
           center: DUBLIN_CENTER,
           zoom: isMobile ? 11 : 12,
           minZoom: 10,
@@ -344,7 +298,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
 
         map.current = newMap;
         
-        // Add controls
+        // Add controls - minimized for less clutter
         newMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
         newMap.addControl(
           new mapboxgl.NavigationControl({
@@ -353,26 +307,8 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }),
           'bottom-right'
         );
-
-        // Add geolocate control
-        const geolocateControl = new mapboxgl.GeolocateControl({
-          positionOptions: { enableHighAccuracy: true },
-          trackUserLocation: true,
-          showUserHeading: true
-        });
         
-        newMap.addControl(geolocateControl, 'bottom-right');
-        
-        // Create popup
-        popupRef.current = new mapboxgl.Popup({
-          closeButton: true,
-          closeOnClick: true,
-          maxWidth: '300px',
-          className: 'queueease-popup',
-          offset: 15
-        });
-
-        // Setup event handlers with performance optimizations
+        // Setup event handlers
         let moveEndTimeout: NodeJS.Timeout;
         
         newMap.on('movestart', () => {
@@ -384,16 +320,38 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           clearTimeout(moveEndTimeout);
           moveEndTimeout = setTimeout(() => {
             isMapMovingRef.current = false;
-            throttledUpdateData();
+            updateMapData();
           }, 100);
         });
 
         newMap.on('load', () => {
-          const styleElement = addMapStyles();
-          initializeMapLayers();
+          addMapStyles();
           
-          // Try to get user's location after map loads
-          getUserLocation();
+          // Ensure the map style is fully loaded before adding sources and layers
+          if (newMap.isStyleLoaded()) {
+            initializeMapLayers();
+            
+            // If user location is already set, update it on the map
+            if (userLocation) {
+              updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
+            } else {
+              // Try to get user's location after map loads
+              getUserLocation();
+            }
+          } else {
+            // If style isn't loaded yet, listen for the style.load event
+            newMap.once('style.load', () => {
+              initializeMapLayers();
+              
+              // If user location is already set, update it on the map
+              if (userLocation) {
+                updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
+              } else {
+                // Try to get user's location after map loads
+                getUserLocation();
+              }
+            });
+          }
         });
       } catch (err) {
         console.error('Error initializing map:', err);
@@ -409,7 +367,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         data: serviceData,
         cluster: true,
         clusterMaxZoom: 14,
-        clusterRadius: 60,
+        clusterRadius: 50, // Slightly reduced for less crowding
         generateId: true,
         maxzoom: 17,
         buffer: 128,
@@ -426,22 +384,22 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           'circle-color': [
             'step',
             ['get', 'point_count'],
-            '#8551d9', // theme.palette.primary.light
-            20, '#6f42c1', // theme.palette.primary.main
-            100, '#5e35b1' // theme.palette.primary.dark
+            '#8551d9',
+            20, '#6f42c1',
+            100, '#5e35b1'
           ],
           'circle-radius': [
             'interpolate',
             ['linear'],
             ['get', 'point_count'],
-            3, 20,
-            10, 25,
-            50, 35,
-            100, 40
+            3, 18,
+            10, 22,
+            50, 30,
+            100, 35
           ],
           'circle-stroke-width': 2,
           'circle-stroke-color': 'white',
-          'circle-opacity': 0.9
+          'circle-opacity': 0.85
         }
       });
 
@@ -461,8 +419,25 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         }
       });
 
-      // Add individual service layers
-      map.current.addLayer(getServicePointLayer(selectedService));
+      // Add individual service layers - smaller and more transparent
+      const servicePointLayer = getServicePointLayer(selectedService);
+      
+      // Fix the TypeScript error by checking if paint exists and creating it if needed
+      if (!servicePointLayer.paint) {
+        servicePointLayer.paint = {};
+      }
+      
+      servicePointLayer.paint['circle-radius'] = [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        10, 5,
+        14, 9,
+        16, 12
+      ];
+      servicePointLayer.paint['circle-opacity'] = 0.85;
+      
+      map.current.addLayer(servicePointLayer);
       map.current.addLayer(getServiceSymbolLayer());
 
       // Handle clicks on clusters
@@ -496,8 +471,6 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
 
         const service = serviceMapRef.current.get(Number(serviceId));
         if (service) {
-          // Clear any existing route when selecting a new service
-          clearRoute();
           onServiceClick(service);
         }
       });
@@ -523,92 +496,62 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     initMap();
 
     return () => {
-      if (popupRef.current) popupRef.current.remove();
-      if (markerRef.current) markerRef.current.remove();
       if (map.current) map.current.remove();
       map.current = null;
     };
-  }, [isMobile, serviceData, getUserLocation, clearRoute]);
+  }, [isMobile, serviceData, getUserLocation, updateUserLocationOnMap, maxDistance, selectedService, userLocation, updateMapData, onServiceClick]);
 
-  const updateMapData = useCallback(() => {
-    if (!map.current) return;
-    if (isMapMovingRef.current) return;
-
-    const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
-    if (!source) return;
-
-    source.setData(serviceData);
-
-    if (map.current.getLayer('service-points')) {
-      map.current.setPaintProperty(
-        'service-points',
-        'circle-stroke-width',
-        [
-          'case',
-          ['==', ['get', 'id'], ['literal', selectedService ? selectedService.id : -1]],
-          3,
-          1.5
-        ]
-      );
-    }
-  }, [serviceData, selectedService]);
-
-  // Update map when services or selected service changes
+  // Update map when radius or user location changes
   useEffect(() => {
-    if (!map.current) return;
-    updateMapData();
-
-    // Show popup for selected service
-    if (selectedService) {
-      if (!popupRef.current) {
-        popupRef.current = new mapboxgl.Popup({
-          closeButton: true,
-          closeOnClick: false,
-          maxWidth: '300px',
-          offset: 15
-        });
+    if (userLocation && map.current) {
+      // Only proceed if map style is loaded
+      if (map.current.isStyleLoaded()) {
+        updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
+        updateMapData();
       } else {
-        popupRef.current.remove();
+        // Wait for style to load
+        map.current.once('style.load', () => {
+          if (map.current && userLocation) {
+            updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
+            updateMapData();
+          }
+        });
       }
+    }
+  }, [maxDistance, userLocation, updateUserLocationOnMap, updateMapData]);
 
-      // Create enhanced popup content with distance if user location is available
-      let popupContent = createServicePopupContent(selectedService);
+  // Update map when selected service changes
+  useEffect(() => {
+    if (!map.current || !selectedService) return;
+    
+    // Check if the map style is loaded before trying to update
+    if (map.current.isStyleLoaded()) {
+      updateMapData();
       
-      if (userLocation) {
-        const distance = calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          selectedService.latitude,
-          selectedService.longitude
-        );
-        
-        const distanceStr = formatDistance(distance);
-        
-        // Inject distance information into popup
-        popupContent = popupContent.replace(
-          '</div>',
-          `<div style="margin-top: 8px; padding: 4px 8px; background-color: #f0f0f0; border-radius: 4px; display: inline-block;">
-            <strong>Distance:</strong> ${distanceStr}
-          </div></div>`
-        );
-      }
-
-      popupRef.current
-        .setLngLat([selectedService.longitude, selectedService.latitude])
-        .setHTML(popupContent)
-        .addTo(map.current);
-
+      // Fly to selected service
       map.current.flyTo({
         center: [selectedService.longitude, selectedService.latitude],
         zoom: Math.max(map.current.getZoom(), 14),
         duration: 500,
         essential: true
       });
-
-      // Clear any existing route when selecting a new service
-      clearRoute();
+    } else {
+      // Wait for style to load
+      map.current.once('style.load', () => {
+        updateMapData();
+        
+        // Fly to selected service
+        if (map.current) {
+          map.current.flyTo({
+            center: [selectedService.longitude, selectedService.latitude],
+            zoom: Math.max(map.current.getZoom(), 14),
+            duration: 500,
+            essential: true
+          });
+        }
+      });
     }
-  }, [services, selectedService, userLocation, calculateDistance, formatDistance, clearRoute, updateMapData]);
+  }, [selectedService, updateMapData]);
 
   return (
     <Box
@@ -627,11 +570,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         sx={{
           height: '100%',
           width: '100%',
-          position: 'relative',
-          '& .mapboxgl-popup-content': {
-            padding: '16px',
-            borderRadius: '8px'
-          }
+          position: 'relative'
         }}
       />
       
@@ -639,7 +578,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       <Box
         sx={{
           position: 'absolute',
-          top: 16,
+          bottom: 100,
           right: 16,
           zIndex: 10
         }}
@@ -648,6 +587,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           variant="contained"
           size="small"
           onClick={getUserLocation}
+          disabled={isLoading}
           sx={{
             minWidth: '40px',
             width: '40px',
@@ -661,94 +601,15 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             }
           }}
         >
-          <MyLocationIcon />
+          {isLoading ? (
+            <CircularProgress size={24} color="secondary" />
+          ) : (
+            <MyLocationIcon />
+          )}
         </Button>
       </Box>
-      
-      {/* Selected Service Actions */}
-      {selectedService && userLocation && (
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 10,
-            width: '90%',
-            maxWidth: '400px'
-          }}
-        >
-          <Paper
-            elevation={3}
-            sx={{
-              p: 2,
-              borderRadius: 2,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(10px)'
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600}>
-                {selectedService.name}
-              </Typography>
-              
-              <Chip
-                size="small"
-                label={formatDistance(
-                  calculateDistance(
-                    userLocation.latitude,
-                    userLocation.longitude,
-                    selectedService.latitude,
-                    selectedService.longitude
-                  )
-                )}
-                color="primary"
-              />
-            </Box>
-            
-            {isDirectionsMode && routeInfo ? (
-              <Box sx={{ mt: 1 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">
-                    Distance: <strong>{formatDistance(routeInfo.distance)}</strong>
-                  </Typography>
-                  <Typography variant="body2">
-                    ETA: <strong>{formatDuration(routeInfo.duration)}</strong>
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  size="small"
-                  onClick={clearRoute}
-                  startIcon={<CloseIcon />}
-                >
-                  Close Directions
-                </Button>
-              </Box>
-            ) : (
-              <Button
-                variant="contained"
-                fullWidth
-                size="small"
-                onClick={showDirections}
-                disabled={isLoadingRoute}
-                startIcon={isLoadingRoute ? <CircularProgress size={16} color="inherit" /> : <DirectionsIcon />}
-                sx={{
-                  backgroundColor: '#6f42c1',
-                  '&:hover': {
-                    backgroundColor: '#8551d9'
-                  }
-                }}
-              >
-                {isLoadingRoute ? 'Loading Route...' : 'Get Directions'}
-              </Button>
-            )}
-          </Paper>
-        </Box>
-      )}
     </Box>
   );
 };
 
-export default ServiceMap;
+export default React.memo(ServiceMap);
