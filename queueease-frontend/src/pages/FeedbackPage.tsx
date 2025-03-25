@@ -11,12 +11,17 @@ import {
   Paper,
   Divider,
   CircularProgress,
-  Alert
+  Alert,
+  Button,
+  Fade
 } from '@mui/material';
 import FeedbackForm from '../components/feedback/FeedbackForm';
 import ServiceSelectionCard from '../components/feedback/ServiceSelectionCard';
 import FeedbackHistoryCard from '../components/feedback/FeedbackHistoryCard';
 import EmptyState from '../components/feedback/EmptyState';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import HistoryIcon from '@mui/icons-material/History';
+import RateReviewIcon from '@mui/icons-material/RateReview';
 import { 
   FeedbackCategory, 
   ServiceWithOrderDetails, 
@@ -189,19 +194,40 @@ const FeedbackPage: React.FC = () => {
     setSelectedService(null);
   };
 
+  const availableServiceCount = services.filter(service => !service.has_feedback).length;
+  const submittedFeedbackCount = services.filter(service => service.has_feedback).length;
+
   if (!user) {
     navigate('/login');
     return null;
   }
 
   return (
-    <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 4 }}>
+    <Box sx={{ 
+      bgcolor: '#f8f9fa', 
+      minHeight: '100vh', 
+      py: 4,
+      background: 'linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%)'
+    }}>
       <Container maxWidth="md">
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Feedback
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate('/usermainpage')}
+            sx={{ 
+              mr: 2, 
+              color: '#6f42c1',
+              '&:hover': { bgcolor: 'rgba(111, 66, 193, 0.08)' }
+            }}
+          >
+            Back
+          </Button>
+          <Typography variant="h4" fontWeight="bold">
+            Feedback
+          </Typography>
+        </Box>
         
-        <Typography variant="body1" color="text.secondary" paragraph>
+        <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 3 }}>
           Share your thoughts and help us improve our services
         </Typography>
         
@@ -227,7 +253,8 @@ const FeedbackPage: React.FC = () => {
               px: 2,
               '& .MuiTab-root': {
                 minHeight: 64,
-                fontWeight: 500
+                fontWeight: 500,
+                fontSize: '0.95rem'
               },
               '& .Mui-selected': {
                 color: '#6f42c1'
@@ -237,15 +264,29 @@ const FeedbackPage: React.FC = () => {
               }
             }}
           >
-            <Tab label="Give Feedback" />
-            <Tab label="Feedback History" />
+            <Tab 
+              label="Give Feedback" 
+              icon={<RateReviewIcon />} 
+              iconPosition="start"
+              sx={{ 
+                '& .MuiTab-iconWrapper': { mr: 1 },
+              }} 
+            />
+            <Tab 
+              label="Feedback History" 
+              icon={<HistoryIcon />} 
+              iconPosition="start"
+              sx={{ 
+                '& .MuiTab-iconWrapper': { mr: 1 },
+              }} 
+            />
           </Tabs>
           
           <Divider />
           
           <Box sx={{ p: 3 }}>
-            {activeTab === 0 && (
-              <>
+            <Fade in={activeTab === 0}>
+              <Box sx={{ display: activeTab === 0 ? 'block' : 'none' }}>
                 {selectedService ? (
                   <>
                     <Box
@@ -259,7 +300,8 @@ const FeedbackPage: React.FC = () => {
                       }}
                       onClick={handleBackToServices}
                     >
-                      <Typography variant="body2">← Back to services</Typography>
+                      <ArrowBackIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+                      <Typography variant="body2">Back to services</Typography>
                     </Box>
                     <FeedbackForm
                       serviceId={selectedService.id}
@@ -273,8 +315,9 @@ const FeedbackPage: React.FC = () => {
                     />
                   </>
                 ) : loadingServices ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                    <CircularProgress size={40} sx={{ color: '#6f42c1' }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, flexDirection: 'column', alignItems: 'center' }}>
+                    <CircularProgress size={40} sx={{ color: '#6f42c1', mb: 2 }} />
+                    <Typography>Loading services...</Typography>
                   </Box>
                 ) : services.length === 0 ? (
                   <EmptyState 
@@ -291,17 +334,17 @@ const FeedbackPage: React.FC = () => {
                       You can only give feedback for services you've used and haven't rated yet.
                     </Typography>
                     
-                    {services
-                      .filter(service => !service.has_feedback)
-                      .map(service => (
-                        <ServiceSelectionCard
-                          key={`${service.id}-${service.order_id}`}
-                          service={service}
-                          onSelect={() => handleSelectService(service)}
-                        />
-                      ))}
-                    
-                    {services.filter(service => !service.has_feedback).length === 0 && (
+                    {availableServiceCount > 0 ? (
+                      services
+                        .filter(service => !service.has_feedback)
+                        .map(service => (
+                          <ServiceSelectionCard
+                            key={`${service.id}-${service.order_id}`}
+                            service={service}
+                            onSelect={() => handleSelectService(service)}
+                          />
+                        ))
+                    ) : (
                       <EmptyState 
                         message="You've already provided feedback for all your services."
                         buttonText="View History"
@@ -309,7 +352,7 @@ const FeedbackPage: React.FC = () => {
                       />
                     )}
                     
-                    {services.filter(service => service.has_feedback).length > 0 && (
+                    {submittedFeedbackCount > 0 && (
                       <>
                         <Typography variant="h6" sx={{ mt: 4, mb: 2 }} fontWeight="medium">
                           Services with submitted feedback
@@ -322,20 +365,22 @@ const FeedbackPage: React.FC = () => {
                               key={`${service.id}-${service.order_id}`}
                               service={service}
                               onSelect={() => {}}
+                              disabled
                             />
                           ))}
                       </>
                     )}
                   </>
                 )}
-              </>
-            )}
+              </Box>
+            </Fade>
             
-            {activeTab === 1 && (
-              <>
+            <Fade in={activeTab === 1}>
+              <Box sx={{ display: activeTab === 1 ? 'block' : 'none' }}>
                 {loadingHistory ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                    <CircularProgress size={40} sx={{ color: '#6f42c1' }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, flexDirection: 'column', alignItems: 'center' }}>
+                    <CircularProgress size={40} sx={{ color: '#6f42c1', mb: 2 }} />
+                    <Typography>Loading feedback history...</Typography>
                   </Box>
                 ) : feedbackHistory.length === 0 ? (
                   <EmptyState 
@@ -345,12 +390,26 @@ const FeedbackPage: React.FC = () => {
                   />
                 ) : (
                   <>
-                    <Typography variant="h6" gutterBottom fontWeight="medium">
-                      Your Feedback History
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                      Review the feedback you've provided for various services.
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                      <Box>
+                        <Typography variant="h6" gutterBottom fontWeight="medium">
+                          Your Feedback History
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Review the feedback you've provided for various services.
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ 
+                        color: 'white', 
+                        bgcolor: '#6f42c1',
+                        p: 1,
+                        px: 2,
+                        borderRadius: 2,
+                        fontWeight: 'medium'
+                      }}>
+                        {feedbackHistory.length} Feedback{feedbackHistory.length !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
                     
                     {feedbackHistory.map(feedback => (
                       <FeedbackHistoryCard
@@ -360,8 +419,8 @@ const FeedbackPage: React.FC = () => {
                     ))}
                   </>
                 )}
-              </>
-            )}
+              </Box>
+            </Fade>
           </Box>
         </Paper>
       </Container>
