@@ -5,7 +5,8 @@ from .views import (api_overview, create_queue, get_qr_code, signup_view, login_
                    service_detail, available_appointment_times, create_appointment, admin_signup, admin_services,
                    admin_dashboard_data, list_services_with_status, queue_history, admin_customers, admin_create_customer,
                    save_fcm_token, test_notification, update_queue_position, submit_feedback, get_feedback_categories,
-                   get_user_feedback_history, get_eligible_services, check_feedback_eligibility, admin_get_analytics)	
+                   get_user_feedback_history, get_eligible_services, check_feedback_eligibility, admin_get_analytics, 
+                   check_and_complete_queue, leave_queue)	
 from django.http import JsonResponse
 
 def test_view(request):
@@ -49,4 +50,6 @@ urlpatterns = [
     path('feedback/eligible-services/<int:user_id>/', get_eligible_services, name='get_eligible_services'),
     path('feedback/check-eligibility/', check_feedback_eligibility, name='check_feedback_eligibility'),
     path('admin-get-analytics/', admin_get_analytics, name='admin-get-analytics'),
+    path('check-complete-queue/<int:queue_id>/', check_and_complete_queue, name='check_and_complete_queue'),
+    path('leave-queue/<int:queue_id>/', leave_queue, name='leave_queue'),
 ]

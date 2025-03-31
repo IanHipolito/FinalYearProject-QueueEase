@@ -32,10 +32,20 @@ class Command(BaseCommand):
             'events_venue': (20, 60),  # Source: Industry reports
             'veterinary': (15, 45),  # Source: Industry studies
             'charging_station': (10, 30),  # Source: Industry reports
+            'fast_food': (5, 18),
             'other': (10, 60)  # General category
         }
 
-        wait_time_range = service_type_wait_times.get(service.name, (10, 60))
+        # First check if the service name has a specific wait time
+        wait_time_range = service_type_wait_times.get(service.name, None)
+
+        # If not, check if the service category has a wait time
+        if wait_time_range is None and service.category:
+            wait_time_range = service_type_wait_times.get(service.category.lower(), None)
+        
+        # If still not found, use the default
+        if wait_time_range is None:
+            wait_time_range = service_type_wait_times.get('other', (10, 60))
 
         for i in range(30):
             date_recorded = datetime.now() - timedelta(days=i)

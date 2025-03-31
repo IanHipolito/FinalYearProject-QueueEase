@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { API } from '../services/api';
 import {
   Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button
 } from '@mui/material';
@@ -16,13 +17,7 @@ import CategoryFilter from '../components/map/CategoryFilter';
 import { CATEGORIES, generateRandomDublinCoordinates } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
 
-interface MapProximityProps {
-  apiUrl?: string;
-}
-
-const MapProximity: React.FC<MapProximityProps> = ({
-  apiUrl = 'http://127.0.0.1:8000/api/list_services/'
-}) => {
+const MapProximity: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -79,49 +74,40 @@ const MapProximity: React.FC<MapProximityProps> = ({
       navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
       return;
     }
-
+  
     try {
       const serviceToJoin = services.find(s => s.id === serviceId);
       if (!serviceToJoin) {
         throw new Error('Service not found');
       }
-
+  
       // Check if this is a service that requires appointments
       if (serviceToJoin.service_type === 'appointment') {
         // Route to booking page for appointment-based services
         navigate(`/book-appointment/${serviceId}`);
         return;
       }
-
+  
       // For immediate services, create a queue entry
       setSnackbarState({
         open: true,
         message: "Creating your queue entry...",
         severity: "info"
       });
-
-      const response = await fetch("http://127.0.0.1:8000/api/create-queue/", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          service_id: serviceId,
-        }),
-      });
-
+  
+      const response = await API.queues.createQueue(user.id, serviceId);
+  
       if (!response.ok) {
         throw new Error(`Failed to create queue: ${response.status}`);
       }
-
+  
       const data = await response.json();
       setSnackbarState({
         open: true,
         message: "Successfully joined queue!",
         severity: "success"
       });
-
+  
       // Navigate to QR code screen with the queue ID
       navigate(`/qrcodescreen/${data.queue_id}`);
     } catch (err) {
@@ -213,25 +199,25 @@ const MapProximity: React.FC<MapProximityProps> = ({
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await fetch(apiUrl);
+        const response = await API.services.list();
         if (!response.ok) {
           throw new Error(`Failed to fetch services: ${response.status}`);
         }
-
+  
         let data = await response.json();
-
+  
         data = data.map((service: Service) => {
           const newService = { 
             ...service,
             subcategory: ''
           };
-
+  
           if (!newService.latitude || !newService.longitude) {
             const { latitude, longitude } = generateRandomDublinCoordinates();
             newService.latitude = latitude;
             newService.longitude = longitude;
           }
-
+  
           const nameLower = newService.name?.toLowerCase() || '';
           if (
             nameLower.includes('mcdonald') ||
@@ -248,21 +234,21 @@ const MapProximity: React.FC<MapProximityProps> = ({
             newService.category = 'fast_food';
             newService.subcategory = 'fast_food';
           }
-
+  
           if ((newService.category && newService.category.toLowerCase().includes('health')) ||
             (newService.category && newService.category.toLowerCase().includes('clinic')) ||
             (newService.category && newService.category.toLowerCase().includes('doctor')) ||
             (newService.category && newService.category.toLowerCase().includes('hospital'))) {
             newService.category = 'healthcare';
           }
-
+  
           if (!newService.category) {
             newService.category = 'other';
           }
-
+  
           return newService;
         });
-
+  
         setServices(data);
         setLoading(false);
       } catch (err) {
@@ -271,9 +257,9 @@ const MapProximity: React.FC<MapProximityProps> = ({
         setLoading(false);
       }
     };
-
+  
     fetchServices();
-  }, [apiUrl]);
+  }, []);
 
   // Debounce search text
   useEffect(() => {

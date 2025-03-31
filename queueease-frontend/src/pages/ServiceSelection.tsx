@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { API } from '../services/api';
 import { useAuth } from "./AuthContext";
 import {
   Box,
@@ -68,13 +68,7 @@ const ServiceSelection: React.FC = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
   
-        const response = await fetch("http://127.0.0.1:8000/api/list_services/", {
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await API.services.list();
   
         clearTimeout(timeoutId);
   
@@ -159,16 +153,7 @@ const ServiceSelection: React.FC = () => {
       return;
     }
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/create-queue/", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: loggedInUserId,
-          service_id: serviceId,
-        }),
-      });
+      const response = await API.queues.createQueue(loggedInUserId, serviceId);
 
       if (!response.ok) {
         throw new Error(`Failed to create queue: ${response.status}`);
@@ -187,7 +172,7 @@ const ServiceSelection: React.FC = () => {
     setError(null);
     const fetchServices = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/list_services/");
+        const response = await API.services.list();
 
         if (!response.ok) {
           throw new Error(`Failed to fetch services: ${response.status}`);

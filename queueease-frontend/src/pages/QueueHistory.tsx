@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Box, Container, Typography, Paper, IconButton, Tab, Tabs, CircularProgress, Alert, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { API } from '../services/api';
 
 // Import custom components
 import HistoryFilterBar from '../components/history/HistoryFilterBar';
@@ -34,7 +35,7 @@ const QueueHistory: React.FC = () => {
     const [showFilters, setShowFilters] = useState<boolean>(false);
     const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-    // Categories derived from your service data
+    // Categories derived from service data
     const categories = [
         'restaurant', 'fast_food', 'cafe', 'pub', 'post_office',
         'bar', 'bank', 'events_venue', 'veterinary', 'charging_station',
@@ -56,14 +57,14 @@ const QueueHistory: React.FC = () => {
                 // Try to fetch queue history with fallback to alternative endpoint
                 try {
                     // First try the standard endpoint
-                    const queueResponse = await fetch(`http://127.0.0.1:8000/api/queue-history/${user.id}/`);
+                    const queueResponse = await API.queues.getHistory(user.id);
                     if (queueResponse.ok) {
                         queueData = await queueResponse.json();
                         console.log("Successfully fetched queue history:", queueData);
                     } else {
                         // If that fails, try the alternative endpoint
                         console.warn(`Queue history API returned ${queueResponse.status}, trying user-queues endpoint`);
-                        const fallbackResponse = await fetch(`http://127.0.0.1:8000/api/user-queues/${user.id}/`);
+                        const fallbackResponse = await API.queues.getUserQueues(user.id);
                         if (fallbackResponse.ok) {
                             queueData = await fallbackResponse.json();
                             console.log("Successfully fetched queue history from fallback:", queueData);
@@ -79,7 +80,7 @@ const QueueHistory: React.FC = () => {
 
                 // Try to fetch appointments
                 try {
-                    const appointmentResponse = await fetch(`http://127.0.0.1:8000/api/appointments/${user.id}/`);
+                    const appointmentResponse = await API.appointments.getAll(user.id);
                     if (appointmentResponse.ok) {
                         appointmentData = await appointmentResponse.json();
                         console.log("Successfully fetched appointments:", appointmentData);

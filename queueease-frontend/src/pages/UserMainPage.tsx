@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API } from '../services/api';
 import {
   Box,
   Container,
@@ -17,7 +18,14 @@ import {
   MenuItem,
   Badge,
   Divider,
-  CircularProgress
+  CircularProgress,
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogContentText, 
+  DialogActions, 
+  Snackbar,
+  Alert
 } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -49,6 +57,7 @@ const UserMainPage: React.FC = () => {
   const open = Boolean(anchorEl);
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const [initialTime, setInitialTime] = useState<number>(0);
+  const [autoCompletionAttempted, setAutoCompletionAttempted] = useState<boolean>(false);
   
   // Separate loading states
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
@@ -61,13 +70,25 @@ const UserMainPage: React.FC = () => {
   // Mock notification count for demo purposes
   const [notificationCount, setNotificationCount] = useState(3);
 
+  // Add these state variables around line 47
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
   // Fetch the active queue for the logged-in user
   useEffect(() => {
     if (!user) return;
 
     const fetchDetailedQueue = async (queueId: number, isInitialLoad = false) => {
       try {
-        const detailRes = await fetch(`http://127.0.0.1:8000/api/queue-detail/${queueId}/`);
+        const detailRes = await API.queues.getDetails(queueId);
         if (detailRes.ok) {
           const detailData = await detailRes.json();
           if (detailData.status !== 'pending') {
@@ -118,7 +139,7 @@ const UserMainPage: React.FC = () => {
         }
 
         if (!user) return;
-        const res = await fetch(`http://127.0.0.1:8000/api/active-queue/${user?.id}/`);
+        const res = await API.queues.getActive(user.id);
 
         if (!res.ok) {
           console.log("No active queue found (status):", res.status);
@@ -183,29 +204,46 @@ const UserMainPage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (activeQueue && activeQueue.expected_ready_time && activeQueue.total_wait !== undefined) {
+    if (activeQueue && 
+        activeQueue.id && 
+        activeQueue.expected_ready_time && 
+        activeQueue.status === 'pending') {
+      
       const expectedMs = new Date(activeQueue.expected_ready_time).getTime();
       const nowMs = Date.now();
       const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
       setRemainingTime(diffSec);
-      if (!initialTime && activeQueue.total_wait > 0) {
-        setInitialTime(activeQueue.total_wait);
+      
+      // Auto-complete when time reaches zero or is negative
+      if (diffSec <= 0 && !isLeavingQueue && !autoCompletionAttempted) {
+        setAutoCompletionAttempted(true); // Set this to avoid repeated API calls
+        
+        API.queues.completeQueue(activeQueue.id)
+          .then(response => response.json())
+          .then(data => {
+            console.log("Auto-completion status:", data);
+            if (data.status === 'completed') {
+              setActiveQueue(null);
+              setTimeout(() => {
+                refreshQueueData(false);
+                setAutoCompletionAttempted(false); // Reset for future queues
+              }, 500);
+            } else {
+              // Reset if not completed so we can try again later
+              setTimeout(() => setAutoCompletionAttempted(false), 30000);
+            }
+          })
+          .catch(error => {
+            console.error("Error in auto-completion check:", error);
+            // Reset on error so we can try again
+            setTimeout(() => setAutoCompletionAttempted(false), 30000);
+          });
       }
     } else {
-      setRemainingTime(0);
+      // Reset when active queue changes or is removed
+      setAutoCompletionAttempted(false);
     }
-
-    if (activeQueue && activeQueue.expected_ready_time) {
-      const timer = setInterval(() => {
-        const expectedMs = new Date(activeQueue.expected_ready_time!).getTime();
-        const nowMs = Date.now();
-        const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
-        setRemainingTime(diffSec);
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }
-  }, [activeQueue, initialTime]);
+  }, [activeQueue, isLeavingQueue, remainingTime]);
 
   const handleProfileMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -220,67 +258,113 @@ const UserMainPage: React.FC = () => {
     navigate('/');
   };
 
-  const refreshQueueData = async (showLoading = true) => {
-    if (showLoading) {
-      setRefreshing(true);
+const refreshQueueData = async (showLoading = true) => {
+  if (showLoading) {
+    setRefreshing(true);
+  }
+  
+  try {
+    if (!user) return;
+    const res = await API.queues.getActive(user.id);
+    
+    if (!res.ok) {
+      console.log("No active queue found after refresh");
+      setActiveQueue(null);
+      setRefreshing(false);
+      return;
     }
     
-    try {
-      if (!user) return;
-      const res = await fetch(`http://127.0.0.1:8000/api/active-queue/${user?.id}/`);
+    const data = await res.json();
+    
+    if (data && data.queue_id && data.current_position !== undefined) {
+      const basicQueue = {
+        ...(activeQueue || {}),
+        id: data.queue_id,
+        service_name: data.service_name,
+        position: data.current_position,
+        status: 'pending'
+      };
       
-      if (!res.ok) {
-        console.log("No active queue found after refresh");
-        setActiveQueue(null);
-        setRefreshing(false);
-        return;
-      }
+      setActiveQueue(basicQueue);
       
-      const data = await res.json();
-      
-      if (data && data.queue_id && data.current_position !== undefined) {
-        const basicQueue = {
-          ...(activeQueue || {}),
-          id: data.queue_id,
-          service_name: data.service_name,
-          position: data.current_position,
-          status: 'pending'
-        };
-        
-        setActiveQueue(basicQueue);
-        
-        try {
-          const detailRes = await fetch(`http://127.0.0.1:8000/api/queue-detail/${data.queue_id}/`);
-          if (detailRes.ok) {
-            const detailData = await detailRes.json();
-            
-            if (detailData.status === 'pending') {
-              setActiveQueue({
-                ...(activeQueue || {}),
-                id: detailData.queue_id,
-                service_name: detailData.service_name,
-                position: detailData.current_position,
-                total_wait: detailData.total_wait,
-                expected_ready_time: detailData.expected_ready_time,
-                status: detailData.status
-              });
-            } else {
-              setActiveQueue(null);
-            }
+      try {
+        const detailRes = await API.queues.getDetails(data.queue_id);
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          
+          if (detailData.status === 'pending') {
+            setActiveQueue({
+              ...(activeQueue || {}),
+              id: detailData.queue_id,
+              service_name: detailData.service_name,
+              position: detailData.current_position,
+              total_wait: detailData.total_wait,
+              expected_ready_time: detailData.expected_ready_time,
+              status: detailData.status
+            });
+          } else {
+            setActiveQueue(null);
           }
-        } catch (detailError) {
-          console.error("Error fetching queue details:", detailError);
         }
-      } else {
-        setActiveQueue(null);
+      } catch (detailError) {
+        console.error("Error fetching queue details:", detailError);
       }
-    } catch (error) {
-      console.error("Error refreshing queue data:", error);
+    } else {
       setActiveQueue(null);
-    } finally {
-      setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error("Error refreshing queue data:", error);
+    setActiveQueue(null);
+  } finally {
+    setRefreshing(false);
+  }
+};
+
+const handleLeaveQueue = () => {
+  if (!activeQueue?.id) return;
+  
+  setIsLeavingQueue(true);
+  
+  API.queues.leaveQueue(activeQueue.id)
+    .then(response => {
+      if (response.ok) {
+        setActiveQueue(null);
+        setSnackbar({
+          open: true,
+          message: 'You have successfully left the queue',
+          severity: 'success'
+        });
+        setTimeout(() => refreshQueueData(false), 500);
+      } else {
+        // Try to get a more specific error message
+        response.json().then(errorData => {
+          setSnackbar({
+            open: true,
+            message: errorData.error || "Failed to leave the queue. Please try again.",
+            severity: 'error'
+          });
+        }).catch(() => {
+          setSnackbar({
+            open: true,
+            message: `Failed to leave the queue: ${response.status} ${response.statusText}`,
+            severity: 'error'
+          });
+        });
+      }
+    })
+    .catch(error => {
+      console.error("Error leaving queue:", error);
+      setSnackbar({
+        open: true,
+        message: "Network error occurred while trying to leave the queue",
+        severity: 'error'
+      });
+    })
+    .finally(() => {
+      setIsLeavingQueue(false);
+      setConfirmDialogOpen(false);
+    });
+};
 
   if (!user) {
     navigate('/login');
@@ -518,30 +602,7 @@ const UserMainPage: React.FC = () => {
                 variant="outlined"
                 size="medium"
                 disabled={isLeavingQueue}
-                onClick={() => {
-                  if (window.confirm("Are you sure you want to leave this queue?")) {
-                    setIsLeavingQueue(true);
-                    
-                    fetch(`http://127.0.0.1:8000/api/leave-queue/${activeQueue.id}/`, {
-                      method: 'POST'
-                    })
-                      .then(response => {
-                        if (response.ok) {
-                          setActiveQueue(null);
-                          setIsLeavingQueue(false);
-                          setTimeout(() => refreshQueueData(false), 500);
-                        } else {
-                          alert("Failed to leave the queue. Please try again.");
-                          setIsLeavingQueue(false);
-                        }
-                      })
-                      .catch(error => {
-                        console.error("Error leaving queue:", error);
-                        alert("An error occurred. Please try again.");
-                        setIsLeavingQueue(false);
-                      });
-                  }
-                }}
+                onClick={() => setConfirmDialogOpen(true)}
                 sx={{
                   borderColor: '#fff',
                   color: '#fff',
@@ -812,6 +873,54 @@ const UserMainPage: React.FC = () => {
           ))}
         </Grid>
       </Container>
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => !isLeavingQueue && setConfirmDialogOpen(false)}
+        aria-labelledby="leave-queue-dialog-title"
+      >
+        <DialogTitle id="leave-queue-dialog-title">Leave Queue?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to leave this queue? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setConfirmDialogOpen(false)}
+            disabled={isLeavingQueue}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleLeaveQueue} 
+            color="error" 
+            variant="contained"
+            disabled={isLeavingQueue}
+            startIcon={isLeavingQueue ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {isLeavingQueue ? 'Leaving...' : 'Leave Queue'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({...snackbar, open: false})}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({...snackbar, open: false})} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* Footer */}
       <Box sx={{ bgcolor: '#fff', py: 3, borderTop: '1px solid', borderColor: 'divider', mt: 'auto' }}>

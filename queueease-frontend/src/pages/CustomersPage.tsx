@@ -161,15 +161,10 @@ const CustomersPage: React.FC = () => {
     setFormError('');
     
     try {
-      // API call to create customer
-      const response = await fetch(`http://127.0.0.1:8000/api/admin/customers/create/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newCustomerForm,
-          service_id: currentService?.id
-        }),
-      });
+      const response = await API.admin.createCustomer(
+        currentService?.id as number, 
+        newCustomerForm
+      );
       
       if (response.ok) {
         const newCustomer = await response.json();

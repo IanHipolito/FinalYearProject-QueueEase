@@ -3,6 +3,7 @@ import { Box, Container, Typography, Paper, CircularProgress, useTheme, ThemePro
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { keyframes } from '@emotion/react';
+import { API } from '../services/api';
 
 interface QRCodeScreenProps {
   queueId: number;
@@ -71,14 +72,41 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({ queueId }) => {
       setLoading(false);
       return;
     }
-
-    const qrCodeEndpoint = `http://127.0.0.1:8000/api/get-qr-code/${queueId}/`;
     
+    const fetchQRCode = async () => {
+      try {
+        const response = await API.queues.getQRCode(queueId);
+        
+        if (!response.ok) {
+          throw new Error("Failed to generate QR code");
+        }
+        
+        // Create a blob URL from the response
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setQrCodeUrl(url);
+      } catch (err) {
+        console.error("Error fetching QR code:", err);
+        setError("Failed to generate QR code");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Add a small timeout to show loading state
     setTimeout(() => {
-      setQrCodeUrl(qrCodeEndpoint);
-      setLoading(false);
+      fetchQRCode();
     }, 500);
   }, [queueId]);
+
+  // Clean up the blob URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (qrCodeUrl && qrCodeUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(qrCodeUrl);
+      }
+    };
+  }, [qrCodeUrl]);
 
   return (
     <ThemeProvider theme={theme}>

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,16 +21,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-nd!t0p79rj(u%jo)@&g(w)tyg_==s-ua7)xt&+%c(+4_4syh-m'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-fallback-secret-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "m2xb3cv3-8000.eun1.devtunnels.ms",
     "m2xb3cv3-3000.eun1.devtunnels.ms",
+    "queueease-5945e.web.app",
+    "C21436494.pythonanywhere.com",
 ]
 
 
@@ -63,12 +66,16 @@ CORS_ALLOWED_ORIGINS = [
     "https://m2xb3cv3-8000.eun1.devtunnels.ms",
     "https://m2xb3cv3-3000.eun1.devtunnels.ms",
     "http://localhost:3000",
+    "https://queueease-5945e.web.app",
+    "https://C21436494.pythonanywhere.com",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://m2xb3cv3-8000.eun1.devtunnels.ms",
     "https://m2xb3cv3-3000.eun1.devtunnels.ms",
     "http://localhost:3000",
+    "https://queueease-5945e.web.app",
+    "https://C21436494.pythonanywhere.com",
 ]
 
 
@@ -96,17 +103,27 @@ WSGI_APPLICATION = 'queueease_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'queueease_db',
+#         'USER': 'queueease_user',
+#         'PASSWORD': 'fyp123',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'queueease_db',
         'USER': 'queueease_user',
         'PASSWORD': 'fyp123',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'HOST': 'C21436494-4463.postgres.pythonanywhere-services.com',
+        'PORT': '14463',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

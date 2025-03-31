@@ -19,6 +19,7 @@ import {
   IconButton,
   InputAdornment
 } from "@mui/material";
+import { API } from '../services/api';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
@@ -62,22 +63,8 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const apiUrl =
-      window.location.hostname === "localhost"
-        ? "http://127.0.0.1:8000/api/login/"
-        : "https://m2xb3cv3-8000.eun1.devtunnels.ms/api/login/";
-
     try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
+      const response = await API.auth.login(formData.email, formData.password);
 
       if (response.ok) {
         const data = await response.json();

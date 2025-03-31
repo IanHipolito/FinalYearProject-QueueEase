@@ -12,8 +12,14 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             }),
+        signup: (data: any) =>
+            fetch(`${API_BASE}/signup/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            }),
         adminLogin: (email: string, password: string) =>
-            fetch(`${API_BASE}/admin-login/`, {
+            fetch(`${API_BASE}/login/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -59,6 +65,12 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(queueData),
             }),
+        updateQueueStatus: (queueId: number, status: string) =>
+            fetch(`${API_BASE}/admin/queues/${queueId}/update-status/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            }),
         deleteQueue: (queueId: number) =>
             fetch(`${API_BASE}/admin/queues/${queueId}/delete/`, {
                 method: 'DELETE',
@@ -86,6 +98,8 @@ export const API = {
         listWithStatus: () => fetch(`${API_BASE}/list_services_with_status/`),
         getAdminServices: (userId: number) => fetch(`${API_BASE}/admin_services/${userId}/`),
         getServiceDetails: (serviceId: number) => fetch(`${API_BASE}/service/${serviceId}/`),
+        getAvailableTimes: (serviceId: number, date: string) => 
+            fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`),
         updateService: (serviceId: number, data: any) =>
             fetch(`${API_BASE}/service/${serviceId}/`, {
                 method: 'PUT',
@@ -104,6 +118,17 @@ export const API = {
     queues: {
         getActive: (userId: number) => fetch(`${API_BASE}/active-queue/${userId}/`),
         getDetails: (queueId: number) => fetch(`${API_BASE}/queue-detail/${queueId}/`),
+        getHistory: (userId: number) => fetch(`${API_BASE}/queue-history/${userId}/`),
+        getUserQueues: (userId: number) => fetch(`${API_BASE}/user-queues/${userId}/`),
+        createQueue: (userId: number, serviceId: number) =>
+            fetch(`${API_BASE}/create-queue/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    user_id: userId, 
+                    service_id: serviceId 
+                }),
+            }),
         joinQueue: (queueId: number, customerId: number) =>
             fetch(`${API_BASE}/join-queue/`, {
                 method: 'POST',
@@ -112,20 +137,38 @@ export const API = {
             }),
         leaveQueue: (queueId: number) =>
             fetch(`${API_BASE}/leave-queue/${queueId}/`, { method: 'POST' }),
+        completeQueue: (queueId: number) =>
+            fetch(`${API_BASE}/queue-complete/${queueId}/`, { method: 'POST' }),
+        getQRCode: (queueId: number) =>
+            fetch(`${API_BASE}/get-qr-code/${queueId}/`),
     },
 
     // Appointment management
     appointments: {
-        getCustomerAppointments: (customerId: number) =>
-            fetch(`${API_BASE}/customer-appointments/${customerId}/`),
+        getAll: (userId: number) => fetch(`${API_BASE}/appointments/${userId}/`),
+        getDetails: (orderId: string) => fetch(`${API_BASE}/appointment/${orderId}/`),
+        add: (orderID: string, userId: number) =>
+            fetch(`${API_BASE}/appointment/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: orderID, user_id: userId }),
+            }),
+        delete: (orderId: string) =>
+            fetch(`${API_BASE}/appointment/delete/${orderId}/`, { method: 'DELETE' }),
         createAppointment: (data: any) =>
-            fetch(`${API_BASE}/appointment/create/`, {
+            fetch(`${API_BASE}/create-appointment/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             }),
         cancelAppointment: (appointmentId: number) =>
             fetch(`${API_BASE}/appointment/${appointmentId}/cancel/`, { method: 'POST' }),
+        generateDemo: (userId: number) =>
+            fetch(`${API_BASE}/generate-demo/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId }),
+            }),
     },
 
     // Feedback management

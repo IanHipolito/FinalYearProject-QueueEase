@@ -27,14 +27,14 @@ logger = logging.getLogger(__name__)
 
 from django.http import JsonResponse
 
-SERVICE_OPTIONS = {
-    "General Checkup": 15,
-    "Dentist": 30,
-    "Surgery": 60,
-    "Restaurant": 90,
-    "McDonald's": 5,
-    "Burger King": 7,
-}
+# SERVICE_OPTIONS = {
+#     "General Checkup": 15,
+#     "Dentist": 30,
+#     "Surgery": 60,
+#     "Restaurant": 90,
+#     "McDonald's": 5,
+#     "Burger King": 7,
+# }
 
 @csrf_exempt
 def login_view(request):
@@ -123,7 +123,7 @@ def api_overview(request):
 def compute_expected_ready_time(service, position, historical_data=None):
     parallel_capacity = service.parallel_capacity or 1
     default_avg_duration = service.average_duration or 15
-    minimal_prep = service.minimal_prep_time or 3
+    minimal_prep = service.minimal_prep_time or 5
     wave_number = (position - 1) // parallel_capacity
     base_wait = wave_number * default_avg_duration
 
@@ -135,8 +135,12 @@ def compute_expected_ready_time(service, position, historical_data=None):
     else:
         avg_historical_wait = base_wait
 
-    fast_food_services = ["McDonald's", "Burger King"]
-    if service.name in fast_food_services:
+    is_fast_food = (
+        service.category and service.category.lower() == 'fast food' or
+        service.name in ["McDonald's", "Burger King"]
+    )
+    
+    if is_fast_food:
         estimated_wait = min(avg_historical_wait, base_wait)
         if position > 1:
             estimated_wait = avg_historical_wait
@@ -197,6 +201,79 @@ def fetch_historical_data(service_id):
     historical_data = ServiceWaitTime.objects.filter(service_id=service_id).values_list('wait_time', flat=True)
     return list(historical_data)
 
+@api_view(['POST'])
+def check_and_complete_queue(request, queue_id):
+    try:
+        queue_item = get_object_or_404(Queue, id=queue_id)
+        
+        if queue_item.status != 'pending':
+            return Response({
+                "message": "Queue is already processed",
+                "status": queue_item.status
+            })
+        
+        # Check if the expected_ready_time has passed
+        if queue_item.expected_ready_time and queue_item.expected_ready_time <= timezone.now():
+            queue_item.status = 'completed'
+            queue_item.save()
+            
+            # Record wait time for analytics
+            if queue_item.date_created:
+                wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
+                ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
+            
+            return Response({
+                "message": "Queue automatically marked as completed", 
+                "status": "completed"
+            })
+            
+        return Response({
+            "message": "Queue is still pending",
+            "status": "pending",
+            "remaining_time": int((queue_item.expected_ready_time - timezone.now()).total_seconds())
+        })
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+# @api_view(['GET'])
+# def queue_detail(request, queue_id):
+#     queue_item = get_object_or_404(Queue, id=queue_id)
+
+#     total_wait = 0
+#     if queue_item.expected_ready_time:
+#         total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
+
+#     if queue_item.status != 'pending':
+#         return Response({
+#             "queue_id": queue_item.id,
+#             "service_name": queue_item.service.name,
+#             "current_position": None,
+#             "status": queue_item.status,
+#             "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+#             "total_wait": total_wait,
+#             "time_created": queue_item.date_created.isoformat()
+#         })
+
+#     pending_queues = Queue.objects.filter(
+#         service=queue_item.service,
+#         status='pending',
+#         is_active=True
+#     ).order_by('date_created')
+
+#     new_position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
+
+#     data = {
+#         "queue_id": queue_item.id,
+#         "service_name": queue_item.service.name,
+#         "current_position": new_position,
+#         "status": queue_item.status,
+#         "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+#         "total_wait": total_wait,
+#         "time_created": queue_item.date_created.isoformat()
+#     }
+#     return Response(data)
+
 @api_view(['GET'])
 def queue_detail(request, queue_id):
     """
@@ -210,6 +287,15 @@ def queue_detail(request, queue_id):
     total_wait = 0
     if queue_item.expected_ready_time:
         total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
+
+    # Auto-complete check: If pending and expected time has passed, mark as completed
+    if queue_item.status == 'pending' and queue_item.expected_ready_time and queue_item.expected_ready_time <= timezone.now():
+        queue_item.status = 'completed'
+        queue_item.save()
+        
+        # Record wait time for analytics
+        wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
+        ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
 
     if queue_item.status != 'pending':
         return Response({
@@ -397,29 +483,29 @@ def generate_order_id(user_id):
     random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
     return f"{user_id}-{timestamp}-{random_str}"
 
-def simulate_appointment(user_id):
-    """Simulate realistic appointment data for demonstration purposes."""
-    service_name = random.choice(list(SERVICE_OPTIONS.keys()))
-    service, _ = Service.objects.get_or_create(name=service_name, defaults={"description": f"{service_name} description"})
+# def simulate_appointment(user_id):
+#     """Simulate realistic appointment data for demonstration purposes."""
+#     service_name = random.choice(list(SERVICE_OPTIONS.keys()))
+#     service, _ = Service.objects.get_or_create(name=service_name, defaults={"description": f"{service_name} description"})
     
-    appointment_date = datetime.now() + timedelta(days=random.randint(1, 30))
-    appointment_time = appointment_date.replace(hour=random.randint(8, 17), minute=random.choice([0, 15, 30, 45]))
-    duration_minutes = SERVICE_OPTIONS[service_name]
-    order_id = generate_order_id(user_id)
+#     appointment_date = datetime.now() + timedelta(days=random.randint(1, 30))
+#     appointment_time = appointment_date.replace(hour=random.randint(8, 17), minute=random.choice([0, 15, 30, 45]))
+#     duration_minutes = SERVICE_OPTIONS[service_name]
+#     order_id = generate_order_id(user_id)
 
-    appointment = AppointmentDetails.objects.create(
-        order_id=order_id,
-        user_id=user_id,
-        service=service,
-        appointment_date=appointment_date.date(),
-        appointment_time=appointment_time.time(),
-        duration_minutes=duration_minutes,
-        status="pending",
-        queue_status="not_started",
-        is_active=True
-    )
+#     appointment = AppointmentDetails.objects.create(
+#         order_id=order_id,
+#         user_id=user_id,
+#         service=service,
+#         appointment_date=appointment_date.date(),
+#         appointment_time=appointment_time.time(),
+#         duration_minutes=duration_minutes,
+#         status="pending",
+#         queue_status="not_started",
+#         is_active=True
+#     )
 
-    return appointment
+#     return appointment
 
 @api_view(['POST'])
 def generate_demo_appointments(request):
@@ -513,7 +599,7 @@ def queue_status(request, queue_id):
         else:
             current_position = list(pending_queues).index(queue) + 1
         
-        average_duration = SERVICE_OPTIONS.get(queue.service.name, 15)
+        average_duration = queue.service.average_duration or 15
         estimated_wait = (current_position - 1) * average_duration if current_position else 0
         
         data = {
@@ -1716,3 +1802,30 @@ def check_feedback_eligibility(request):
     except Exception as e:
         print(f"Error in check_feedback_eligibility: {str(e)}")
         return Response({'error': str(e)}, status=500)
+
+@api_view(['POST'])
+def leave_queue(request, queue_id):
+    try:
+        queue = get_object_or_404(Queue, id=queue_id)
+        
+        # Check if queue is already completed or inactive
+        if queue.status != 'pending' or not queue.is_active:
+            return Response({"error": "This queue has already been completed or is inactive"}, status=400)
+        
+        # Check if it's within the time window (3 minutes)
+        time_window = timedelta(minutes=3)
+        if timezone.now() - queue.date_created > time_window:
+            return Response(
+                {"error": "You can only leave a queue within the first 3 minutes of joining"}, 
+                status=400
+            )
+        
+        # Mark the queue as inactive and update status
+        queue.is_active = False
+        queue.status = 'cancelled'
+        queue.save()
+        
+        return Response({"message": "Successfully left the queue"})
+        
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

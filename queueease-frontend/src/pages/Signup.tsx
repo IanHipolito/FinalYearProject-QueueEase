@@ -19,6 +19,7 @@ import {
   InputAdornment,
   IconButton
 } from "@mui/material";
+import { API } from '../services/api';
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 
 // Get all countries and their codes
@@ -146,17 +147,8 @@ const Signup: React.FC = () => {
       phoneNumber: fullPhoneNumber
     };
 
-    const apiUrl =
-      window.location.hostname === "localhost"
-        ? "http://127.0.0.1:8000/api/signup/"
-        : "https://m2xb3cv3-8000.eun1.devtunnels.ms/api/signup/";
-
     try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataToSend),
-      });
+      const response = await API.auth.signup(dataToSend);
 
       if (response.ok) {
         alert("Signup successful!");

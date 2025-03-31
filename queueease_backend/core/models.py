@@ -88,7 +88,7 @@ class Service(models.Model):
     date_valid_to = models.DateTimeField(null=True, blank=True)
     date_deleted = models.DateTimeField(null=True, blank=True)
     requires_prep_time = models.BooleanField(default=True)
-    minimal_prep_time = models.IntegerField(default=3)
+    minimal_prep_time = models.IntegerField(default=5)
     parallel_capacity = models.IntegerField(default=1)
     average_duration = models.IntegerField(default=15)
     latitude = models.FloatField(null=True, blank=True)

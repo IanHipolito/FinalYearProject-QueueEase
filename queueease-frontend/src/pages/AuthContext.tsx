@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { API } from '../services/api';
 
 interface User {
   id: number;
@@ -55,11 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Regular user login
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/login/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await API.auth.login(email, password);
 
       if (response.ok) {
         const data = await response.json();
@@ -88,11 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Admin-specific login
   const adminLogin = async (email: string, password: string) => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/login/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await API.auth.adminLogin(email, password);
 
       if (response.ok) {
         const data = await response.json();
@@ -163,14 +156,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshServiceData = async (serviceId: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/service/${serviceId}/`);
+      const response = await API.services.getServiceDetails(serviceId);
+      
       if (response.ok) {
         const updatedService = await response.json();
         setManagedServices(prev => 
           prev.map(service => service.id === serviceId ? {...service, ...updatedService} : service)
         );
         if (currentService?.id === serviceId) {
-          setCurrentService(prev => ({...prev, ...updatedService}));
+          setCurrentService(prev => prev ? {...prev, ...updatedService} : null);
         }
         return updatedService;
       }

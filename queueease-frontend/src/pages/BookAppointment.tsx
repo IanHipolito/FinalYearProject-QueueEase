@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { API } from '../services/api';
 import {
   Box, Container, Typography, Paper, Grid, FormControl,
   InputLabel, Select, MenuItem, Alert, IconButton,
@@ -34,10 +35,9 @@ const BookAppointment: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   
   useEffect(() => {
-    // Fetch service details
     const fetchService = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:8000/api/service/${serviceId}/`);
+        const response = await API.services.getServiceDetails(Number(serviceId));
         if (!response.ok) {
           throw new Error('Service not found');
         }
@@ -56,9 +56,7 @@ const BookAppointment: React.FC = () => {
   const fetchAvailableTimes = async (date: Date) => {
     try {
       const formattedDate = date.toISOString().split('T')[0];
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/available-times/${serviceId}/?date=${formattedDate}`
-      );
+      const response = await API.services.getAvailableTimes(Number(serviceId), formattedDate);
       
       if (!response.ok) {
         throw new Error('Failed to fetch available times');
@@ -90,18 +88,14 @@ const BookAppointment: React.FC = () => {
     setSubmitting(true);
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/create-appointment/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          service_id: serviceId,
-          appointment_date: selectedDate.toISOString().split('T')[0],
-          appointment_time: selectedTime,
-        }),
-      });
+      const appointmentData = {
+        user_id: user.id,
+        service_id: Number(serviceId),
+        appointment_date: selectedDate.toISOString().split('T')[0],
+        appointment_time: selectedTime,
+      };
+      
+      const response = await API.appointments.createAppointment(appointmentData);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

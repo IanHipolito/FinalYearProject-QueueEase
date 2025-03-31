@@ -66,17 +66,7 @@ const QueuesPage: React.FC = () => {
     setActionLoading(true);
     
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/queues/create/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: currentService.id,
-            ...newQueue
-          }),
-        }
-      );
+      const response = await API.admin.createQueue(currentService.id, newQueue);
       
       if (response.ok) {
         const newQueueData = await response.json();
@@ -114,16 +104,7 @@ const QueuesPage: React.FC = () => {
     setActionLoading(true);
     
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/queues/${queueId}/update-status/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: newStatus
-          }),
-        }
-      );
+      const response = await API.admin.updateQueueStatus(queueId, newStatus);
       
       if (response.ok) {
         setQueues(queues.map(q => 

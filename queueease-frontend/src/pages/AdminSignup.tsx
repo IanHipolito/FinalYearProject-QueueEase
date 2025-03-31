@@ -4,7 +4,7 @@ import {
   Box, Button, TextField, Typography, CircularProgress, createTheme
 } from "@mui/material";
 import { debounce } from "lodash";
-
+import { API } from '../services/api';
 // Import custom components
 import FormContainer from '../components/common/FormContainer';
 import ServiceSelector from '../components/admin/ServiceSelector';
@@ -63,7 +63,8 @@ const AdminSignup: React.FC = () => {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://127.0.0.1:8000/api/list_services_with_status/");
+        const response = await API.services.listWithStatus();
+        
         if (response.ok) {
           const data = await response.json();
           setServices(data);
@@ -168,16 +169,12 @@ const AdminSignup: React.FC = () => {
     setSubmitting(true);
     
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/admin-signup/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phoneNumber: formData.phoneNumber,
-          password: formData.password,
-          serviceId: formData.serviceId
-        }),
+      const response = await API.auth.adminSignup({
+        name: formData.name,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        password: formData.password,
+        serviceId: formData.serviceId
       });
 
       const data = await response.json();

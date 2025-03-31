@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, ThemeProvider, createTheme, Card, CardContent, Grid } from '@mui/material';
+import { Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, ThemeProvider, createTheme, Card, CardContent, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import QueueIcon from '@mui/icons-material/Queue';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import LogoutIcon from '@mui/icons-material/Logout';
 import { keyframes } from '@emotion/react';
+import { API } from '../services/api';
 
 interface QueueData {
   queue_id: number;
@@ -103,35 +105,60 @@ const SuccessPage: React.FC = () => {
   const [queueData, setQueueData] = useState<QueueData | null>(null);
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const [initialTime, setInitialTime] = useState<number>(0);
+  const [queueJoinTime, setQueueJoinTime] = useState<Date | null>(null);
+  const [canLeaveQueue, setCanLeaveQueue] = useState<boolean>(false);
   const [completionTriggered, setCompletionTriggered] = useState<boolean>(false);
+  
+  // UI state
+  const [isLeavingQueue, setIsLeavingQueue] = useState<boolean>(false);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState<boolean>(false);
+  const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error' | 'info' | 'warning'}>({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+
+  const fetchQueueDetails = async () => {
+    if (!queueId) return;
+    try {
+      const response = await API.queues.getDetails(parseInt(queueId));
+      if (!response.ok) {
+        throw new Error('Failed to fetch queue detail');
+      }
+      const data: QueueData = await response.json();
+      setQueueData(data);
+
+      // Set queue join time if not already set
+      if (data.time_created && !queueJoinTime) {
+        setQueueJoinTime(new Date(data.time_created));
+      }
+
+      // Check if user can leave the queue (within 3 minutes of joining)
+      if (queueJoinTime) {
+        const threeMinutesInMs = 3 * 60 * 1000;
+        const currentTime = new Date();
+        const joinedTime = new Date(queueJoinTime);
+        const timeElapsed = currentTime.getTime() - joinedTime.getTime();
+        setCanLeaveQueue(timeElapsed <= threeMinutesInMs);
+      }
+
+      if (data.expected_ready_time && data.total_wait !== undefined) {
+        const expectedMs = new Date(data.expected_ready_time).getTime();
+        const nowMs = Date.now();
+        const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
+        setRemainingTime(diffSec);
+        if (!initialTime && data.total_wait > 0) {
+          setInitialTime(data.total_wait);
+        }
+      } else {
+        setRemainingTime(0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    const fetchQueueDetails = async () => {
-      if (!queueId) return;
-      try {
-        const response = await fetch(`http://127.0.0.1:8000/api/queue-detail/${queueId}/`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch queue detail');
-        }
-        const data: QueueData = await response.json();
-        setQueueData(data);
-
-        if (data.expected_ready_time && data.total_wait !== undefined) {
-          const expectedMs = new Date(data.expected_ready_time).getTime();
-          const nowMs = Date.now();
-          const diffSec = Math.max(0, Math.floor((expectedMs - nowMs) / 1000));
-          setRemainingTime(diffSec);
-          if (!initialTime && data.total_wait > 0) {
-            setInitialTime(data.total_wait);
-          }
-        } else {
-          setRemainingTime(0);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
     fetchQueueDetails();
     const intervalId = setInterval(fetchQueueDetails, 30000);
     return () => clearInterval(intervalId);
@@ -146,27 +173,22 @@ const SuccessPage: React.FC = () => {
   }, [remainingTime]);
 
   useEffect(() => {
-    if (remainingTime === 0 && queueData && queueData.status === 'pending' && !completionTriggered) {
-      completeQueue(queueData.queue_id);
-      setCompletionTriggered(true);
+    if (remainingTime <= 0 && queueData && queueData.status === 'pending' && !completionTriggered) {
+      // When timer reaches zero, call the check_and_complete_queue endpoint
+      API.queues.completeQueue(queueData.queue_id)
+        .then(response => response.json())
+        .then(data => {
+          console.log("Queue completion check:", data);
+          if (data.status === 'completed') {
+            setQueueData(prev => prev ? { ...prev, status: 'completed' } : prev);
+          }
+          setCompletionTriggered(true);
+        })
+        .catch(error => {
+          console.error("Error in auto-completion check:", error);
+        });
     }
   }, [remainingTime, queueData, completionTriggered]);
-
-  const completeQueue = async (queueId: number) => {
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/api/queue-complete/${queueId}/`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        console.log("Queue marked as completed");
-        setQueueData(prev => prev ? { ...prev, status: 'completed' } : prev);
-      } else {
-        console.error("Failed to mark queue as completed.");
-      }
-    } catch (error) {
-      console.error("Error in completeQueue:", error);
-    }
-  };
 
   const progressPercentage = initialTime
     ? ((initialTime - remainingTime) / initialTime) * 100
@@ -176,6 +198,69 @@ const SuccessPage: React.FC = () => {
     const mm = Math.floor(seconds / 60);
     const ss = seconds % 60;
     return `${mm}m ${ss}s`;
+  };
+
+  const handleLeaveQueue = async () => {
+    if (!queueId) return;
+    
+    setIsLeavingQueue(true);
+    try {
+      const response = await API.queues.leaveQueue(parseInt(queueId));
+      
+      if (response.ok) {
+        setSnackbar({
+          open: true,
+          message: 'You have successfully left the queue',
+          severity: 'success'
+        });
+        // Navigate back to main page after a short delay
+        setTimeout(() => navigate('/usermainpage'), 1500);
+      } else {
+        let errorMessage = 'Failed to leave the queue';
+        
+        // Try to get a more specific error message
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error("Error parsing response:", parseError);
+          // If we can't parse the JSON, use the status text
+          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
+        }
+        
+        setSnackbar({
+          open: true,
+          message: errorMessage,
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error("Error leaving queue:", error);
+      setSnackbar({
+        open: true,
+        message: 'Network error occurred while trying to leave the queue',
+        severity: 'error'
+      });
+    } finally {
+      setIsLeavingQueue(false);
+      setOpenConfirmDialog(false);
+    }
+  };
+
+  const handleOpenConfirmDialog = () => {
+    if (!canLeaveQueue) {
+      setSnackbar({
+        open: true,
+        message: 'You can only leave the queue within the first 3 minutes of joining',
+        severity: 'warning'
+      });
+      return;
+    }
+    setOpenConfirmDialog(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   if (queueData?.status === 'completed') {
@@ -398,24 +483,53 @@ const SuccessPage: React.FC = () => {
                 />
               </Box>
               
-              <Button 
-                variant="contained" 
-                color="primary" 
-                onClick={() => navigate('/usermainpage')}
-                sx={{ 
-                  px: 4, 
-                  py: 1.5,
-                  borderRadius: 2,
-                  boxShadow: '0 4px 14px rgba(111, 66, 193, 0.3)',
-                  transition: 'all 0.3s',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 20px rgba(111, 66, 193, 0.4)',
-                  }
-                }}
-              >
-                Return to Main Page
-              </Button>
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={() => navigate('/usermainpage')}
+                  sx={{ 
+                    px: 4, 
+                    py: 1.5,
+                    borderRadius: 2,
+                    boxShadow: '0 4px 14px rgba(111, 66, 193, 0.3)',
+                    transition: 'all 0.3s',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 20px rgba(111, 66, 193, 0.4)',
+                    }
+                  }}
+                >
+                  Return to Main Page
+                </Button>
+                
+                <Button 
+                  variant="outlined"
+                  color="error"
+                  startIcon={<LogoutIcon />}
+                  disabled={isLeavingQueue || !canLeaveQueue}
+                  onClick={handleOpenConfirmDialog}
+                  sx={{ 
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: 2,
+                    transition: 'all 0.3s',
+                    opacity: canLeaveQueue ? 1 : 0.6,
+                    '&:hover': canLeaveQueue ? {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 6px 20px rgba(244, 67, 54, 0.15)',
+                    } : {}
+                  }}
+                >
+                  {isLeavingQueue ? 'Leaving...' : 'Leave Queue'}
+                </Button>
+              </Box>
+              
+              {!canLeaveQueue && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                  You can only leave the queue within the first 3 minutes of joining
+                </Typography>
+              )}
             </Box>
           ) : (
             <Box sx={{ 
@@ -436,6 +550,54 @@ const SuccessPage: React.FC = () => {
           )}
         </Paper>
       </Container>
+      
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={openConfirmDialog}
+        onClose={() => setOpenConfirmDialog(false)}
+      >
+        <DialogTitle>Leave Queue?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to leave this queue? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setOpenConfirmDialog(false)} 
+            color="primary"
+            disabled={isLeavingQueue}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleLeaveQueue} 
+            color="error" 
+            variant="contained"
+            disabled={isLeavingQueue}
+            startIcon={isLeavingQueue ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            {isLeavingQueue ? 'Leaving...' : 'Leave Queue'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 };

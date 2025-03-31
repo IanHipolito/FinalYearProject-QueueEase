@@ -125,7 +125,7 @@ const LatestOrdersList: React.FC<LatestOrdersListProps> = ({
               color: '#3d8bfd'
             }}
           >
-            {isImmediateService() ? 'View All Customers' : 'View All Appointments'}
+            {isImmediateService() ? 'View All Orders' : 'View All Appointments'}
           </Button>
         )}
       </Box>
