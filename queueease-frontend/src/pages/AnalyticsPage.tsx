@@ -58,20 +58,24 @@ const AnalyticsPage: React.FC = () => {
 
       try {
         const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
-        
+
         if (!response.ok) {
           let errorMessage = 'Failed to load analytics data';
           let errorData;
-          
+
           try {
             errorData = await response.json();
             console.error('API response error:', errorData);
-            
-            if (errorData.error && errorData.error.includes('Resource punkt_tab not found')) {
+
+            // Special handling for known backend errors
+            if (errorData.error && (
+              errorData.error.includes('Resource punkt_tab not found') ||
+              errorData.error.includes('NLTK')
+            )) {
               console.log("NLTK dependency missing on the server, using fallback approach...");
-              
+
               setAnalyticsData({
-                feedback_distribution: [], 
+                feedback_distribution: [],
                 customer_comments: [],
                 total_reports: 0,
                 satisfaction_rate: 0,
@@ -80,15 +84,15 @@ const AnalyticsPage: React.FC = () => {
                 satisfaction_trend: Array(12).fill(0),
                 feedback_keywords: []
               });
-              
+
               setError("Natural Language Processing features are unavailable. The server is missing required NLTK packages. Please contact the administrator.");
               setLoading(false);
               return;
             }
-            
+
             if (errorData.error && errorData.error.includes("'Queue' object has no attribute 'total_wait'")) {
               console.log("Queue total_wait attribute missing, using fallback approach...");
-              
+
               setAnalyticsData({
                 feedback_distribution: errorData.feedback_distribution || [],
                 customer_comments: errorData.customer_comments || [],
@@ -99,12 +103,12 @@ const AnalyticsPage: React.FC = () => {
                 satisfaction_trend: errorData.satisfaction_trend || Array(12).fill(0),
                 feedback_keywords: errorData.feedback_keywords || []
               });
-              
+
               setError("Note: Wait time analysis is currently unavailable. Other analytics are still accessible.");
               setLoading(false);
               return;
             }
-            
+
             errorMessage = errorData.error || errorMessage;
           } catch (err) {
             const errorText = await response.text().catch(() => '');
@@ -112,7 +116,7 @@ const AnalyticsPage: React.FC = () => {
           }
           throw new Error(`Failed to load analytics data: ${response.status}`);
         }
-        
+
         const data = await response.json();
 
         setAnalyticsData({
@@ -121,8 +125,8 @@ const AnalyticsPage: React.FC = () => {
           total_reports: data.total_reports || 0,
           satisfaction_rate: data.satisfaction_rate || 0,
           average_wait_time: data.average_wait_time || 0,
-          wait_time_trend: data.wait_time_trend || [],
-          satisfaction_trend: data.satisfaction_trend || [],
+          wait_time_trend: data.wait_time_trend || Array(12).fill(0),
+          satisfaction_trend: data.satisfaction_trend || Array(12).fill(0),
           feedback_keywords: data.feedback_keywords || []
         });
 
@@ -135,8 +139,8 @@ const AnalyticsPage: React.FC = () => {
           total_reports: 0,
           satisfaction_rate: 0,
           average_wait_time: 0,
-          wait_time_trend: [],
-          satisfaction_trend: [],
+          wait_time_trend: Array(12).fill(0),
+          satisfaction_trend: Array(12).fill(0),
           feedback_keywords: []
         });
       } finally {

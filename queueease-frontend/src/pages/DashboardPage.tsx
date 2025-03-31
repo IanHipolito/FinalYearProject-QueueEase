@@ -45,29 +45,43 @@ const DashboardPage: React.FC = () => {
     try {
       console.log(`Fetching dashboard data for service ID ${serviceId} with timeRange=${timeRangeParam}`);
       const response = await API.admin.getDashboardData(serviceId, timeRangeParam);
-      const data = await API.handleResponse(response);
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('Dashboard API error:', errorText);
+        throw new Error(`Failed to load dashboard data: ${response.status}`);
+      }
+      
+      const data = await response.json();
       
       let processedCustomerStats = data.customer_stats || [];
       if (processedCustomerStats.length === 0) {
-        // If no data, create empty placeholders based on time range
         const placeholderCount = timeRangeParam === 'daily' ? 7 : timeRangeParam === 'weekly' ? 5 : 12;
         processedCustomerStats = Array(placeholderCount).fill(0);
       } else {
-        // Ensure we have numeric values
         processedCustomerStats = processedCustomerStats.map((val: any) => 
           typeof val === 'number' ? val : 0
         );
         
-        // If we don't have enough data points, pad with zeros
         const expectedLength = timeRangeParam === 'daily' ? 7 : timeRangeParam === 'weekly' ? 5 : 12;
         if (processedCustomerStats.length < expectedLength) {
           const padding = Array(expectedLength - processedCustomerStats.length).fill(0);
           processedCustomerStats = [...padding, ...processedCustomerStats];
         } else if (processedCustomerStats.length > expectedLength) {
-          // If we have too many data points, truncate to expected length
           processedCustomerStats = processedCustomerStats.slice(0, expectedLength);
         }
       }
+
+      let processedLatestOrders = data.latest_orders || [];
+      processedLatestOrders = processedLatestOrders.map((order: any) => ({
+        id: order.id || 'unknown',
+        customer_name: order.customer_name || 'Unknown Customer',
+        date: order.date || 'N/A',
+        time: order.time || null,
+        status: order.status || 'unknown',
+        service_name: order.service_name || currentService?.name || 'Unknown Service',
+        type: order.type || (currentService?.service_type === 'appointment' ? 'appointment' : 'immediate')
+      }));
 
       // Generate appropriate time labels
       const generatedTimeLabels = generateTimeLabels(timeRangeParam);
@@ -75,16 +89,26 @@ const DashboardPage: React.FC = () => {
       
       setDashboardData({
         customerCount: data.customer_count || 0,
-        queueCount: data.queue_count || 0,
+        queueCount: data.queue_count || 1, // Never show 0 queues
         orderCount: data.order_count || 0,
-        latestOrders: data.latest_orders || [],
+        latestOrders: processedLatestOrders,
         customerStats: processedCustomerStats,
-        growth: data.growth_rate || 0,
+        growth: data.growth || 0,
         service_type: data.service_type || currentService?.service_type || 'immediate'
       });
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
       setError(err.message || 'Failed to load dashboard data');
+      
+      // Set default values when API fails
+      const placeholderCount = timeRangeParam === 'daily' ? 7 : timeRangeParam === 'weekly' ? 5 : 12;
+      const generatedTimeLabels = generateTimeLabels(timeRangeParam);
+      setTimeLabels(generatedTimeLabels);
+      
+      setDashboardData({
+        ...dashboardData,
+        customerStats: Array(placeholderCount).fill(0),
+      });
     } finally {
       setLoading(false);
     }

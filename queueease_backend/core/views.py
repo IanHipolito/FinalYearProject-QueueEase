@@ -12,6 +12,7 @@ from rest_framework import status
 from django.db import models
 from django.contrib.auth.hashers import check_password
 import json
+import traceback
 from .serializers import AppointmentDetailsSerializer
 from datetime import datetime, timedelta
 import random
@@ -121,36 +122,134 @@ def api_overview(request):
     return Response({"message": "Welcome to the API!"})
 
 def compute_expected_ready_time(service, position, historical_data=None):
-    parallel_capacity = service.parallel_capacity or 1
-    default_avg_duration = service.average_duration or 15
-    minimal_prep = service.minimal_prep_time or 5
-    wave_number = (position - 1) // parallel_capacity
-    base_wait = wave_number * default_avg_duration
+    try:
+        # Ensure position is an integer
+        position = int(position)
+        
+        # Get service parameters
+        parallel_capacity = service.parallel_capacity or 8
+        default_avg_duration = service.average_duration or 15
+        minimal_prep = service.minimal_prep_time or 5
+        
+        print(f"Service: {service.name}, Position: {position}, Type: {service.service_type}")
+        print(f"Parameters: min_prep={minimal_prep}, parallel_capacity={parallel_capacity}, avg_duration={default_avg_duration}")
+        
+        # Process historical data first if available
+        historical_avg = None
+        if historical_data and len(historical_data) > 0:
+            print(f"Historical data available: {len(historical_data)} records")
+            try:
+                # Convert to numpy array for more efficient calculations
+                historical_array = np.array(historical_data)
+                
+                # Remove outliers if we have enough data
+                if len(historical_array) >= 5:
+                    lower_bound = np.percentile(historical_array, 15)
+                    upper_bound = np.percentile(historical_array, 85)
+                    filtered_data = historical_array[(historical_array >= lower_bound) & 
+                                                (historical_array <= upper_bound)]
+                    print(f"Filtered data: {len(filtered_data)} records (removed {len(historical_array) - len(filtered_data)} outliers)")
+                    print(f"Bounds: {lower_bound} to {upper_bound}")
+                    
+                    if len(filtered_data) > 0:
+                        historical_avg = np.mean(filtered_data)
+                    else:
+                        historical_avg = np.mean(historical_array)
+                else:
+                    historical_avg = np.mean(historical_array)
+                
+                print(f"Historical average wait time: {historical_avg:.2f} minutes")
+            except Exception as e:
+                print(f"Error processing historical data: {str(e)}")
+                historical_avg = None
+        
+        if service.service_type == 'immediate':
+            # Calculate wait time based on position
+            if position == 1:
+                # First position is always minimal prep time
+                position_wait = minimal_prep
+                print(f"Position 1: Using minimal prep time: {position_wait}")
+            else:
+                # For positions beyond 1, use a diminishing returns model for wait time growth
+                # Formula: base + (position-1)^0.6 * factor
+                base_time = minimal_prep
+                time_factor = 2.5  # Additional time per position, with diminishing returns
+                position_factor = (position - 1) ** 0.6  # Sublinear growth
+                
+                position_wait = base_time + (position_factor * time_factor)
+                print(f"Position {position}: Base={base_time}, Factor={position_factor:.2f}, Additional={position_factor * time_factor:.2f}")
+                
+                # Apply a reasonable cap for higher positions
+                max_wait = 20  # Maximum wait time for any position in immediate service
+                position_wait = min(position_wait, max_wait)
+            
+            # Apply historical influence for improved accuracy, but with very limited impact
+            final_wait = position_wait
+            if historical_avg is not None:
+                # Use a small weight that increases slightly with position but stays minimal
+                # First position gets almost no historical influence
+                if position == 1:
+                    historical_weight = 0.05  # 5% influence for position 1
+                else:
+                    # Gradual increase in weight for higher positions, but never exceeding 15%
+                    historical_weight = min(0.15, 0.05 + (position * 0.02))
+                
+                # Blend calculated time with historical data
+                weighted_historical = historical_avg * historical_weight
+                weighted_position = position_wait * (1 - historical_weight)
+                final_wait = weighted_position + weighted_historical
+                
+                print(f"Historical weight: {historical_weight:.2f}, Adding {weighted_historical:.2f} minutes of historical influence")
+                print(f"Final wait after historical adjustment: {final_wait:.2f} minutes")
+            
+            # Apply sensible cap and rounding
+            final_wait = min(final_wait, 25)  # Hard cap at 25 minutes
+            final_wait = round(final_wait)  # Round to nearest minute
+            
+            now = timezone.now()
+            expected_time = now + timedelta(minutes=final_wait)
+            print(f"Final wait time: {final_wait} minutes, expected time: {expected_time}")
+            return expected_time
+        
+        # APPOINTMENT-BASED SERVICE HANDLING
+        else:
+            # Calculate wave number and base wait time
+            wave_number = (position - 1) // parallel_capacity
+            base_wait = wave_number * default_avg_duration
 
-    if service.requires_prep_time and wave_number == 0:
-        base_wait = max(base_wait, minimal_prep)
-
-    if historical_data:
-        avg_historical_wait = np.mean(historical_data)
-    else:
-        avg_historical_wait = base_wait
-
-    is_fast_food = (
-        service.category and service.category.lower() == 'fast food' or
-        service.name in ["McDonald's", "Burger King"]
-    )
-    
-    if is_fast_food:
-        estimated_wait = min(avg_historical_wait, base_wait)
-        if position > 1:
-            estimated_wait = avg_historical_wait
-    else:
-        estimated_wait = base_wait
-        if historical_data:
-            estimated_wait = (estimated_wait + avg_historical_wait) / 2
-
-    now = datetime.now()
-    return now + timedelta(minutes=estimated_wait)
+            # Apply minimal prep time for first wave
+            if service.requires_prep_time and wave_number == 0:
+                base_wait = max(base_wait, minimal_prep)
+            
+            print(f"Appointment service base wait: {base_wait} minutes (wave {wave_number})")
+            
+            # For appointment services, historical data can have more influence
+            final_wait = base_wait
+            if historical_avg is not None:
+                # Higher weight for appointment services, but still capped
+                historical_weight = min(0.3, 0.1 + (wave_number * 0.1))
+                
+                weighted_historical = historical_avg * historical_weight
+                weighted_base = base_wait * (1 - historical_weight)
+                final_wait = weighted_base + weighted_historical
+                
+                print(f"Historical weight: {historical_weight:.2f}, Adding {weighted_historical:.2f} minutes of historical influence")
+                print(f"Final wait after historical adjustment: {final_wait:.2f} minutes")
+            
+            # Round to nearest minute
+            final_wait = round(final_wait)
+            
+            now = timezone.now()
+            expected_time = now + timedelta(minutes=final_wait)
+            print(f"Final wait time: {final_wait} minutes, expected time: {expected_time}")
+            return expected_time
+            
+    except Exception as e:
+        print(f"Error calculating wait time: {str(e)}")
+        traceback.print_exc()
+        # Fallback to a reasonable default if there's an error
+        now = timezone.now()
+        return now + timedelta(minutes=10) 
 
 @csrf_exempt
 @api_view(['POST'])
@@ -164,16 +263,20 @@ def create_queue(request):
         user = get_object_or_404(User, id=user_id)
         service = get_object_or_404(Service, id=service_id)
 
+        # Get pending queues for this service
         pending_queues = Queue.objects.filter(
             service=service,
             status='pending',
             is_active=True
         ).order_by('date_created')
 
+        # Calculate position (number of people ahead + 1)
         position = pending_queues.count() + 1
-
+        
+        # Get historical wait time data for this service
         historical_data = fetch_historical_data(service.id)
         
+        # Create queue entry
         queue_item = Queue.objects.create(
             user=user,
             service=service,
@@ -181,25 +284,100 @@ def create_queue(request):
             status='pending'
         )
 
+        # Calculate expected ready time based on position and service type
         queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
         queue_item.save()
+        
+        # Create QR code for this queue
         qr_data = f"Queue ID: {queue_item.id}"
         qr_code = QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
+
+        # Calculate wait time in minutes for response
+        now = timezone.now()
+        wait_minutes = 0
+        if queue_item.expected_ready_time:
+            wait_seconds = max(0, (queue_item.expected_ready_time - now).total_seconds())
+            wait_minutes = int(wait_seconds / 60)
 
         return Response({
             "message": "Queue created",
             "queue_id": queue_item.id,
             "position": position,
             "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
+            "estimated_wait_minutes": wait_minutes,
             "qr_hash": qr_code.qr_hash
         })
     except Exception as e:
         logger.error(f"Error in create_queue: {str(e)}")
+        logger.error(traceback.format_exc())  # Add traceback for better debugging
         return Response({"error": str(e)}, status=500)
 
 def fetch_historical_data(service_id):
-    historical_data = ServiceWaitTime.objects.filter(service_id=service_id).values_list('wait_time', flat=True)
-    return list(historical_data)
+    now = timezone.now()
+    current_hour = now.hour
+    is_weekend = now.weekday() >= 5  # Weekend is Saturday (5) or Sunday (6)
+    
+    # For time, consider a 2-hour window around current time
+    time_window_start = (current_hour - 1) % 24
+    time_window_end = (current_hour + 1) % 24
+    
+    # Query for time-specific data from the last 14 days
+    two_weeks_ago = now - timedelta(days=14)
+    
+    if time_window_start < time_window_end:
+        # Normal case, e.g., 10-12
+        time_specific_data = ServiceWaitTime.objects.filter(
+            service_id=service_id,
+            date_recorded__gte=two_weeks_ago,
+            date_recorded__hour__gte=time_window_start,
+            date_recorded__hour__lte=time_window_end
+        )
+    else:
+        # Wrapped case, e.g., 23-1
+        time_specific_data = ServiceWaitTime.objects.filter(
+            service_id=service_id,
+            date_recorded__gte=two_weeks_ago
+        ).filter(
+            models.Q(date_recorded__hour__gte=time_window_start) | 
+            models.Q(date_recorded__hour__lte=time_window_end)
+        )
+    
+    # If on weekend, prioritize weekend data; if weekday, prioritize weekday data
+    if is_weekend:
+        weekend_data = time_specific_data.filter(
+            date_recorded__week_day__in=[1, 7]  # Django uses 1=Sunday, 7=Saturday
+        )
+        if weekend_data.exists() and weekend_data.count() >= 5:  # Enough weekend data
+            selected_data = weekend_data
+        else:
+            selected_data = time_specific_data  # Fall back to all time-specific data
+    else:
+        weekday_data = time_specific_data.filter(
+            date_recorded__week_day__in=[2, 3, 4, 5, 6]  # Monday to Friday
+        )
+        if weekday_data.exists() and weekday_data.count() >= 5:  # Enough weekday data
+            selected_data = weekday_data
+        else:
+            selected_data = time_specific_data  # Fall back to all time-specific data
+    
+    # If we don't have enough time-specific data, fall back to recent data
+    if selected_data.count() < 5:
+        selected_data = ServiceWaitTime.objects.filter(
+            service_id=service_id
+        ).order_by('-date_recorded')[:30]
+    
+    # Extract wait times and return as list
+    wait_times = list(selected_data.values_list('wait_time', flat=True))
+    
+    # Log what we're using
+    print(f"Historical data query for service {service_id}:")
+    print(f"Current time: {now.strftime('%A %H:%M')}")
+    print(f"Retrieved {len(wait_times)} relevant historical records")
+    
+    if wait_times:
+        print(f"Min: {min(wait_times)}, Max: {max(wait_times)}, Avg: {sum(wait_times)/len(wait_times):.2f}")
+    
+    return wait_times
 
 @api_view(['POST'])
 def check_and_complete_queue(request, queue_id):
@@ -276,12 +454,6 @@ def check_and_complete_queue(request, queue_id):
 
 @api_view(['GET'])
 def queue_detail(request, queue_id):
-    """
-    Return up-to-date information for a queue item, including:
-      - current_position (recalculated)
-      - expected_ready_time
-      - total_wait (in seconds) computed from date_created to expected_ready_time.
-    """
     queue_item = get_object_or_404(Queue, id=queue_id)
 
     total_wait = 0
@@ -308,18 +480,43 @@ def queue_detail(request, queue_id):
             "time_created": queue_item.date_created.isoformat()
         })
 
+    # Get all pending queues for this service and order by date created
     pending_queues = Queue.objects.filter(
         service=queue_item.service,
         status='pending',
         is_active=True
     ).order_by('date_created')
 
-    new_position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
+    # Find the position of our queue item
+    position = 0
+    for i, queue in enumerate(pending_queues):
+        if queue.id == queue_item.id:
+            position = i + 1
+            break
+    
+    # If position is still 0, fallback to the filter method
+    if position == 0:
+        position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
+
+    # If this is an immediate service and position is 1, we might need to update the expected ready time
+    if queue_item.service.service_type == 'immediate' and position == 1:
+        current_time = timezone.now()
+        time_in_queue = (current_time - queue_item.date_created).total_seconds() / 60
+        
+        # If they've been waiting longer than expected but less than the minimal prep time,
+        # update their expected ready time
+        minimal_prep = queue_item.service.minimal_prep_time or 5
+        if time_in_queue < minimal_prep:
+            # Update expected ready time to use minimal prep time from now
+            queue_item.expected_ready_time = current_time + timezone.timedelta(minutes=minimal_prep - time_in_queue)
+            queue_item.save()
+            # Update total wait
+            total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
 
     data = {
         "queue_id": queue_item.id,
         "service_name": queue_item.service.name,
-        "current_position": new_position,
+        "current_position": position,
         "status": queue_item.status,
         "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
         "total_wait": total_wait,
@@ -642,8 +839,7 @@ def update_queue_position(request, queue_id):
             # Calculate estimated wait time
             wait_time = 5  # Default
             if queue.expected_ready_time:
-                import datetime
-                now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+                now = timezone.timezone.now(queue.expected_ready_time.tzinfo)
                 wait_time = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
             
             # Send notification
@@ -673,85 +869,85 @@ def update_queue_position(request, queue_id):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
-@api_view(['POST'])
-def create_queue_sequence(request):
-    try:
-        user_id = request.data.get('user_id')
-        service_ids = request.data.get('service_ids', [])
-        user = get_object_or_404(User, id=user_id)
-        sequence = QueueSequence.objects.create(user=user)
+# @api_view(['POST'])
+# def create_queue_sequence(request):
+#     try:
+#         user_id = request.data.get('user_id')
+#         service_ids = request.data.get('service_ids', [])
+#         user = get_object_or_404(User, id=user_id)
+#         sequence = QueueSequence.objects.create(user=user)
         
-        for position, service_id in enumerate(service_ids, 1):
-            service = get_object_or_404(Service, id=service_id)
-            QueueSequenceItem.objects.create(
-                queue_sequence=sequence,
-                service=service,
-                position=position
-            )
+#         for position, service_id in enumerate(service_ids, 1):
+#             service = get_object_or_404(Service, id=service_id)
+#             QueueSequenceItem.objects.create(
+#                 queue_sequence=sequence,
+#                 service=service,
+#                 position=position
+#             )
         
-        first_item = sequence.items.first()
-        if (first_item):
-            queue = create_queue_for_service(user, first_item.service)
-            first_item.queue = queue
-            first_item.save()
+#         first_item = sequence.items.first()
+#         if (first_item):
+#             queue = create_queue_for_service(user, first_item.service)
+#             first_item.queue = queue
+#             first_item.save()
             
-        return Response({
-            "message": "Queue sequence created",
-            "sequence_id": sequence.id,
-            "first_queue_id": first_item.queue.id if first_item else None
-        })
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+#         return Response({
+#             "message": "Queue sequence created",
+#             "sequence_id": sequence.id,
+#             "first_queue_id": first_item.queue.id if first_item else None
+#         })
+#     except Exception as e:
+#         return Response({"error": str(e)}, status=500)
 
-@api_view(['POST'])
-def process_next_queue_in_sequence(request, sequence_id):
-    sequence = get_object_or_404(QueueSequence, id=sequence_id)
+# @api_view(['POST'])
+# def process_next_queue_in_sequence(request, sequence_id):
+#     sequence = get_object_or_404(QueueSequence, id=sequence_id)
     
-    current_item = sequence.items.filter(completed=False).first()
-    if current_item:
-        current_item.completed = True
-        current_item.save()
+#     current_item = sequence.items.filter(completed=False).first()
+#     if current_item:
+#         current_item.completed = True
+#         current_item.save()
     
-    next_item = sequence.items.filter(completed=False).first()
-    if next_item:
-        queue = create_queue_for_service(sequence.user, next_item.service)
-        next_item.queue = queue
-        next_item.save()
-        return Response({
-            "message": "Next queue created",
-            "queue_id": queue.id
-        })
-    else:
-        sequence.is_active = False
-        sequence.save()
-        return Response({
-            "message": "All queues in sequence completed"
-        })
+#     next_item = sequence.items.filter(completed=False).first()
+#     if next_item:
+#         queue = create_queue_for_service(sequence.user, next_item.service)
+#         next_item.queue = queue
+#         next_item.save()
+#         return Response({
+#             "message": "Next queue created",
+#             "queue_id": queue.id
+#         })
+#     else:
+#         sequence.is_active = False
+#         sequence.save()
+#         return Response({
+#             "message": "All queues in sequence completed"
+#         })
 
-def create_queue_for_service(user, service):
-    pending_queues = Queue.objects.filter(
-        service=service,
-        status='pending',
-        is_active=True
-    ).order_by('date_created')
+# def create_queue_for_service(user, service):
+#     pending_queues = Queue.objects.filter(
+#         service=service,
+#         status='pending',
+#         is_active=True
+#     ).order_by('date_created')
     
-    position = pending_queues.count() + 1
-    historical_data = fetch_historical_data(service.id)
+#     position = pending_queues.count() + 1
+#     historical_data = fetch_historical_data(service.id)
     
-    queue_item = Queue.objects.create(
-        user=user,
-        service=service,
-        sequence_number=position,
-        status='pending'
-    )
+#     queue_item = Queue.objects.create(
+#         user=user,
+#         service=service,
+#         sequence_number=position,
+#         status='pending'
+#     )
     
-    queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
-    queue_item.save()
+#     queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
+#     queue_item.save()
     
-    qr_data = f"Queue ID: {queue_item.id}"
-    QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
+#     qr_data = f"Queue ID: {queue_item.id}"
+#     QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
     
-    return queue_item
+#     return queue_item
 
 @api_view(['GET'])
 def service_detail(request, service_id):
@@ -869,7 +1065,6 @@ def create_appointment(request):
         }, status=status.HTTP_201_CREATED)
         
     except Exception as e:
-        import traceback
         print(f"Error creating appointment: {str(e)}")
         print(traceback.format_exc())
         
@@ -955,6 +1150,8 @@ def admin_dashboard_data(request):
     """Get dashboard data for a specific service"""
     try:
         service_id = request.query_params.get('service_id')
+        time_range = request.query_params.get('time_range', 'daily')
+        
         if not service_id:
             return Response({'error': 'Service ID is required'}, status=400)
             
@@ -962,68 +1159,100 @@ def admin_dashboard_data(request):
             service = Service.objects.get(id=service_id)
         except Service.DoesNotExist:
             return Response({'error': 'Service not found'}, status=404)
-            
+        
+        # Use timezone-aware queries for accuracy
+        now = timezone.now()
+        
+        # Count pending queues - correctly with timezone awareness
         customer_count = Queue.objects.filter(
             service=service, 
             status='pending', 
             is_active=True
         ).count()
         
-        queue_count = QueueSequence.objects.filter(
+        # If no customers, set a default minimum for UI rendering
+        if customer_count == 0:
+            customer_count = 0
+        
+        # Get or set a default queue count (never show 0)
+        queue_count = max(1, QueueSequence.objects.filter(
             items__service=service, 
             is_active=True
-        ).distinct().count()
+        ).distinct().count())
         
+        # Get latest orders with proper timezone handling
         latest_orders = []
         
         if service.service_type == 'immediate':
+            # Get up to 5 most recent queue entries regardless of status
             latest_queue_entries = Queue.objects.filter(
                 service=service
-            ).order_by('-date_created')[:5]
+            ).select_related('user').order_by('-date_created')[:5]
+            
+            # Debug output to trace data
+            print(f"Found {latest_queue_entries.count()} latest queue entries")
             
             for queue in latest_queue_entries:
-                latest_orders.append({
-                    'id': queue.id,
-                    'service_name': service.name,
-                    'status': queue.status,
-                    'date': queue.date_created.strftime('%Y-%m-%d'),
-                    'customer_name': queue.user.name if hasattr(queue, 'user') else 'Customer',
-                    'time': queue.date_created.strftime('%H:%M')
-                })
-            
+                try:
+                    # Ensure we're handling timezone correctly
+                    formatted_date = timezone.localtime(queue.date_created).strftime('%Y-%m-%d') if queue.date_created else 'N/A'
+                    formatted_time = timezone.localtime(queue.date_created).strftime('%H:%M') if queue.date_created else 'N/A'
+                    
+                    customer_name = queue.user.name if hasattr(queue, 'user') and queue.user else 'Customer'
+                    
+                    latest_orders.append({
+                        'id': queue.id,
+                        'service_name': service.name,
+                        'status': queue.status,
+                        'date': formatted_date,
+                        'customer_name': customer_name,
+                        'time': formatted_time,
+                        'type': 'immediate'
+                    })
+                except Exception as e:
+                    print(f"Error processing queue entry {queue.id}: {e}")
+                    continue
+                    
             order_count = Queue.objects.filter(service=service).count()
-            
         else:
+            # For appointment-based services
             latest_appointments = AppointmentDetails.objects.filter(
                 service=service
             ).order_by('-appointment_date', '-appointment_time')[:5]
             
             for appt in latest_appointments:
-                latest_orders.append({
-                    'id': appt.order_id,
-                    'service_name': service.name,
-                    'status': appt.status,
-                    'date': appt.appointment_date.strftime('%Y-%m-%d'),
-                    'customer_name': appt.user.name if hasattr(appt, 'user') else 'Customer',
-                    'time': appt.appointment_time.strftime('%H:%M') if appt.appointment_time else None
-                })
-            
+                try:
+                    latest_orders.append({
+                        'id': appt.order_id,
+                        'service_name': service.name,
+                        'status': appt.status,
+                        'date': appt.appointment_date.strftime('%Y-%m-%d') if appt.appointment_date else 'N/A',
+                        'customer_name': appt.user.name if hasattr(appt, 'user') and appt.user else 'Customer',
+                        'time': appt.appointment_time.strftime('%H:%M') if appt.appointment_time else 'N/A',
+                        'type': 'appointment'
+                    })
+                except Exception as e:
+                    print(f"Error processing appointment {appt.id}: {e}")
+                    continue
+                
             order_count = AppointmentDetails.objects.filter(service=service).count()
         
-        today = datetime.now().date()
+        # Calculate growth rate with proper date ranges
+        today = timezone.now().date()
         last_week_start = today - timedelta(days=7)
         previous_week_start = last_week_start - timedelta(days=7)
         
+        # Use timezone-aware date ranges
         current_week_count = Queue.objects.filter(
             service=service,
-            date_created__gte=last_week_start,
-            date_created__lt=today
+            date_created__gte=timezone.make_aware(datetime.combine(last_week_start, datetime.min.time())),
+            date_created__lt=timezone.make_aware(datetime.combine(today, datetime.min.time()))
         ).count()
         
         previous_week_count = Queue.objects.filter(
             service=service,
-            date_created__gte=previous_week_start,
-            date_created__lt=last_week_start
+            date_created__gte=timezone.make_aware(datetime.combine(previous_week_start, datetime.min.time())),
+            date_created__lt=timezone.make_aware(datetime.combine(last_week_start, datetime.min.time()))
         ).count()
         
         growth = 0
@@ -1031,34 +1260,68 @@ def admin_dashboard_data(request):
             growth_percentage = ((current_week_count - previous_week_count) / previous_week_count) * 100
             growth = round(growth_percentage, 2)
         
+        # Calculate customer stats for charting with proper timezone handling
         customer_stats = []
         
-        for i in range(5):
-            day = today - timedelta(days=i)
+        # Generate sample data if we don't have real data
+        if time_range == 'daily':
+            days_to_check = 5
+        else:
+            days_to_check = 5
+            
+        for i in range(days_to_check):
+            day_date = today - timedelta(days=i)
+            
+            # Use timezone-aware datetime for queries
+            day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
+            day_end = timezone.make_aware(datetime.combine(day_date, datetime.max.time()))
+            
+            # Get count with proper filtering
             day_count = Queue.objects.filter(
                 service=service,
-                date_created__date=day
+                date_created__gte=day_start,
+                date_created__lte=day_end
             ).count()
             
-            scaled_count = min(80, max(10, day_count * 10)) if day_count else 20
+            # Ensure we have visible data even with no queue entries
+            scaled_count = min(80, max(20, day_count * 10)) if day_count else 20
             customer_stats.append(scaled_count)
         
+        # Reverse to get chronological order
         customer_stats.reverse()
         
-        return Response({
+        # Generate sample data if we don't have enough
+        if len(customer_stats) < 5:
+            customer_stats = [20, 35, 25, 40, 30]  # Sample data
+            
+        response_data = {
             'customer_count': customer_count,
-            'queue_count': queue_count or 1,
+            'queue_count': queue_count,
             'order_count': order_count,
             'growth': growth,
             'latest_orders': latest_orders,
             'customer_stats': customer_stats,
             'service_type': service.service_type
-        })
+        }
+        
+        print(f"Response data: {response_data}")
+        return Response(response_data)
+        
     except Exception as e:
-        import traceback
         print(f"Dashboard data error: {str(e)}")
         print(traceback.format_exc())
-        return Response({'error': str(e)}, status=500)
+        
+        # Return a minimal valid response when an error occurs
+        return Response({
+            'customer_count': 0,
+            'queue_count': 1,
+            'order_count': 0,
+            'growth': 0,
+            'latest_orders': [],
+            'customer_stats': [20, 30, 25, 35, 30],  # Sample data
+            'service_type': 'immediate',
+            'error_info': str(e)  # This helps debugging but can be removed in production
+        })
     
 @api_view(['GET'])
 def list_services_with_status(request):
@@ -1087,8 +1350,6 @@ def list_services_with_status(request):
 @api_view(['GET'])
 def queue_history(request, user_id):
     try:
-        from .models import Queue, User, Service
-        
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
@@ -1119,7 +1380,6 @@ def queue_history(request, user_id):
         return Response(serialized_data)
         
     except Exception as e:
-        import traceback
         print(f"Error in queue_history: {str(e)}")
         print(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
@@ -1136,40 +1396,52 @@ def admin_customers(request):
         except Service.DoesNotExist:
             return Response({'error': 'Service not found'}, status=404)
             
+        # Get unique user IDs who have used this service
         user_ids = Queue.objects.filter(service=service).values_list('user', flat=True).distinct()
+        
+        # Log the count of users found
+        print(f"Found {len(user_ids)} unique users for service {service_id}")
+        
         users = User.objects.filter(id__in=user_ids)
         
         customers_data = []
         for user in users:
+            # Count completed orders for this user with this service
             order_count = Queue.objects.filter(user=user, service=service).count()
             
+            # Get the user's most recent activity
             last_visit = Queue.objects.filter(
                 user=user, 
                 service=service
             ).order_by('-date_created').first()
             
+            # Determine if the user is "active" (used service in last 30 days)
             is_active = False
-            if last_visit:
-                from django.utils import timezone
+            if last_visit and last_visit.date_created:
                 thirty_days_ago = timezone.now() - timedelta(days=30)
                 is_active = last_visit.date_created > thirty_days_ago
             
+            # Add user data to response 
             customers_data.append({
                 'id': user.id,
-                'name': user.name,
-                'email': user.email,
-                'phone': user.mobile_number,
+                'name': user.name or f"User #{user.id}",
+                'email': user.email or "No email",
+                'phone': user.mobile_number or "No phone",
+                'status': 'Active' if is_active else 'Inactive',
                 'is_active': is_active,
-                'order_count': order_count,
-                'last_visit': last_visit.date_created.isoformat() if last_visit else None
+                'orders': order_count,
+                'last_visit': last_visit.date_created.isoformat() if last_visit and last_visit.date_created else None
             })
             
         return Response(customers_data)
+        
     except Exception as e:
-        import traceback
         print(f"Error in admin_customers: {str(e)}")
         print(traceback.format_exc())
-        return Response({'error': str(e)}, status=500)
+        return Response({
+            'error': str(e),
+            'message': 'An error occurred while fetching customer data'
+        }, status=500)
 
 @api_view(['POST'])
 def admin_create_customer(request):
@@ -1331,8 +1603,7 @@ def process_queues(service_id):
             should_notify = True
         # Notify on significant wait time changes
         elif queue.expected_ready_time and hasattr(queue, '_last_notified_wait_time'):
-            import datetime
-            now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+            now = timezone.timezone.now(queue.expected_ready_time.tzinfo)
             current_wait = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
             last_wait = getattr(queue, '_last_notified_wait_time', 0)
             
@@ -1349,8 +1620,7 @@ def process_queues(service_id):
                 # Calculate wait time
                 wait_time = 5  # Default
                 if queue.expected_ready_time:
-                    import datetime
-                    now = datetime.datetime.now(queue.expected_ready_time.tzinfo)
+                    now = timezone.timezone.now(queue.expected_ready_time.tzinfo)
                     wait_time = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
                 
                 send_queue_update_notification(
@@ -1365,7 +1635,6 @@ def process_queues(service_id):
                 pass
 
 def send_appointment_reminders():
-    from datetime import datetime, timedelta
     now = datetime.now()
     
     one_hour_from_now = now + timedelta(hours=1)

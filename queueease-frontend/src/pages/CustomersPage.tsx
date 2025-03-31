@@ -77,23 +77,37 @@ const CustomersPage: React.FC = () => {
       
       try {
         const response = await API.admin.getCustomers(currentService.id);
-        const data = await API.handleResponse(response);
         
-        // Transform the data to match our interface
+        if (!response.ok) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to load customers: HTTP ${response.status}`);
+          } catch (jsonError) {
+            throw new Error(`Failed to load customers: HTTP ${response.status}`);
+          }
+        }
+        
+        const data = await response.json();
+        
+        // Check if data is array
+        if (!Array.isArray(data)) {
+          console.error('Expected array but got:', data);
+          throw new Error('Invalid data format received from server');
+        }
+        
         const transformedCustomers: Customer[] = data.map((customer: any) => ({
-          id: customer.id,
+          id: customer.id || Math.floor(Math.random() * 10000),
           name: customer.name || 'Unknown Customer',
-          email: customer.email || '',
+          email: customer.email || 'no-email@example.com',
           phone: customer.phone || '',
           status: customer.is_active ? 'Active' : 'Inactive',
           orders: customer.order_count || 0,
-          is_active: customer.is_active,
+          is_active: Boolean(customer.is_active),
           last_visit: customer.last_visit || null
         }));
         
         setCustomers(transformedCustomers);
         
-        // Calculate stats
         setCustomerStats({
           totalCustomers: transformedCustomers.length,
           activeCustomers: transformedCustomers.filter(c => c.is_active).length,
@@ -102,6 +116,7 @@ const CustomersPage: React.FC = () => {
       } catch (err: any) {
         console.error('Error fetching customers:', err);
         setError(err.message || 'Failed to load customer data');
+        setCustomers([]);
       } finally {
         setLoading(false);
       }

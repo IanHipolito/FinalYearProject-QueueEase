@@ -146,7 +146,7 @@ export const API = {
     // Appointment management
     appointments: {
         getAll: (userId: number) => fetch(`${API_BASE}/appointments/${userId}/`),
-        getDetails: (orderId: string) => fetch(`${API_BASE}/appointment/${orderId}/`),
+        getAppointmentDetails: (orderId: string) => fetch(`${API_BASE}/appointment/${orderId}/`),
         add: (orderID: string, userId: number) =>
             fetch(`${API_BASE}/appointment/`, {
                 method: 'POST',
@@ -201,15 +201,18 @@ export const API = {
     // Helper methods for common operations
     async handleResponse(response: Response) {
         if (!response.ok) {
-            try {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(
-                    errorData.error || errorData.detail || `API Error: ${response.status} ${response.statusText}`
-                );
-            } catch (e) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+          try {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              errorData.error || errorData.detail || `API Error: ${response.status} ${response.statusText}`
+            );
+          } catch (e) {
+            if (e instanceof Error) {
+              throw e; // Rethrow if it's already a proper error
             }
+            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+          }
         }
         return await response.json();
-    },
+      },
 };
