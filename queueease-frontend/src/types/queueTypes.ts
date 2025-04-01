@@ -6,6 +6,8 @@ export interface Queue {
   customers: number;
   description?: string;
   max_capacity?: number;
+  sequence_number?: number;
+  is_active?: boolean;
 }
 
 export interface QueueFormData {

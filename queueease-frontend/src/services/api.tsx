@@ -39,7 +39,7 @@ export const API = {
         getCustomers: (serviceId: number) =>
             fetch(`${API_BASE}/admin/customers/?service_id=${serviceId}`),
         getQueueDetails: (serviceId: number) =>
-            fetch(`${API_BASE}/admin/queues/?service_id=${serviceId}`),
+            fetch(`${API_BASE}/service_queues/${serviceId}/`),
         getAppointments: (serviceId: number) =>
             fetch(`${API_BASE}/admin/appointments/?service_id=${serviceId}`),
         getAnalytics: (serviceId: number, period: string = 'month') =>
@@ -65,11 +65,11 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(queueData),
             }),
-        updateQueueStatus: (queueId: number, status: string) =>
-            fetch(`${API_BASE}/admin/queues/${queueId}/update-status/`, {
+        updateQueueStatus: (queueId: number, isActive: boolean) =>
+            fetch(`${API_BASE}/update-queue-position/${queueId}/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status }),
+                body: JSON.stringify({ is_active: isActive }),
             }),
         deleteQueue: (queueId: number) =>
             fetch(`${API_BASE}/admin/queues/${queueId}/delete/`, {

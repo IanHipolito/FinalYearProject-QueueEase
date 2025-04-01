@@ -6,8 +6,7 @@ import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
 import QueueStatsOverview from '../components/queues/QueueStatsOverview';
 import QueueManagement from '../components/queues/QueueManagement';
-import CreateQueueDialog from '../components/queues/CreateQueueDialog';
-import { Queue, QueueFormData } from '../types/queueTypes';
+import { Queue } from '../types/queueTypes';
 
 const QueuesPage: React.FC = () => {
   const { currentService } = useAuth();
@@ -15,13 +14,6 @@ const QueuesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [newQueue, setNewQueue] = useState<QueueFormData>({
-    name: '',
-    department: '',
-    description: '',
-    max_capacity: 50
-  });
   const [actionLoading, setActionLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -36,7 +28,18 @@ const QueuesPage: React.FC = () => {
       try {
         const response = await API.admin.getQueueDetails(currentService.id);
         const data = await API.handleResponse(response);
-        setQueues(data);
+        
+        const transformedData = data.map((queue: any) => ({
+          id: queue.id,
+          name: queue.name,
+          department: queue.department || 'General',
+          status: queue.is_active ? 'Active' : 'Inactive',
+          customers: queue.current_customers || 0,
+          max_capacity: queue.max_capacity || 50,
+          is_active: queue.is_active
+        }));
+        
+        setQueues(transformedData);
       } catch (err: any) {
         setError(err.message || 'Failed to load queue data');
         console.error('Error fetching queues:', err);
@@ -56,50 +59,16 @@ const QueuesPage: React.FC = () => {
 
   // Calculate stats
   const totalQueues = queues.length;
-  const activeQueues = queues.filter(q => q.status === 'Active').length;
-  const totalCustomers = queues.reduce((sum, q) => sum + q.customers, 0);
+  const activeQueues = queues.filter(q => q.is_active || q.status === 'Active').length;
+  const inactiveQueues = totalQueues - activeQueues;
+  
+  const totalCustomersInActiveQueues = queues
+    .filter(q => q.is_active || q.status === 'Active')
+    .reduce((sum, q) => sum + (q.customers || 0), 0);
 
-  // Handle queue creation
-  const handleCreateQueue = async () => {
+  // Handle queue status toggle
+  const handleToggleQueueStatus = async (queueId: number, newStatus: boolean) => {
     if (!currentService?.id) return;
-    
-    setActionLoading(true);
-    
-    try {
-      const response = await API.admin.createQueue(currentService.id, newQueue);
-      
-      if (response.ok) {
-        const newQueueData = await response.json();
-        setQueues([...queues, {
-          ...newQueueData,
-          status: 'Active',
-          customers: 0
-        }]);
-        setSuccessMessage('Queue created successfully');
-        setOpenCreateDialog(false);
-        setNewQueue({
-          name: '',
-          department: '',
-          description: '',
-          max_capacity: 50
-        });
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || `Failed to create queue (status: ${response.status})`);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Toggle queue status
-  const toggleQueueStatus = async (queueId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'Active' ? 'Paused' : 'Active';
     
     setActionLoading(true);
     
@@ -107,10 +76,14 @@ const QueuesPage: React.FC = () => {
       const response = await API.admin.updateQueueStatus(queueId, newStatus);
       
       if (response.ok) {
+        // Update queue status in local state
         setQueues(queues.map(q => 
-          q.id === queueId ? {...q, status: newStatus} : q
+          q.id === queueId 
+            ? { ...q, status: newStatus ? 'Active' : 'Inactive', is_active: newStatus } 
+            : q
         ));
-        setSuccessMessage(`Queue ${newStatus === 'Active' ? 'activated' : 'paused'} successfully`);
+        
+        setSuccessMessage(`Queue ${newStatus ? 'activated' : 'deactivated'} successfully`);
         
         // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(''), 3000);
@@ -150,7 +123,8 @@ const QueuesPage: React.FC = () => {
       <QueueStatsOverview
         totalQueues={totalQueues}
         activeQueues={activeQueues}
-        totalCustomers={totalCustomers}
+        inactiveQueues={inactiveQueues}
+        totalCustomersInActiveQueues={totalCustomersInActiveQueues}
       />
       
       {/* Queue Management */}
@@ -159,17 +133,7 @@ const QueuesPage: React.FC = () => {
         loading={loading}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        onCreateClick={() => setOpenCreateDialog(true)}
-        onToggleStatus={toggleQueueStatus}
-      />
-      
-      {/* Create Queue Dialog */}
-      <CreateQueueDialog
-        open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
-        onCreate={handleCreateQueue}
-        formData={newQueue}
-        setFormData={setNewQueue}
+        onToggleQueueStatus={handleToggleQueueStatus}
       />
     </Box>
   );

@@ -3,13 +3,14 @@ from django.views.decorators.csrf import csrf_exempt
 import qrcode
 from django.shortcuts import get_object_or_404
 from io import BytesIO
-from .models import Queue, QRCode, User, Service, Feedback, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken
+from .models import Queue, QRCode, User, Service, Feedback, AppointmentDetails, ServiceWaitTime, QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken, ServiceQueue
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 from django.db import models
+from django.db.models import F
 from django.contrib.auth.hashers import check_password
 import json
 import traceback
@@ -25,17 +26,6 @@ from django.utils import timezone
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
-
-from django.http import JsonResponse
-
-# SERVICE_OPTIONS = {
-#     "General Checkup": 15,
-#     "Dentist": 30,
-#     "Surgery": 60,
-#     "Restaurant": 90,
-#     "McDonald's": 5,
-#     "Burger King": 7,
-# }
 
 @csrf_exempt
 def login_view(request):
@@ -263,15 +253,32 @@ def create_queue(request):
         user = get_object_or_404(User, id=user_id)
         service = get_object_or_404(Service, id=service_id)
 
+        # Check if there's an active queue for this service
+        service_queue = ServiceQueue.objects.filter(
+            service=service,
+            is_active=True
+        ).first()
+        
+        # If no active queue exists, create one
+        if not service_queue:
+            service_queue = ServiceQueue.objects.create(
+                service=service,
+                current_member_count=0
+            )
+        
         # Get pending queues for this service
         pending_queues = Queue.objects.filter(
-            service=service,
+            service_queue=service_queue,
             status='pending',
             is_active=True
         ).order_by('date_created')
 
         # Calculate position (number of people ahead + 1)
         position = pending_queues.count() + 1
+        
+        # Increment the member count on the service queue
+        service_queue.current_member_count += 1
+        service_queue.save()
         
         # Get historical wait time data for this service
         historical_data = fetch_historical_data(service.id)
@@ -280,10 +287,11 @@ def create_queue(request):
         queue_item = Queue.objects.create(
             user=user,
             service=service,
+            service_queue=service_queue,
             sequence_number=position,
             status='pending'
         )
-
+        
         # Calculate expected ready time based on position and service type
         queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
         queue_item.save()
@@ -307,9 +315,10 @@ def create_queue(request):
             "estimated_wait_minutes": wait_minutes,
             "qr_hash": qr_code.qr_hash
         })
+        
     except Exception as e:
         logger.error(f"Error in create_queue: {str(e)}")
-        logger.error(traceback.format_exc())  # Add traceback for better debugging
+        logger.error(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
 
 def fetch_historical_data(service_id):
@@ -414,44 +423,6 @@ def check_and_complete_queue(request, queue_id):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
-# @api_view(['GET'])
-# def queue_detail(request, queue_id):
-#     queue_item = get_object_or_404(Queue, id=queue_id)
-
-#     total_wait = 0
-#     if queue_item.expected_ready_time:
-#         total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
-
-#     if queue_item.status != 'pending':
-#         return Response({
-#             "queue_id": queue_item.id,
-#             "service_name": queue_item.service.name,
-#             "current_position": None,
-#             "status": queue_item.status,
-#             "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
-#             "total_wait": total_wait,
-#             "time_created": queue_item.date_created.isoformat()
-#         })
-
-#     pending_queues = Queue.objects.filter(
-#         service=queue_item.service,
-#         status='pending',
-#         is_active=True
-#     ).order_by('date_created')
-
-#     new_position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
-
-#     data = {
-#         "queue_id": queue_item.id,
-#         "service_name": queue_item.service.name,
-#         "current_position": new_position,
-#         "status": queue_item.status,
-#         "expected_ready_time": queue_item.expected_ready_time.isoformat() if queue_item.expected_ready_time else None,
-#         "total_wait": total_wait,
-#         "time_created": queue_item.date_created.isoformat()
-#     }
-#     return Response(data)
-
 @api_view(['GET'])
 def queue_detail(request, queue_id):
     queue_item = get_object_or_404(Queue, id=queue_id)
@@ -526,14 +497,36 @@ def queue_detail(request, queue_id):
 
 @api_view(['POST'])
 def complete_queue(request, queue_id):
-    queue_item = get_object_or_404(Queue, id=queue_id)
-    queue_item.status = 'completed'
-    queue_item.save()
-
-    wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
-    ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
-
-    return Response({"message": "Order marked as completed."})
+    try:
+        queue_item = get_object_or_404(Queue, id=queue_id)
+        service_queue = queue_item.service_queue
+        
+        if queue_item.status != 'pending':
+            return Response({"error": "This queue has already been completed"}, status=400)
+        
+        # Mark the queue as completed
+        queue_item.status = 'completed'
+        queue_item.save()
+        
+        # Record wait time for analytics
+        wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
+        ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
+        
+        # Update service queue status
+        if service_queue:
+            # Update positions for members behind this one
+            Queue.objects.filter(
+                service_queue=service_queue,
+                sequence_number__gt=queue_item.sequence_number,
+                status='pending',
+                is_active=True
+            ).update(sequence_number=F('sequence_number')-1)
+            
+            update_service_queue_status(service_queue.id)
+        
+        return Response({"status": "completed"})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['GET'])
@@ -680,30 +673,6 @@ def generate_order_id(user_id):
     random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
     return f"{user_id}-{timestamp}-{random_str}"
 
-# def simulate_appointment(user_id):
-#     """Simulate realistic appointment data for demonstration purposes."""
-#     service_name = random.choice(list(SERVICE_OPTIONS.keys()))
-#     service, _ = Service.objects.get_or_create(name=service_name, defaults={"description": f"{service_name} description"})
-    
-#     appointment_date = datetime.now() + timedelta(days=random.randint(1, 30))
-#     appointment_time = appointment_date.replace(hour=random.randint(8, 17), minute=random.choice([0, 15, 30, 45]))
-#     duration_minutes = SERVICE_OPTIONS[service_name]
-#     order_id = generate_order_id(user_id)
-
-#     appointment = AppointmentDetails.objects.create(
-#         order_id=order_id,
-#         user_id=user_id,
-#         service=service,
-#         appointment_date=appointment_date.date(),
-#         appointment_time=appointment_time.time(),
-#         duration_minutes=duration_minutes,
-#         status="pending",
-#         queue_status="not_started",
-#         is_active=True
-#     )
-
-#     return appointment
-
 @api_view(['POST'])
 def generate_demo_appointments(request):
     user_id = request.data.get('user_id')
@@ -812,10 +781,43 @@ def queue_status(request, queue_id):
 
 @api_view(['POST'])
 def update_queue_position(request, queue_id):
-    """Update queue position and notify user"""
+    """Update queue position and notify user or toggle active status"""
     try:
         queue = Queue.objects.get(id=queue_id)
+        is_active = request.data.get('is_active')
         
+        # If is_active status is being toggled
+        if is_active is not None:
+            is_active = bool(is_active)
+            
+            # Update queue status
+            queue.is_active = is_active
+            
+            # If setting to inactive and this is a service queue, update status
+            service_queue = queue.service_queue if hasattr(queue, 'service_queue') else None
+            if not is_active and service_queue:
+                # If queue has no customers, mark it as inactive
+                if queue.customers == 0:
+                    queue.status = 'inactive'
+                    
+                    # Update the service queue
+                    update_service_queue_status(service_queue.id)
+            
+            # If setting to active, update status
+            if is_active:
+                queue.status = 'pending'
+            else:
+                queue.status = 'inactive'
+                
+            queue.save()
+            
+            return Response({
+                "success": True,
+                "is_active": is_active,
+                "status": queue.status
+            })
+            
+        # Original behavior for position updates
         # Calculate current position
         position = Queue.objects.filter(
             service=queue.service,
@@ -868,86 +870,6 @@ def update_queue_position(request, queue_id):
         return Response({"error": "Queue not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
-# @api_view(['POST'])
-# def create_queue_sequence(request):
-#     try:
-#         user_id = request.data.get('user_id')
-#         service_ids = request.data.get('service_ids', [])
-#         user = get_object_or_404(User, id=user_id)
-#         sequence = QueueSequence.objects.create(user=user)
-        
-#         for position, service_id in enumerate(service_ids, 1):
-#             service = get_object_or_404(Service, id=service_id)
-#             QueueSequenceItem.objects.create(
-#                 queue_sequence=sequence,
-#                 service=service,
-#                 position=position
-#             )
-        
-#         first_item = sequence.items.first()
-#         if (first_item):
-#             queue = create_queue_for_service(user, first_item.service)
-#             first_item.queue = queue
-#             first_item.save()
-            
-#         return Response({
-#             "message": "Queue sequence created",
-#             "sequence_id": sequence.id,
-#             "first_queue_id": first_item.queue.id if first_item else None
-#         })
-#     except Exception as e:
-#         return Response({"error": str(e)}, status=500)
-
-# @api_view(['POST'])
-# def process_next_queue_in_sequence(request, sequence_id):
-#     sequence = get_object_or_404(QueueSequence, id=sequence_id)
-    
-#     current_item = sequence.items.filter(completed=False).first()
-#     if current_item:
-#         current_item.completed = True
-#         current_item.save()
-    
-#     next_item = sequence.items.filter(completed=False).first()
-#     if next_item:
-#         queue = create_queue_for_service(sequence.user, next_item.service)
-#         next_item.queue = queue
-#         next_item.save()
-#         return Response({
-#             "message": "Next queue created",
-#             "queue_id": queue.id
-#         })
-#     else:
-#         sequence.is_active = False
-#         sequence.save()
-#         return Response({
-#             "message": "All queues in sequence completed"
-#         })
-
-# def create_queue_for_service(user, service):
-#     pending_queues = Queue.objects.filter(
-#         service=service,
-#         status='pending',
-#         is_active=True
-#     ).order_by('date_created')
-    
-#     position = pending_queues.count() + 1
-#     historical_data = fetch_historical_data(service.id)
-    
-#     queue_item = Queue.objects.create(
-#         user=user,
-#         service=service,
-#         sequence_number=position,
-#         status='pending'
-#     )
-    
-#     queue_item.expected_ready_time = compute_expected_ready_time(service, position, historical_data)
-#     queue_item.save()
-    
-#     qr_data = f"Queue ID: {queue_item.id}"
-#     QRCode.objects.create(queue=queue_item, qr_hash=qr_data)
-    
-#     return queue_item
 
 @api_view(['GET'])
 def service_detail(request, service_id):
@@ -2072,10 +1994,34 @@ def check_feedback_eligibility(request):
         print(f"Error in check_feedback_eligibility: {str(e)}")
         return Response({'error': str(e)}, status=500)
 
+def update_service_queue_status(service_queue_id):
+    try:
+        service_queue = ServiceQueue.objects.get(id=service_queue_id)
+        
+        # Count active members
+        active_members = Queue.objects.filter(
+            service_queue=service_queue,
+            status='pending',
+            is_active=True
+        ).count()
+        
+        # Update member count
+        service_queue.current_member_count = active_members
+        
+        # If no active members, set queue to inactive
+        if active_members == 0:
+            service_queue.is_active = False
+        
+        service_queue.save()
+        
+    except ServiceQueue.DoesNotExist:
+        pass
+
 @api_view(['POST'])
 def leave_queue(request, queue_id):
     try:
         queue = get_object_or_404(Queue, id=queue_id)
+        service_queue = queue.service_queue
         
         # Check if queue is already completed or inactive
         if queue.status != 'pending' or not queue.is_active:
@@ -2089,12 +2035,70 @@ def leave_queue(request, queue_id):
                 status=400
             )
         
-        # Mark the queue as inactive and update status
+        # Mark the queue member as inactive and update status
         queue.is_active = False
         queue.status = 'cancelled'
         queue.save()
+        
+        # Update positions for members behind this one
+        if service_queue:
+            Queue.objects.filter(
+                service_queue=service_queue,
+                sequence_number__gt=queue.sequence_number,
+                status='pending',
+                is_active=True
+            ).update(sequence_number=F('sequence_number')-1)
+            
+            # Update service queue status
+            update_service_queue_status(service_queue.id)
         
         return Response({"message": "Successfully left the queue"})
         
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+@api_view(['GET'])
+def service_queues(request, service_id):
+    try:
+        service = get_object_or_404(Service, id=service_id)
+        
+        # Get all active service queues for this service
+        service_queues = ServiceQueue.objects.filter(service=service, is_active=True)
+        
+        queue_data = []
+        for sq in service_queues:
+            queue_data.append({
+                'id': sq.id,
+                'name': service.name,
+                'department': service.category or 'General',
+                'description': service.description,
+                'is_active': sq.is_active,
+                'current_customers': sq.current_member_count,
+                'max_capacity': 50  # Default or you can store this in the model
+            })
+        
+        # If no active service queues but there are individual queue members,
+        # include them as legacy support
+        if not service_queues.exists():
+            # Count customers with pending status for this service
+            current_customers = Queue.objects.filter(
+                service=service, 
+                status='pending',
+                is_active=True,
+                service_queue__isnull=True
+            ).count()
+            
+            if current_customers > 0:
+                queue_data.append({
+                    'id': f"legacy_{service.id}",
+                    'name': service.name,
+                    'department': service.category or 'General',
+                    'description': service.description,
+                    'is_active': True,
+                    'current_customers': current_customers,
+                    'max_capacity': 50
+                })
+        
+        return Response(queue_data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

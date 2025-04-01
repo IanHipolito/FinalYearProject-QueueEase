@@ -327,13 +327,14 @@ const CustomersPage: React.FC = () => {
             chart={!loading && activityChart}
           />
         </Grid>
-        
+
         <Grid item xs={12} md={4}>
           <CustomerStatsCard
-            title="Total Orders"
-            value={customerStats.totalOrders}
+            title="Retention Rate"
+            value={`${customerStats.totalCustomers > 
+              0 ? Math.round((customerStats.activeCustomers / customerStats.totalCustomers) * 100) : 0}%`}
             icon={<ShoppingBagIcon />}
-            description="Total number of orders placed with this service"
+            description="Percentage of customers who are still active"
             loading={loading}
             gradient="linear-gradient(135deg, #198754 0%, #28a745 100%)"
           />

@@ -10,7 +10,6 @@ class KeywordExtractor:
     """
     
     def __init__(self):
-        # Download NLTK resources if needed
         try:
             nltk.data.find('tokenizers/punkt')
         except LookupError:

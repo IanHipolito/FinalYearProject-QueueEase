@@ -115,6 +115,19 @@ class ServiceCompany(models.Model):
     class Meta:
         unique_together = ('service', 'company')
 
+class ServiceQueue(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='service_queues')
+    is_active = models.BooleanField(default=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    current_member_count = models.IntegerField(default=0)
+    
+    class Meta:
+        verbose_name = "Service Queue"
+        verbose_name_plural = "Service Queues"
+    
+    def __str__(self):
+        return f"Queue for {self.service.name} ({self.current_member_count} members)"
+    
 class Queue(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -124,7 +137,8 @@ class Queue(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    employee = models.ForeignKey(EmployeeDetails, on_delete=models.CASCADE, null=True, blank=True) # Allow null for self-service
+    service_queue = models.ForeignKey(ServiceQueue, on_delete=models.CASCADE, related_name='members', null=True)
+    employee = models.ForeignKey(EmployeeDetails, on_delete=models.CASCADE, null=True, blank=True)
     appointment = models.ForeignKey('AppointmentDetails', on_delete=models.SET_NULL, null=True, blank=True)
     sequence_number = models.IntegerField()
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')

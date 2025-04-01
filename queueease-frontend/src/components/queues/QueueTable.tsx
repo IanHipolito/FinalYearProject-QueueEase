@@ -8,10 +8,13 @@ import {
   TableCell, 
   TableBody, 
   Chip, 
-  IconButton 
+  IconButton,
+  Tooltip,
+  Switch 
 } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ToggleOnIcon from '@mui/icons-material/ToggleOn';
+import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import { TableSkeleton } from '../skeletons/LoadingSkeletons';
 
 interface Queue {
@@ -22,15 +25,17 @@ interface Queue {
   customers: number;
   description?: string;
   max_capacity?: number;
+  sequence_number?: number;
+  is_active?: boolean;
 }
 
 interface QueueTableProps {
   queues: Queue[];
   loading: boolean;
-  onToggleStatus: (queueId: number, currentStatus: string) => void;
+  onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
 }
 
-const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleStatus }) => {
+const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleQueueStatus }) => {
   return (
     <>
       {loading ? (
@@ -40,6 +45,7 @@ const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleStatus
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f5f7fb' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>Queue ID</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Queue Name</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
@@ -49,32 +55,38 @@ const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleStatus
             </TableHead>
             <TableBody>
               {queues.length > 0 ? (
-                queues.map((queue) => (
-                  <TableRow key={queue.id} hover>
-                    <TableCell>{queue.name}</TableCell>
-                    <TableCell>{queue.department}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={queue.status}
-                        color={queue.status === 'Active' ? 'success' : 'default'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{queue.customers}</TableCell>
-                    <TableCell>
-                      <IconButton 
-                        size="small" 
-                        color={queue.status === 'Active' ? 'warning' : 'success'}
-                        onClick={() => onToggleStatus(queue.id, queue.status)}
-                      >
-                        {queue.status === 'Active' ? <PauseIcon /> : <PlayArrowIcon />}
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                queues.map((queue) => {
+                  const isActive = queue.status === 'Active' || queue.is_active === true;
+                  return (
+                    <TableRow key={queue.id} hover>
+                      <TableCell>#{queue.sequence_number || queue.id}</TableCell>
+                      <TableCell>{queue.name}</TableCell>
+                      <TableCell>{queue.department}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={isActive ? 'Active' : 'Inactive'}
+                          color={isActive ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>{queue.customers}</TableCell>
+                      <TableCell>
+                        <Tooltip title={isActive ? "Deactivate Queue" : "Activate Queue"}>
+                          <IconButton 
+                            size="small" 
+                            color={isActive ? "primary" : "default"}
+                            onClick={() => onToggleQueueStatus(queue.id, !isActive)}
+                          >
+                            {isActive ? <ToggleOnIcon /> : <ToggleOffIcon />}
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     No queues found
                   </TableCell>
                 </TableRow>
