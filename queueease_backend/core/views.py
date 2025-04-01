@@ -5,7 +5,8 @@ from .views.auth_views import (
 from .views.queue_views import (
     create_queue, queue_detail, complete_queue, active_queue,
     get_qr_code, validate_qr, queue_status, update_queue_position,
-    check_and_complete_queue, leave_queue, queue_history, service_queues
+    check_and_complete_queue, leave_queue, queue_history, service_queues,
+    user_analytics
 )
 
 from .views.service_views import (

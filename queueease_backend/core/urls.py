@@ -6,7 +6,7 @@ from .views import (
     # Queue views
     create_queue, queue_detail, complete_queue, active_queue, get_qr_code, 
     validate_qr, queue_status, update_queue_position, check_and_complete_queue, 
-    leave_queue, queue_history, service_queues,
+    leave_queue, queue_history, service_queues, user_analytics,
     
     # Service views
     api_overview, list_services, service_detail, available_appointment_times, 
@@ -47,6 +47,7 @@ urlpatterns = [
     path('leave-queue/<int:queue_id>/', leave_queue, name='leave_queue'),
     path('user-queues/<int:user_id>/', queue_history, name='user-queues'),
     path('service_queues/<int:service_id>/', service_queues, name='service_queues'),
+    path('user-analytics/<int:user_id>/', user_analytics, name='user-analytics'),
     
     # Authentication endpoints
     path('signup/', signup_view, name='signup'),

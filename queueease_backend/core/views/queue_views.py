@@ -763,3 +763,119 @@ def queue_status(request, queue_id):
         return Response(data)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+@api_view(['GET'])
+def user_analytics(request, user_id):
+    try:
+        user = get_object_or_404(User, id=user_id)
+        time_range = request.GET.get('time_range', 'month')
+        
+        # Determine date range based on the time_range
+        now = timezone.now()
+        if time_range == 'week':
+            start_date = now - timedelta(days=7)
+        elif time_range == 'month':
+            start_date = now - timedelta(days=30)
+        elif time_range == 'year':
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = now - timedelta(days=30)  # Default to month
+        
+        # Get queue history for the user within the date range
+        queue_history = Queue.objects.filter(
+            user=user,
+            date_created__gte=start_date
+        ).order_by('-date_created')
+        
+        # Calculate statistics
+        total_queues = queue_history.count()
+        completed_queues = queue_history.filter(status='completed').count()
+        cancelled_queues = queue_history.filter(status='cancelled').count()
+        
+        # Calculate average wait time
+        wait_times = []
+        completed_with_wait = queue_history.filter(
+            status='completed'
+        )
+        
+        for queue in completed_with_wait:
+            if queue.date_created and queue.expected_ready_time:
+                wait_seconds = (queue.expected_ready_time - queue.date_created).total_seconds()
+                wait_minutes = int(wait_seconds / 60)
+                wait_times.append(wait_minutes)
+        
+        avg_wait_time = sum(wait_times) / len(wait_times) if wait_times else 0
+        
+        # Calculate wait time by day and hour
+        wait_by_day = {}
+        wait_by_hour = {}
+        
+        for queue in completed_with_wait:
+            if not (queue.date_created and queue.expected_ready_time):
+                continue
+                
+            day_of_week = queue.date_created.strftime('%A')
+            hour_of_day = queue.date_created.hour
+            wait_seconds = (queue.expected_ready_time - queue.date_created).total_seconds()
+            wait_minutes = int(wait_seconds / 60)
+            
+            # For day
+            if day_of_week not in wait_by_day:
+                wait_by_day[day_of_week] = {'total': 0, 'count': 0}
+            wait_by_day[day_of_week]['total'] += wait_minutes
+            wait_by_day[day_of_week]['count'] += 1
+            
+            # For hour
+            if hour_of_day not in wait_by_hour:
+                wait_by_hour[hour_of_day] = {'total': 0, 'count': 0}
+            wait_by_hour[hour_of_day]['total'] += wait_minutes
+            wait_by_hour[hour_of_day]['count'] += 1
+        
+        # Format day stats
+        day_stats = []
+        for day, stats in wait_by_day.items():
+            avg = stats['total'] / stats['count'] if stats['count'] > 0 else 0
+            day_stats.append({
+                'day': day,
+                'avgWait': round(avg),
+                'count': stats['count']
+            })
+        
+        # Format hour stats
+        hour_stats = []
+        for hour, stats in wait_by_hour.items():
+            avg = stats['total'] / stats['count'] if stats['count'] > 0 else 0
+            hour_stats.append({
+                'hour': hour,
+                'avgWait': round(avg),
+                'count': stats['count']
+            })
+        
+        # Get most visited services
+        service_visits = {}
+        for queue in queue_history:
+            service_name = queue.service.name
+            if service_name not in service_visits:
+                service_visits[service_name] = 0
+            service_visits[service_name] += 1
+        
+        # Sort and take top 5
+        most_visited = sorted(
+            [{'name': name, 'count': count} for name, count in service_visits.items()],
+            key=lambda x: x['count'],
+            reverse=True
+        )[:5]
+        
+        # Return the analytics data
+        return Response({
+            'totalQueues': total_queues,
+            'completedQueues': completed_queues,
+            'canceledQueues': cancelled_queues,
+            'averageWaitTime': round(avg_wait_time),
+            'mostVisitedServices': most_visited,
+            'waitTimeByDay': day_stats,
+            'waitTimeByHour': hour_stats
+        })
+    
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

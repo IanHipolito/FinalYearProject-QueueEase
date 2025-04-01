@@ -141,6 +141,8 @@ export const API = {
             fetch(`${API_BASE}/queue-complete/${queueId}/`, { method: 'POST' }),
         getQRCode: (queueId: number) =>
             fetch(`${API_BASE}/get-qr-code/${queueId}/`),
+        getUserAnalytics: (userId: number, timeRange: string = 'month') =>
+            fetch(`${API_BASE}/user-analytics/${userId}/?time_range=${timeRange}`),
     },
 
     // Appointment management

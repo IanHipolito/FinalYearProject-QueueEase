@@ -24,6 +24,7 @@ import { AuthProvider } from './pages/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
 import IOSInstallGuide from './components/IOSInstallGuide';
 import FeedbackPage from './pages/FeedbackPage';
+import UserAnalyticsPage from './pages/UserAnalyticsPage';
 
 const App: React.FC = () => {
   return (
@@ -51,6 +52,11 @@ const App: React.FC = () => {
           <Route path="/qrscanner" element={
             <PrivateRoute>
               <QRScanner />
+            </PrivateRoute>
+          } />
+          <Route path="/analytics" element={
+            <PrivateRoute>
+              <UserAnalyticsPage />
             </PrivateRoute>
           } />
           <Route path="/success/:queueId" element={<SuccessPage />} />

@@ -38,6 +38,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import InsightsIcon from '@mui/icons-material/Insights';
 import { useAuth } from '../pages/AuthContext';
 
 interface Queue {
@@ -811,11 +812,11 @@ const handleLeaveQueue = () => {
               color: "linear-gradient(135deg, #fd7e14 0%, #ffb066 100%)"
             },
             {
-              title: "View Tickets",
-              description: "Access your active and past tickets",
-              icon: <ReceiptLongIcon sx={{ fontSize: 48, color: '#dc3545' }} />,
-              action: () => navigate('/tickets'),
-              color: "linear-gradient(135deg, #dc3545 0%, #e35d6a 100%)"
+              title: "View Analytics",
+              description: "See insights about your queue usage patterns",
+              icon: <InsightsIcon sx={{ fontSize: 48, color: '#6f42c1' }} />,
+              action: () => navigate('/analytics'),
+              color: "linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
             }
           ].map((feature, index) => (
             <Grid item xs={12} sm={6} md={4} key={index}>
