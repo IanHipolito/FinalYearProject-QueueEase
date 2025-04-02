@@ -149,8 +149,8 @@ export const API = {
     appointments: {
         getAll: (userId: number) => fetch(`${API_BASE}/appointments/${userId}/`),
         getAppointmentDetails: (orderId: string) => fetch(`${API_BASE}/appointment/${orderId}/`),
-        add: (orderID: string, userId: number) =>
-            fetch(`${API_BASE}/appointment/`, {
+        addAppointment: (orderID: string, userId: number) =>
+            fetch(`${API_BASE}/appointment/add-existing/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order_id: orderID, user_id: userId }),
@@ -184,10 +184,8 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(feedbackData),
             }),
-        
         getUserFeedbackHistory: (userId: number) =>
             fetch(`${API_BASE}/feedback/user/${userId}/`),
-        
         getUserEligibleServices: (userId: number) =>
             fetch(`${API_BASE}/feedback/eligible-services/${userId}/`, {
                 headers: {
@@ -195,7 +193,6 @@ export const API = {
                     'Content-Type': 'application/json'
                 }
             }),
-        
         checkFeedbackEligibility: (userId: number, serviceId: number, orderId: number) =>
             fetch(`${API_BASE}/feedback/check-eligibility/?user_id=${userId}&service_id=${serviceId}&order_id=${orderId}`),
     },

@@ -1,49 +1,58 @@
 import React from 'react';
-import { Box, LinearProgress, Typography, useTheme } from '@mui/material';
+import { Box, LinearProgress, Typography } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 interface TimeProgressProps {
-  remainingTime: number;
+  remainingTime: string | number;
   progressPercentage: number;
 }
 
 const TimeProgress: React.FC<TimeProgressProps> = ({ remainingTime, progressPercentage }) => {
-  const theme = useTheme();
-
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}m ${secs}s`;
-  };
-
   return (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="h6" gutterBottom fontWeight={600}>
+    <Box>
+      <Typography 
+        variant="h6" 
+        fontWeight={600} 
+        sx={{ mb: 2 }}
+      >
         Time Remaining
       </Typography>
-      <Box sx={{ position: 'relative', mt: 1 }}>
-        <LinearProgress
-          variant="determinate"
-          value={100 - progressPercentage}
-          sx={{
-            height: 10,
-            borderRadius: 5,
-            bgcolor: 'rgba(0, 0, 0, 0.08)',
-            '& .MuiLinearProgress-bar': {
-              bgcolor: theme.palette.primary.main,
-            }
-          }}
+
+      <LinearProgress 
+        variant="determinate" 
+        value={progressPercentage} 
+        sx={{ 
+          height: 12, 
+          borderRadius: 6,
+          mb: 2,
+          backgroundColor: 'rgba(111, 66, 193, 0.1)',
+          '& .MuiLinearProgress-bar': {
+            backgroundColor: 'primary.main',
+            borderRadius: 6
+          }
+        }}
+      />
+
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          mt: 2
+        }}
+      >
+        <AccessTimeIcon 
+          sx={{ 
+            mr: 1, 
+            color: 'primary.main' 
+          }} 
         />
-      </Box>
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        mt: 2
-      }}>
-        <AccessTimeIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
-        <Typography variant="h6" fontWeight={600} color={theme.palette.primary.main}>
-          {formatTime(remainingTime)} remaining
+        <Typography 
+          variant="h6" 
+          color="primary.main"
+          fontWeight={600}
+        >
+          {typeof remainingTime === 'string' ? remainingTime : `${Math.floor(remainingTime / 60)}m ${remainingTime % 60}s remaining`}
         </Typography>
       </Box>
     </Box>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { API } from '../services/api';
 import {
   Box,
   Grid,
@@ -11,7 +12,6 @@ import {
   useTheme
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 // Import components
 import PageContainer from '../components/common/PageContainer';
@@ -45,8 +45,13 @@ const AppointmentsList: React.FC = () => {
   useEffect(() => {
     if (user) {
       setLoading(true);
-      fetch(`http://localhost:8000/api/appointments/${user.id}/`)
-        .then(response => response.json())
+      API.appointments.getAll(user.id)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch appointments');
+          }
+          return response.json();
+        })
         .then(data => {
           setAppointments(data);
           setLoading(false);
@@ -64,9 +69,8 @@ const AppointmentsList: React.FC = () => {
 
   const handleRemoveAppointment = async (orderId: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/appointment/delete/${orderId}/`, {
-        method: 'DELETE'
-      });
+      const response = await API.appointments.delete(orderId);
+      
       if (response.ok) {
         setAlert({
           open: true,
@@ -87,39 +91,6 @@ const AppointmentsList: React.FC = () => {
       setAlert({
         open: true,
         message: "An error occurred while removing the appointment.",
-        severity: 'error'
-      });
-    }
-  };
-
-  const generateDemoAppointments = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/generate-demo/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user?.id }),
-      });
-  
-      if (response.ok) {
-        setAlert({
-          open: true,
-          message: 'Demo appointments generated!',
-          severity: 'success'
-        });
-        window.location.reload();
-      } else {
-        const data = await response.json();
-        setAlert({
-          open: true,
-          message: `Failed to generate demo appointments: ${data.error}`,
-          severity: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error generating demo appointments:', error);
-      setAlert({
-        open: true,
-        message: 'Error generating demo appointments',
         severity: 'error'
       });
     }
@@ -146,14 +117,7 @@ const AppointmentsList: React.FC = () => {
           >
             Add Appointment
           </StyledButton>
-          <StyledButton
-            variant="outlined"
-            startIcon={<AutoAwesomeIcon />}
-            onClick={generateDemoAppointments}
-            sx={{ flex: { xs: '1', sm: '0 0 auto' } }}
-          >
-            Generate Demo Appointments
-          </StyledButton>
+          {/* Remove the Generate Demo Appointments button */}
         </Stack>
       </StyledCard>
 
@@ -174,7 +138,8 @@ const AppointmentsList: React.FC = () => {
             No appointments found
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Add a new appointment or generate demo appointments to get started.
+            {/* Message */}
+            Add a new appointment to get started.
           </Typography>
         </StyledCard>
       ) : (

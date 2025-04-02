@@ -6,7 +6,6 @@ import StorefrontIcon from '@mui/icons-material/Storefront';
 import QueueIcon from '@mui/icons-material/Queue';
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ScheduleIcon from '@mui/icons-material/Schedule';
 
 interface AppointmentInfoGridProps {
   appointment: {
@@ -14,7 +13,6 @@ interface AppointmentInfoGridProps {
     queue_status: string;
     appointment_date: string;
     appointment_time: string;
-    estimated_wait_time: number;
     queue_position: number;
   };
   formatDate: (date: string) => string;
@@ -52,14 +50,6 @@ const AppointmentInfoGrid: React.FC<AppointmentInfoGridProps> = ({ appointment, 
           icon={<AccessTimeIcon />} 
           label="Appointment Time" 
           value={appointment.appointment_time} 
-        />
-      </Grid>
-
-      <Grid item xs={12} sm={6}>
-        <InfoItem 
-          icon={<ScheduleIcon />} 
-          label="Waiting Time" 
-          value={`${appointment.estimated_wait_time} minutes`} 
         />
       </Grid>
 

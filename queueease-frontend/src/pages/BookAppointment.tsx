@@ -55,7 +55,7 @@ const BookAppointment: React.FC = () => {
   
   const fetchAvailableTimes = async (date: Date) => {
     try {
-      const formattedDate = date.toISOString().split('T')[0];
+      const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       const response = await API.services.getAvailableTimes(Number(serviceId), formattedDate);
       
       if (!response.ok) {
@@ -88,10 +88,15 @@ const BookAppointment: React.FC = () => {
     setSubmitting(true);
     
     try {
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
+
       const appointmentData = {
         user_id: user.id,
         service_id: Number(serviceId),
-        appointment_date: selectedDate.toISOString().split('T')[0],
+        appointment_date: formattedDate,
         appointment_time: selectedTime,
       };
       

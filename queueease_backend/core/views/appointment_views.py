@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import random
 import logging
 import traceback
+from django.utils import timezone
 
 from ..models import AppointmentDetails, User, Service
 from ..serializers import AppointmentDetailsSerializer
@@ -30,41 +31,58 @@ def user_appointments(request, user_id):
 
 @api_view(['GET'])
 def appointment_detail(request, order_id):
-    appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+    try:
+        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
 
-    same_day_appointments = AppointmentDetails.objects.filter(
-        appointment_date=appointment.appointment_date,
-        service=appointment.service
-    ).order_by('appointment_time')
+        same_day_appointments = AppointmentDetails.objects.filter(
+            appointment_date=appointment.appointment_date,
+            service=appointment.service
+        ).order_by('appointment_time')
 
-    position = list(same_day_appointments).index(appointment) + 1
+        position = list(same_day_appointments).index(appointment) + 1
 
-    average_duration = appointment.duration_minutes or 15  # Default duration
+        average_duration = appointment.duration_minutes or 15
 
-    if appointment.service.requires_prep_time:
-        minimal_prep = appointment.service.minimal_prep_time
-        estimated_waiting_time = max(minimal_prep, (position - 1) * average_duration)
-    else:
-        estimated_waiting_time = (position - 1) * average_duration
+        if appointment.service.requires_prep_time:
+            minimal_prep = appointment.service.minimal_prep_time
+            estimated_waiting_time = max(minimal_prep, (position - 1) * average_duration)
+        else:
+            estimated_waiting_time = (position - 1) * average_duration
 
-    serializer = AppointmentDetailsSerializer(appointment)
-    data = serializer.data
-    data['queue_position'] = position
-    data['estimated_wait_time'] = estimated_waiting_time
-    data['service_name'] = appointment.service.name
-    data['appointment_title'] = f"{appointment.service.name} Appointment"
+        serializer = AppointmentDetailsSerializer(appointment)
+        data = serializer.data
+        data['queue_position'] = position
+        data['estimated_wait_time'] = estimated_waiting_time
+        data['service_name'] = appointment.service.name
+        data['appointment_title'] = f"{appointment.service.name} Appointment"
 
-    appointment_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
-    expected_start_time = appointment_start + timedelta(minutes=estimated_waiting_time)
-    data['expected_start_time'] = expected_start_time.isoformat()
+        # Fix timezone handling - explicitly handle naive datetimes
+        try:
+            naive_appointment_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+            naive_expected_start = naive_appointment_start + timedelta(minutes=estimated_waiting_time)
+            # Make timezone aware without assuming specific timezone
+            expected_start_time = timezone.make_aware(naive_expected_start)
+            data['expected_start_time'] = expected_start_time.isoformat()
+        except Exception as e:
+            # Fallback if date handling fails
+            logger.error(f"Date processing error: {str(e)}")
+            current_time = timezone.now()
+            data['expected_start_time'] = (current_time + timedelta(minutes=estimated_waiting_time)).isoformat()
 
-    return Response(data)
+        return Response(data)
+    except Exception as e:
+        logger.error(f"Error in appointment_detail: {str(e)}")
+        return Response({"error": "An error occurred processing this appointment"}, status=500)
 
-@api_view(['POST'])
+@api_view(['POST', 'GET'])
 def get_or_create_appointment(request):
     try:
-        order_id = request.data.get('order_id')
-        user_id = request.data.get('user_id')
+        if request.method == 'POST':
+            order_id = request.data.get('order_id')
+            user_id = request.data.get('user_id')
+        else:
+            order_id = request.query_params.get('order_id')
+            user_id = request.query_params.get('user_id')
 
         if not order_id or not user_id:
             return Response({"error": "Order ID and User ID are required."}, status=400)
@@ -74,22 +92,26 @@ def get_or_create_appointment(request):
             serializer = AppointmentDetailsSerializer(appointment)
             return Response(serializer.data)
 
-        default_service = Service.objects.get(name='Default Service')
+        # Only create a new appointment on POST
+        if request.method == 'POST':
+            default_service = Service.objects.get(name='Default Service')
 
-        new_appointment = AppointmentDetails.objects.create(
-            order_id=order_id,
-            user_id=user_id,
-            service=default_service,
-            appointment_date='2025-01-01',
-            appointment_time='09:00:00',
-            duration_minutes=30,
-            status='pending',
-            queue_status='not_started',
-            is_active=True
-        )
+            new_appointment = AppointmentDetails.objects.create(
+                order_id=order_id,
+                user_id=user_id,
+                service=default_service,
+                appointment_date='2025-01-01',
+                appointment_time='09:00:00',
+                duration_minutes=30,
+                status='pending',
+                queue_status='not_started',
+                is_active=True
+            )
 
-        serializer = AppointmentDetailsSerializer(new_appointment)
-        return Response(serializer.data, status=201)
+            serializer = AppointmentDetailsSerializer(new_appointment)
+            return Response(serializer.data, status=201)
+        else:
+            return Response({"error": "Appointment not found"}, status=404)
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
@@ -172,13 +194,14 @@ def create_appointment(request):
                 "expected": "HH:MM (e.g., 14:30)"
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        appointment_date_obj = datetime.strptime(appointment_date, '%Y-%m-%d').date()
         order_id = generate_order_id(user_id)
         
         appointment = AppointmentDetails.objects.create(
             order_id=order_id,
             user=user,
             service=service,
-            appointment_date=appointment_date,
+            appointment_date=appointment_date_obj,
             appointment_time=time_obj,
             duration_minutes=service.average_duration or 30,
             status='pending',

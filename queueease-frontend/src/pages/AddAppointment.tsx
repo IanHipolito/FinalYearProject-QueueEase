@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Box, Typography, useTheme } from '@mui/material';
+import { API } from '../services/api';
 
 // Custom components
 import PageContainer from '../components/common/PageContainer';
@@ -15,20 +16,20 @@ const AddAppointment: React.FC = () => {
   const theme = useTheme();
 
   const handleSubmit = async (orderID: string) => {
-    const response = await fetch('http://localhost:8000/api/appointment/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: orderID, user_id: user?.id }),
-    });
-
-    const data = await response.json();
+    if (!user?.id) {
+      throw new Error('You must be logged in to add appointments');
+    }
+    
+    const response = await API.appointments.addAppointment(orderID, user.id);
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to add appointment.');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to add appointment.');
     }
-
+    
+    const data = await response.json();
     alert('Appointment added successfully!');
-    navigate('/appointments');
+    navigate(`/appointment/${data.order_id}`);
   };
 
   return (

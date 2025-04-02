@@ -784,7 +784,7 @@ const handleLeaveQueue = () => {
               color: "linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
             },
             {
-              title: "Book Appointment",
+              title: "View Appointments",
               description: "Schedule your visit to avoid the wait",
               icon: <CalendarTodayIcon sx={{ fontSize: 48, color: '#0d6efd' }} />,
               action: () => navigate('/appointments'),
