@@ -52,7 +52,7 @@ const AppointmentsList: React.FC = () => {
 
   const handleRemoveAppointment = async (orderId: string) => {
     try {
-      const response = await API.appointments.delete(orderId);
+      const response = await API.appointments.deleteAppointment(orderId);
       
       if (response.ok) {
         setAlert({

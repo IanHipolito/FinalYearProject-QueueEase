@@ -735,36 +735,6 @@ def service_queues(request, service_id):
         return Response({'error': str(e)}, status=500)
     
 @api_view(['GET'])
-def queue_status(request, queue_id):
-    try:
-        queue = get_object_or_404(Queue, id=queue_id)
-        
-        pending_queues = Queue.objects.filter(
-            service=queue.service,
-            status='pending',
-            is_active=True
-        ).order_by('sequence_number')
-        
-        if queue.status != 'pending' or queue not in pending_queues:
-            current_position = None
-        else:
-            current_position = list(pending_queues).index(queue) + 1
-        
-        average_duration = queue.service.average_duration or 15
-        estimated_wait = (current_position - 1) * average_duration if current_position else 0
-        
-        data = {
-            "currentPosition": current_position,
-            "estimatedWait": estimated_wait,
-            "serviceName": queue.service.name,
-            "queueNumber": queue.sequence_number,
-            "status": queue.status,
-        }
-        return Response(data)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-    
-@api_view(['GET'])
 def user_analytics(request, user_id):
     try:
         user = get_object_or_404(User, id=user_id)

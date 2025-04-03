@@ -40,8 +40,6 @@ export const API = {
             fetch(`${API_BASE}/admin/customers/?service_id=${serviceId}`),
         getQueueDetails: (serviceId: number) =>
             fetch(`${API_BASE}/service_queues/${serviceId}/`),
-        getAppointments: (serviceId: number) =>
-            fetch(`${API_BASE}/admin/appointments/?service_id=${serviceId}`),
         getAnalytics: (serviceId: number, period: string = 'month') =>
             fetch(`${API_BASE}/admin-get-analytics/?service_id=${serviceId}&period=${period}`, {
                 headers: {
@@ -50,37 +48,12 @@ export const API = {
                 },
                 method: 'GET'
             }),
-        createQueue: (serviceId: number, queueData: any) =>
-            fetch(`${API_BASE}/admin/queues/create/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    service_id: serviceId,
-                    ...queueData
-                }),
-            }),
-        updateQueue: (queueId: number, queueData: any) =>
-            fetch(`${API_BASE}/admin/queues/${queueId}/update/`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(queueData),
-            }),
         updateQueueStatus: (queueId: number, isActive: boolean) =>
             fetch(`${API_BASE}/update-queue-position/${queueId}/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_active: isActive }),
             }),
-        deleteQueue: (queueId: number) =>
-            fetch(`${API_BASE}/admin/queues/${queueId}/delete/`, {
-                method: 'DELETE',
-            }),
-        getQueueStatus: (queueId: number) =>
-            fetch(`${API_BASE}/admin/queues/${queueId}/status/`),
-        getAppointmentDetails: (appointmentId: string) =>
-            fetch(`${API_BASE}/admin/appointment/${appointmentId}/`),
-        getCustomerDetails: (customerId: number) =>
-            fetch(`${API_BASE}/admin/customer/${customerId}/`),
         createCustomer: (serviceId: number, data: any) =>
             fetch(`${API_BASE}/admin/customers/create/`, {
                 method: 'POST',
@@ -96,22 +69,10 @@ export const API = {
     services: {
         list: () => fetch(`${API_BASE}/list_services/`),
         listWithStatus: () => fetch(`${API_BASE}/list_services_with_status/`),
-        getAdminServices: (userId: number) => fetch(`${API_BASE}/admin_services/${userId}/`),
+        // getAdminServices: (userId: number) => fetch(`${API_BASE}/admin_services/${userId}/`),
         getServiceDetails: (serviceId: number) => fetch(`${API_BASE}/service/${serviceId}/`),
         getAvailableTimes: (serviceId: number, date: string) => 
             fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`),
-        updateService: (serviceId: number, data: any) =>
-            fetch(`${API_BASE}/service/${serviceId}/`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            }),
-        createService: (data: any) =>
-            fetch(`${API_BASE}/service/create/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            }),
     },
 
     // Queue management
@@ -154,7 +115,7 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order_id: orderID, user_id: userId }),
             }),
-        delete: (orderId: string) =>
+        deleteAppointment: (orderId: string) =>
             fetch(`${API_BASE}/appointment/delete/${orderId}/`, { method: 'DELETE' }),
         createAppointment: (data: any) =>
             fetch(`${API_BASE}/create-appointment/`, {
@@ -164,12 +125,6 @@ export const API = {
             }),
         cancelAppointment: (appointmentId: number) =>
             fetch(`${API_BASE}/appointment/${appointmentId}/cancel/`, { method: 'POST' }),
-        generateDemo: (userId: number) =>
-            fetch(`${API_BASE}/generate-demo/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId }),
-            }),
         checkAndUpdateAppointments: () =>
             fetch(`${API_BASE}/check-appointments/`),
         checkStatus: (orderId: string) =>
@@ -195,8 +150,6 @@ export const API = {
                     'Content-Type': 'application/json'
                 }
             }),
-        checkFeedbackEligibility: (userId: number, serviceId: number, orderId: number) =>
-            fetch(`${API_BASE}/feedback/check-eligibility/?user_id=${userId}&service_id=${serviceId}&order_id=${orderId}`),
     },
 
     // Helper methods for common operations
@@ -209,7 +162,7 @@ export const API = {
             );
           } catch (e) {
             if (e instanceof Error) {
-              throw e; // Rethrow if it's already a proper error
+              throw e;
             }
             throw new Error(`API Error: ${response.status} ${response.statusText}`);
           }

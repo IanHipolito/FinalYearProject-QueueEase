@@ -131,32 +131,3 @@ def get_eligible_services(request, user_id):
     except Exception as e:
         print(f"Error in get_eligible_services: {str(e)}")
         return Response({'error': str(e)}, status=500)
-    
-@api_view(['GET'])
-def check_feedback_eligibility(request):
-    try:
-        user_id = request.GET.get('user_id')
-        service_id = request.GET.get('service_id')
-        order_id = request.GET.get('order_id')
-        
-        if not all([user_id, service_id]):
-            return Response({'error': 'User ID and Service ID are required'}, status=400)
-        
-        queue = None
-        if order_id:
-            queue = Queue.objects.filter(id=order_id).first()
-            
-        existing_feedback = Feedback.objects.filter(
-            user_id=user_id,
-            service_id=service_id,
-            queue=queue
-        ).exists()
-        
-        return Response({
-            'eligible': not existing_feedback,
-            'reason': 'Feedback already submitted' if existing_feedback else None
-        })
-        
-    except Exception as e:
-        print(f"Error in check_feedback_eligibility: {str(e)}")
-        return Response({'error': str(e)}, status=500)

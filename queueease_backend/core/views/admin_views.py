@@ -19,34 +19,33 @@ from ..services.notifications import send_push_notification, send_queue_update_n
 
 logger = logging.getLogger(__name__)
 
-@api_view(['GET'])
-def admin_services(request, user_id):
-    """Get all services an admin can manage"""
-    try:
-        user = User.objects.get(id=user_id, user_type='admin')
-        service_admins = ServiceAdmin.objects.filter(user=user)
+# @api_view(['GET'])
+# def admin_services(request, user_id):
+#     try:
+#         user = User.objects.get(id=user_id, user_type='admin')
+#         service_admins = ServiceAdmin.objects.filter(user=user)
         
-        services = []
-        for sa in service_admins:
-            service_data = {
-                'id': sa.service.id,
-                'name': sa.service.name,
-                'description': sa.service.description,
-                'category': sa.service.category,
-                'is_owner': sa.is_owner,
-                'queue_length': Queue.objects.filter(
-                    service=sa.service, 
-                    status='pending',
-                    is_active=True
-                ).count()
-            }
-            services.append(service_data)
+#         services = []
+#         for sa in service_admins:
+#             service_data = {
+#                 'id': sa.service.id,
+#                 'name': sa.service.name,
+#                 'description': sa.service.description,
+#                 'category': sa.service.category,
+#                 'is_owner': sa.is_owner,
+#                 'queue_length': Queue.objects.filter(
+#                     service=sa.service, 
+#                     status='pending',
+#                     is_active=True
+#                 ).count()
+#             }
+#             services.append(service_data)
             
-        return Response(services)
-    except User.DoesNotExist:
-        return Response({'error': 'Admin not found'}, status=404)
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
+#         return Response(services)
+#     except User.DoesNotExist:
+#         return Response({'error': 'Admin not found'}, status=404)
+#     except Exception as e:
+#         return Response({'error': str(e)}, status=500)
     
 @api_view(['GET'])
 def admin_dashboard_data(request):

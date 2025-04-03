@@ -127,32 +127,6 @@ def generate_order_id(user_id):
     random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
     return f"{user_id}-{timestamp}-{random_str}"
 
-@api_view(['POST'])
-def generate_demo_appointments(request):
-    user_id = request.data.get('user_id')
-    if not user_id:
-        return Response({"error": "User ID is required."}, status=400)
-
-    demo_appointments = []
-    for i in range(5):
-        order_id = generate_order_id(user_id)
-        service, _ = Service.objects.get_or_create(name="General Checkup", defaults={"description": "General Checkup", "is_active": True})
-        appointment_date = datetime.now().date() + timedelta(days=1)
-        appointment_time = (datetime.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(minutes=15 * i)).time()
-        appointment = AppointmentDetails.objects.create(
-            order_id=order_id,
-            user_id=user_id,
-            service=service,
-            appointment_date=appointment_date,
-            appointment_time=appointment_time,
-            duration_minutes=15,
-            status='pending',
-            queue_status='not_started',
-            is_active=True
-        )
-        demo_appointments.append(appointment)
-    return Response({"message": "Demo appointments generated successfully."})
-
 @api_view(['DELETE'])
 def delete_appointment(request, order_id):
     appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
