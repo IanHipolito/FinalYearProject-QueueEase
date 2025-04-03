@@ -177,7 +177,6 @@ export const API = {
     feedback: {
         getCategories: () => 
             fetch(`${API_BASE}/feedback/categories/`),
-        
         submitFeedback: (feedbackData: any) =>
             fetch(`${API_BASE}/feedback/submit/`, {
                 method: 'POST',

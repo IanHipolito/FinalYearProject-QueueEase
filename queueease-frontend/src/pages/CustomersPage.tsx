@@ -2,30 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
 import {
-  Box,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  Skeleton,
-  Snackbar,
-  Alert,
-  TableRow,
-  TableCell,
+  Box, Typography, Grid, Card, CardContent, Skeleton,
+  Snackbar, Alert, TableRow, TableCell,
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
-
-// Import components
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import CustomerStatsCard from '../components/customers/CustomerStatsCard';
 import CustomerFilters from '../components/customers/CustomerFilters';
 import CustomerTable from '../components/customers/CustomerTable';
 import CustomerDetailsDialog from '../components/customers/CustomerDetailsDialog';
 import CreateCustomerDialog from '../components/customers/CreateCustomerDialog';
-
-// Import types
 import { Customer, CustomerStats, CustomerFormData } from '../types/customerTypes';
 
 const CustomersPage: React.FC = () => {

@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Box, Button, TextField, Typography, CircularProgress, createTheme
-} from "@mui/material";
+import { Box, Button, TextField, Typography, CircularProgress, createTheme } from "@mui/material";
 import { debounce } from "lodash";
 import { API } from '../services/api';
-// Import custom components
+import { ServiceAdmin } from '../types/serviceTypes';
 import FormContainer from '../components/common/FormContainer';
 import ServiceSelector from '../components/admin/ServiceSelector';
 import ServiceDetailDialog from '../components/admin/ServiceDetailDialog';
@@ -19,16 +17,6 @@ const theme = createTheme({
     }
   }
 });
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  category?: string;
-  location?: string;
-  business_hours?: string;
-  has_admin?: boolean;
-}
 
 const AdminSignup: React.FC = () => {
   const navigate = useNavigate();
@@ -44,15 +32,15 @@ const AdminSignup: React.FC = () => {
   });
   
   // Services state
-  const [services, setServices] = useState<Service[]>([]);
-  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<ServiceAdmin[]>([]);
+  const [filteredServices, setFilteredServices] = useState<ServiceAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceAdmin | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [serviceDetailView, setServiceDetailView] = useState<Service | null>(null);
+  const [serviceDetailView, setServiceDetailView] = useState<ServiceAdmin | null>(null);
   
   // Virtual scrolling settings
   const [visibleStart, setVisibleStart] = useState(0);
@@ -68,7 +56,7 @@ const AdminSignup: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setServices(data);
-          const availableServices = data.filter((service: Service) => !service.has_admin);
+          const availableServices = data.filter((service: ServiceAdmin) => !service.has_admin);
           setFilteredServices(availableServices);
         } else {
           setError("Failed to load services");
@@ -134,7 +122,7 @@ const AdminSignup: React.FC = () => {
   };
   
   // Service selection handler
-  const handleServiceSelect = (service: Service | null) => {
+  const handleServiceSelect = (service: ServiceAdmin | null) => {
     setSelectedService(service);
     if (service) {
       setFormData({ ...formData, serviceId: service.id.toString() });
@@ -144,7 +132,7 @@ const AdminSignup: React.FC = () => {
   };
 
   // View service details
-  const viewServiceDetails = (service: Service, e?: React.MouseEvent) => {
+  const viewServiceDetails = (service: ServiceAdmin, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setServiceDetailView(service);
     setDetailDialogOpen(true);

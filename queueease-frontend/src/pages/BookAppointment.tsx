@@ -10,15 +10,8 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-// Import custom components
 import PageHeader from '../components/common/PageHeader';
 import ActionButton from '../components/common/ActionButton';
-import InfoItem from '../components/common/InfoItem';
-import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
 
 const BookAppointment: React.FC = () => {
   const { serviceId } = useParams<{ serviceId: string }>();

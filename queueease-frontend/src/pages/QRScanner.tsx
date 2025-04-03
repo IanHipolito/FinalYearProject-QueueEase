@@ -2,16 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
 import { 
-  Box, 
-  Container, 
-  Typography, 
-  IconButton,
-  Paper,
-  Alert,
-  Backdrop,
-  CircularProgress,
-  Fade,
-  useTheme
+  Box, Container, Typography, IconButton, Paper, Alert,
+  Backdrop, CircularProgress, Fade, useTheme
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";

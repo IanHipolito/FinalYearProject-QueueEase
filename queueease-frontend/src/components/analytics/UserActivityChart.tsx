@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, useTheme, Typography, Tooltip, Paper, CircularProgress } from '@mui/material';
+import { Box, useTheme, Typography, Tooltip, Paper, CircularProgress, alpha } from '@mui/material';
 
 interface QueueEntry {
   id: number;
@@ -30,7 +30,6 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
   
   const prepareChartData = () => {
     setIsProcessing(true);
-    console.log(`Preparing chart data with ${queueHistory?.length || 0} queue entries`);
     
     // Determine time intervals based on timeRange
     let format: string;
@@ -66,7 +65,7 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
       for (let i = intervalCount - 1; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(now.getDate() - i);
-        labels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+        labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
       }
       
       // Fill in data
@@ -93,14 +92,14 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
         });
       }
     } else if (format === 'week') {
-      // Weekly format
+      // Weekly format with better labels
       for (let i = intervalCount - 1; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(now.getDate() - (i * 7));
         const endDate = new Date(date);
         endDate.setDate(date.getDate() + 6);
         
-        labels.push(`${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+        labels.push(`Week ${intervalCount - i}`);
       }
       
       // Fill in data
@@ -161,12 +160,6 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
       }
     }
     
-    console.log('Chart data prepared:', {
-      labels: labels.length,
-      completedData: completedData.reduce((sum, val) => sum + val, 0),
-      canceledData: canceledData.reduce((sum, val) => sum + val, 0)
-    });
-    
     setChartData({
       labels,
       completedData,
@@ -213,7 +206,7 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
                   position: 'relative',
                   zIndex: 1,
                   cursor: 'pointer',
-                  transition: 'transform 0.2s ease',
+                  transition: 'transform 0.3s ease',
                   transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                 }}
                 onMouseEnter={() => setHoveredBarIndex(index)}
@@ -223,13 +216,15 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
                 {chartData.completedData[index] > 0 && (
                   <Box sx={{ 
                     width: '70%', 
-                    height: `${Math.min(100, chartData.completedData[index] * 10)}%`,
+                    height: `${Math.min(100, Math.max(10, chartData.completedData[index] * 10))}%`,
                     minHeight: 5,
                     bgcolor: theme.palette.success.main,
                     borderRadius: '4px 4px 0 0',
                     mb: 0.5,
-                    transition: 'all 0.2s ease',
-                    opacity: isHovered ? 1 : 0.9
+                    transition: 'all 0.3s ease',
+                    opacity: isHovered ? 1 : 0.9,
+                    boxShadow: isHovered ? '0 5px 15px rgba(0,0,0,0.1)' : 'none',
+                    border: `1px solid ${alpha(theme.palette.success.main, 0.6)}`
                   }} />
                 )}
                 
@@ -237,12 +232,14 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
                 {chartData.canceledData[index] > 0 && (
                   <Box sx={{ 
                     width: '70%', 
-                    height: `${Math.min(100, chartData.canceledData[index] * 10)}%`,
+                    height: `${Math.min(100, Math.max(10, chartData.canceledData[index] * 10))}%`,
                     minHeight: 5,
                     bgcolor: theme.palette.error.main,
                     borderRadius: '4px 4px 0 0',
-                    transition: 'all 0.2s ease',
-                    opacity: isHovered ? 1 : 0.9
+                    transition: 'all 0.3s ease',
+                    opacity: isHovered ? 1 : 0.9,
+                    boxShadow: isHovered ? '0 5px 15px rgba(0,0,0,0.1)' : 'none',
+                    border: `1px solid ${alpha(theme.palette.error.main, 0.6)}`
                   }} />
                 )}
                 
@@ -278,8 +275,7 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
                     mt: 1,
                     fontSize: '0.7rem',
                     color: theme.palette.text.secondary,
-                    transform: timeRange === 'month' ? 'rotate(-20deg)' : 'rotate(-35deg)',
-                    transformOrigin: 'top center',
+                    transform: 'none',
                     whiteSpace: 'nowrap',
                     width: '100%',
                     textAlign: 'center',
@@ -288,9 +284,7 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
                     fontWeight: isHovered ? 'bold' : 'normal'
                   }}
                 >
-                  {timeRange === 'month' 
-                    ? label.split(' - ')[0]
-                    : label}
+                  {label}
                 </Typography>
               </Box>
             );
@@ -346,11 +340,15 @@ const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, tim
             justifyContent: 'center',
             backgroundColor: 'rgba(255, 255, 255, 0.7)',
             zIndex: 2,
-            borderRadius: 1
+            borderRadius: 1,
+            flexDirection: 'column'
           }}
         >
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
             No activity data available for the selected time period
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Try changing the time period or check back later
           </Typography>
         </Box>
       )}

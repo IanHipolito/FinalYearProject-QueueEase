@@ -2,11 +2,7 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
-import {
-  Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button
-} from '@mui/material';
-
-// Map and service components
+import { Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button } from '@mui/material';
 import ServiceMap from '../components/map/ServiceMap';
 import ServiceCard from '../components/serviceList/ServiceCard';
 import BottomSheet from '../components/serviceList/BottomSheet';
@@ -14,15 +10,13 @@ import ServiceDetailPanel from '../components/serviceList/ServiceDetailPanel';
 import DistanceFilter from '../components/map/DistanceFilter';
 import SearchBar from '../components/map/SearchBar';
 import CategoryFilter from '../components/map/CategoryFilter';
-import { CATEGORIES, generateRandomDublinCoordinates } from '../utils/mapUtils';
+import { generateRandomDublinCoordinates } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
 
 const MapProximity: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const bottomSheetRef = useRef<HTMLDivElement>(null);
-  
-  // State management
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

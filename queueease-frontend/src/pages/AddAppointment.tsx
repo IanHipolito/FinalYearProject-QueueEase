@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Box, Typography, useTheme } from '@mui/material';
 import { API } from '../services/api';
-
-// Custom components
 import PageContainer from '../components/common/PageContainer';
 import PageHeader from '../components/common/PageHeader';
 import StyledCard from '../components/common/StyledCard';

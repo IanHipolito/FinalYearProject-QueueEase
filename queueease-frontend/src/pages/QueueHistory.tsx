@@ -4,13 +4,9 @@ import { useAuth } from './AuthContext';
 import { Box, Container, Typography, Paper, IconButton, Tab, Tabs, CircularProgress, Alert, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { API } from '../services/api';
-
-// Import custom components
 import HistoryFilterBar from '../components/history/HistoryFilterBar';
 import AdvancedFilters from '../components/history/AdvancedFilters';
 import HistoryList from '../components/history/HistoryList';
-
-// Import types
 import { HistoryEntry } from '../types/historyTypes';
 
 const QueueHistory: React.FC = () => {

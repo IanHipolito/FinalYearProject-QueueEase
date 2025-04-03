@@ -9,8 +9,6 @@ import LatestOrdersList from '../components/dashboard/LatestOrdersList';
 import CustomerTrendsChart from '../components/dashboard/CustomerTrendsChart';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import { Order, DashboardData } from '../types/dashboardTypes';
-
-// Icons
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';

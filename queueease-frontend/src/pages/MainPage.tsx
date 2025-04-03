@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Box } from '@mui/material';
-
-// Import components
 import Header from '../components/landing/Header';
 import HeroSection from '../components/landing/HeroSection';
 import FeaturesSection from '../components/landing/FeaturesSection';

@@ -3,114 +3,59 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
 import { useAuth } from './AuthContext';
 import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
-  Alert,
-  CircularProgress,
-  Divider,
-  Tooltip
+  Box, Container, Typography, Grid, Paper, FormControl,
+  InputLabel, Select, MenuItem, Button, Alert,
+  CircularProgress, Tabs, Tab, useTheme, alpha
 } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EventIcon from '@mui/icons-material/Event';
-import DateRangeIcon from '@mui/icons-material/DateRange';
+import FeedbackIcon from '@mui/icons-material/Feedback';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InsightsIcon from '@mui/icons-material/Insights';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PageHeader from '../components/common/PageHeader';
 import StyledCard from '../components/common/StyledCard';
-
-// Analytics components
 import UserActivityChart from '../components/analytics/UserActivityChart';
 import WaitTimeStats from '../components/analytics/WaitTimeStats';
 import FrequentServicesChart from '../components/analytics/FrequentServicesChart';
 import AnalyticsSummaryCard from '../components/analytics/AnalyticsSummaryCard';
-
-interface AnalyticsHistoryEntry {
-  id: number;
-  date_created: string;
-  status: string;
-  waiting_time?: string | number;
-  service_name: string;
-  service_type?: 'immediate' | 'appointment';
-  category?: string;
-}
-
-// interface NormalizedQueueItem extends AnalyticsHistoryEntry {
-// }
-
-interface ServiceVisit {
-  name: string;
-  count: number;
-}
-
-interface WaitTimeStatsEntry {
-  day: string;
-  avgWait: number;
-  count: number;
-}
-
-interface WaitTimeByHourEntry {
-  hour: number;
-  avgWait: number;
-  count: number;
-}
-
-interface BusyTimeEntry {
-  dayName: string;
-  hour: number;
-  count: number;
-}
-
-interface AnalyticsData {
-  totalQueues: number;
-  completedQueues: number;
-  canceledQueues: number;
-  averageWaitTime: number;
-  queueHistory: AnalyticsHistoryEntry[];
-  mostVisitedServices: ServiceVisit[];
-  waitTimeByDay: WaitTimeStatsEntry[];
-  waitTimeByHour: WaitTimeByHourEntry[];
-  busyTimes: BusyTimeEntry[];
-}
-
-interface AnalyticsApiResponse {
-  totalQueues?: number;
-  completedQueues?: number;
-  canceledQueues?: number;
-  averageWaitTime?: number;
-  queueHistory?: AnalyticsHistoryEntry[];
-  mostVisitedServices?: ServiceVisit[];
-  waitTimeByDay?: WaitTimeStatsEntry[];
-  waitTimeByHour?: WaitTimeByHourEntry[];
-  busyTimes?: BusyTimeEntry[];
-}
+import FeedbackAnalyticsSection from '../components/analytics/FeedbackAnalyticsSection';
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
+import { 
+  AnalyticsHistoryEntry, 
+  ServiceVisit,
+  WaitTimeStatsEntry,
+  WaitTimeByHourEntry,
+  BusyTimeEntry,
+  UserFeedback,
+  AnalyticsData,
+  AnalyticsApiResponse 
+} from '../types/userAnalyticsTypes';
 
 const UserAnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [timeRange, setTimeRange] = useState<"week" | "month" | "year">('month');
-  const [debugMode, setDebugMode] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     totalQueues: 0,
     completedQueues: 0,
     canceledQueues: 0,
+    appointmentCount: 0,
     averageWaitTime: 0,
     queueHistory: [],
     mostVisitedServices: [],
     waitTimeByDay: [],
     waitTimeByHour: [],
-    busyTimes: []
+    busyTimes: [],
+    averageRating: 0
   });
+  const [feedbackData, setFeedbackData] = useState<UserFeedback[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -119,53 +64,25 @@ const UserAnalyticsPage: React.FC = () => {
     }
     
     fetchAnalyticsData();
-  }, [user, timeRange]);
+    fetchFeedbackData();
+  }, [user, timeRange, refreshKey]);
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
     setError('');
     
     try {
-      console.log('Fetching analytics data for time range:', timeRange);
+      // Fetch analytics data
       const analyticsRes = await API.queues.getUserAnalytics(user!.id, timeRange);
       
       if (!analyticsRes.ok) {
         console.log('Analytics API failed, falling back to raw queue data');
-        // Fall back to processing raw queue data if the dedicated endpoint fails
-        const historyRes = await API.queues.getUserQueues(user!.id);
-        
-        if (!historyRes.ok) {
-          throw new Error('Failed to fetch queue history');
-        }
-        
-        const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
-        console.log('Raw queue history data:', historyData);
-        
-        // Ensure proper status field values
-        const normalizedData = historyData.map((item: AnalyticsHistoryEntry) => ({
-          ...item,
-          // Normalize status values for consistency
-          status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
-        }));
-        
-        const processedData = processAnalyticsData(normalizedData, timeRange);
-        setAnalyticsData({
-          ...processedData,
-          queueHistory: normalizedData
-        });
+        // Fall back to processing raw queue data
+        await fetchRawQueueData();
       } else {
         // Use the data from the analytics endpoint
         const responseData = await analyticsRes.json() as AnalyticsApiResponse;
-        console.log('Analytics API response:', responseData);
         
-        // Log the API response structure to debug missing queue history
-        console.log('API response data structure:', {
-          responseKeys: Object.keys(responseData),
-          hasQueueHistory: responseData.hasOwnProperty('queueHistory'),
-          queueHistoryType: responseData.queueHistory ? typeof responseData.queueHistory : 'not present',
-          queueHistoryLength: responseData.queueHistory ? responseData.queueHistory.length : 0
-        });
-
         // Handle queue history data - with fallback if missing
         let normalizedQueueHistory: AnalyticsHistoryEntry[] = [];
 
@@ -175,46 +92,40 @@ const UserAnalyticsPage: React.FC = () => {
             ...item,
             status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
           }));
-          console.log('Using queue history from API response');
         } 
         else {
-          console.log('Queue history not provided in API response, fetching raw queue data');
-          try {
-            const historyRes = await API.queues.getUserQueues(user!.id);
-            
-            if (historyRes.ok) {
-              const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
-              normalizedQueueHistory = historyData.map((item: AnalyticsHistoryEntry) => ({
-                ...item,
-                status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
-              }));
-              console.log(`Fetched ${normalizedQueueHistory.length} queue history entries directly`);
-            } else {
-              console.error('Failed to fetch queue history');
-            }
-          } catch (err) {
-            console.error('Error fetching queue history:', err);
+          // Fetch raw queue data if not provided
+          const historyRes = await API.queues.getUserQueues(user!.id);
+          
+          if (historyRes.ok) {
+            const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
+            normalizedQueueHistory = historyData.map((item: AnalyticsHistoryEntry) => ({
+              ...item,
+              status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
+            }));
           }
+        }
+
+        // Fetch appointments data
+        const appointmentsRes = await API.appointments.getAll(user!.id);
+        let appointmentCount = 0;
+        
+        if (appointmentsRes.ok) {
+          const appointmentsData = await appointmentsRes.json();
+          appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
         }
         
         setAnalyticsData({
           totalQueues: responseData.totalQueues || 0,
           completedQueues: responseData.completedQueues || 0,
           canceledQueues: responseData.canceledQueues || 0,
+          appointmentCount,
           averageWaitTime: responseData.averageWaitTime || 0,
           queueHistory: normalizedQueueHistory,
           mostVisitedServices: responseData.mostVisitedServices || [],
-          waitTimeByDay: responseData.waitTimeByDay || [],
+          waitTimeByDay: ensureAllDaysPresent(responseData.waitTimeByDay || []),
           waitTimeByHour: responseData.waitTimeByHour || [],
           busyTimes: responseData.busyTimes || []
-        });
-        
-        console.log('Final analytics data being set:', {
-          totalCount: responseData.totalQueues,
-          queueHistoryCount: normalizedQueueHistory?.length || 'N/A',
-          hasCompletedItems: normalizedQueueHistory?.some(q => q.status === 'completed') || false,
-          hasCanceledItems: normalizedQueueHistory?.some(q => q.status === 'canceled') || false,
-          timeRange
         });
       }
     } catch (err) {
@@ -226,6 +137,7 @@ const UserAnalyticsPage: React.FC = () => {
         totalQueues: 0,
         completedQueues: 0,
         canceledQueues: 0,
+        appointmentCount: 0,
         averageWaitTime: 0,
         queueHistory: [],
         mostVisitedServices: [],
@@ -235,6 +147,70 @@ const UserAnalyticsPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeedbackData = async () => {
+    if (!user) return;
+    
+    try {
+      const feedbackRes = await API.feedback.getUserFeedbackHistory(user.id);
+      
+      if (feedbackRes.ok) {
+        const feedback = await feedbackRes.json();
+        setFeedbackData(feedback);
+        
+        // Calculate average rating if we have feedback data
+        if (Array.isArray(feedback) && feedback.length > 0) {
+          const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
+          const avgRating = Math.round((totalRating / feedback.length) * 10) / 10;
+          
+          setAnalyticsData(prev => ({
+            ...prev,
+            averageRating: avgRating,
+            userFeedback: feedback
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching feedback data:", err);
+    }
+  };
+
+  const fetchRawQueueData = async () => {
+    try {
+      const historyRes = await API.queues.getUserQueues(user!.id);
+      
+      if (!historyRes.ok) {
+        throw new Error('Failed to fetch queue history');
+      }
+      
+      const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
+      
+      // Ensure proper status field values
+      const normalizedData = historyData.map((item: AnalyticsHistoryEntry) => ({
+        ...item,
+        status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
+      }));
+      
+      // Fetch appointments data
+      const appointmentsRes = await API.appointments.getAll(user!.id);
+      let appointmentCount = 0;
+      
+      if (appointmentsRes.ok) {
+        const appointmentsData = await appointmentsRes.json();
+        appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
+      }
+      
+      const processedData = processAnalyticsData(normalizedData, timeRange);
+      setAnalyticsData({
+        ...processedData,
+        appointmentCount,
+        queueHistory: normalizedData
+      });
+    } catch (error) {
+      console.error("Error in fetchRawQueueData:", error);
+      throw error;
     }
   };
 
@@ -299,7 +275,7 @@ const UserAnalyticsPage: React.FC = () => {
       .slice(0, 5);
         
     // Calculate wait time by day of week and hour of day
-    const waitTimeByDay: WaitTimeStatsEntry[] = calculateWaitTimeByDay(filteredHistory);
+    const waitTimeByDay: WaitTimeStatsEntry[] = ensureAllDaysPresent(calculateWaitTimeByDay(filteredHistory));
     const waitTimeByHour: WaitTimeByHourEntry[] = calculateWaitTimeByHour(filteredHistory);
     
     // Calculate busy times
@@ -309,6 +285,7 @@ const UserAnalyticsPage: React.FC = () => {
       totalQueues: filteredHistory.length,
       completedQueues,
       canceledQueues,
+      appointmentCount: 0, // Will be updated elsewhere
       averageWaitTime,
       queueHistory: filteredHistory,
       mostVisitedServices,
@@ -316,6 +293,27 @@ const UserAnalyticsPage: React.FC = () => {
       waitTimeByHour,
       busyTimes
     };
+  };
+
+  // Ensure all days of the week are present in wait time data
+  const ensureAllDaysPresent = (dayStats: WaitTimeStatsEntry[]): WaitTimeStatsEntry[] => {
+    const days: string[] = [
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    ];
+    
+    const dayMap: {[key: string]: WaitTimeStatsEntry} = {};
+    
+    // Map existing data
+    dayStats.forEach(stat => {
+      dayMap[stat.day] = stat;
+    });
+    
+    // Ensure all days exist
+    const completeStats = days.map(day => {
+      return dayMap[day] || { day, avgWait: 0, count: 0 };
+    });
+    
+    return completeStats;
   };
 
   const calculateWaitTimeByDay = (
@@ -436,49 +434,11 @@ const UserAnalyticsPage: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    fetchAnalyticsData();
+    setRefreshKey(prev => prev + 1);
   };
 
-  // Debug Panel component
-  const DebugPanel = () => {
-    if (!debugMode) return null;
-    
-    return (
-      <Paper sx={{ p: 2, mb: 2, bgcolor: '#f5f5f5', fontSize: '12px', maxHeight: '200px', overflow: 'auto' }}>
-        <Typography variant="subtitle2">Debug Information</Typography>
-        <Box component="pre" sx={{ fontSize: '11px' }}>
-          {JSON.stringify({
-            timeRange,
-            queueHistory: analyticsData.queueHistory?.map(q => ({
-              id: q.id,
-              status: q.status,
-              date: q.date_created?.substring(0, 10),
-            })).slice(0, 5),
-            counts: {
-              total: analyticsData.totalQueues,
-              completed: analyticsData.completedQueues,
-              canceled: analyticsData.canceledQueues,
-            },
-            queueHistoryLength: analyticsData.queueHistory?.length || 0
-          }, null, 2)}
-        </Box>
-        <Button 
-          size="small" 
-          variant="outlined" 
-          onClick={() => console.log('Full analytics data:', analyticsData)}
-          sx={{ mr: 1 }}
-        >
-          Log Data
-        </Button>
-        <Button 
-          size="small" 
-          variant="outlined" 
-          onClick={() => setDebugMode(false)}
-        >
-          Close
-        </Button>
-      </Paper>
-    );
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
   };
 
   if (loading) {
@@ -490,7 +450,7 @@ const UserAnalyticsPage: React.FC = () => {
         height: '100vh',
         flexDirection: 'column',
         gap: 2,
-        bgcolor: '#f8fafd'
+        bgcolor: alpha(theme.palette.primary.main, 0.03)
       }}>
         <CircularProgress color="primary" size={50} />
         <Typography variant="subtitle1" color="text.secondary">
@@ -501,7 +461,12 @@ const UserAnalyticsPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f8fafd', py: 4 }}>
+    <Box sx={{ 
+      minHeight: '100vh', 
+      bgcolor: alpha(theme.palette.primary.main, 0.03), 
+      py: 4,
+      backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,1))' 
+    }}>
       <Container maxWidth="lg">
         <PageHeader title="Your Queue Analytics" backUrl="/usermainpage" />
         
@@ -527,7 +492,12 @@ const UserAnalyticsPage: React.FC = () => {
             bgcolor: 'white',
             p: 2,
             borderRadius: 3,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.06)'
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            transition: 'transform 0.2s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+            }
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -546,18 +516,6 @@ const UserAnalyticsPage: React.FC = () => {
                 <MenuItem value="year">Last Year</MenuItem>
               </Select>
             </FormControl>
-            
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setDebugMode(!debugMode)}
-              sx={{ 
-                ml: 2,
-                borderRadius: 2
-              }}
-            >
-              {debugMode ? 'Hide Debug' : 'Debug'}
-            </Button>
           </Box>
           
           <Button
@@ -566,19 +524,20 @@ const UserAnalyticsPage: React.FC = () => {
             onClick={handleRefresh}
             sx={{ 
               borderRadius: 2,
-              bgcolor: '#6f42c1',
+              bgcolor: theme.palette.primary.main,
+              px: 3,
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
               '&:hover': {
-                bgcolor: '#5e35b1',
-              },
-              px: 3
+                bgcolor: theme.palette.primary.dark,
+                transform: 'translateY(-2px)',
+                boxShadow: '0 6px 10px rgba(0,0,0,0.15)',
+              }
             }}
           >
             Refresh
           </Button>
         </Box>
-        
-        {/* Debug Panel */}
-        <DebugPanel />
         
         {/* Summary Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -600,10 +559,10 @@ const UserAnalyticsPage: React.FC = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <AnalyticsSummaryCard
-              title="Canceled"
-              value={analyticsData.canceledQueues}
-              icon={<DateRangeIcon />}
-              color="linear-gradient(135deg, #dc3545 0%, #e35d6a 100%)"
+              title="Appointments"
+              value={analyticsData.appointmentCount}
+              icon={<CalendarMonthIcon />}
+              color="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
@@ -611,136 +570,329 @@ const UserAnalyticsPage: React.FC = () => {
               title="Avg. Wait Time"
               value={`${analyticsData.averageWaitTime} min`}
               icon={<AccessTimeIcon />}
-              color="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
+              color="linear-gradient(135deg, #fd7e14 0%, #ffb34d 100%)"
             />
           </Grid>
         </Grid>
         
-        {/* Charts */}
-        <Grid container spacing={3}>
-          {/* Activity Chart - Full width */}
-          <Grid item xs={12}>
-            <StyledCard sx={{ 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
-              borderRadius: 4,
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-5px)',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-              }
-            }}>
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  <InsightsIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#6f42c1' }} />
-                  Your Queue Activity
-                </Typography>
-                <UserActivityChart queueHistory={analyticsData.queueHistory} timeRange={timeRange} />
-              </Box>
-            </StyledCard>
-          </Grid>
-          
-          {/* Wait Time Stats and Most Visited Services - Side by side */}
-          <Grid item xs={12} md={6}>
-            <StyledCard sx={{ 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
-              borderRadius: 4,
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-5px)',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-              }
-            }}>
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Wait Time by Day of Week
-                </Typography>
-                <WaitTimeStats data={analyticsData.waitTimeByDay} type="day" />
-              </Box>
-            </StyledCard>
-          </Grid>
-          
-          {/* Most Used Services - Moved beside Wait Time */}
-          <Grid item xs={12} md={6}>
-            <StyledCard sx={{ 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
-              borderRadius: 4,
-              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-5px)',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-              },
-              height: '100%'
-            }}>
-              <Box sx={{ p: 3 }}>
-                <Typography variant="h6" fontWeight={600} gutterBottom>
-                  Most Visited Services
-                </Typography>
-                <FrequentServicesChart services={analyticsData.mostVisitedServices} />
-              </Box>
-            </StyledCard>
-          </Grid>
-        </Grid>
-        
-        {/* History Summary */}
-        <Box sx={{ mt: 3 }}>
-          <Paper 
-            elevation={0} 
+        {/* Tabs Navigation */}
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            borderRadius: 3, 
+            mb: 3, 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+            overflow: 'hidden',
+            transition: 'transform 0.2s ease',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+            }
+          }}
+        >
+          <Tabs 
+            value={activeTab} 
+            onChange={handleTabChange} 
             sx={{ 
-              p: 3, 
-              borderRadius: 3,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.06)'
+              borderBottom: 1, 
+              borderColor: 'divider',
+              '& .MuiTabs-indicator': {
+                backgroundColor: theme.palette.primary.main,
+                height: 3
+              },
+              '& .MuiTab-root': {
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  color: theme.palette.primary.main,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                }
+              }
             }}
           >
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Summary
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={6} md={3}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Total Entries
+            <Tab 
+              label="Activity" 
+              icon={<InsightsIcon />} 
+              iconPosition="start"
+            />
+            <Tab 
+              label="Wait Times" 
+              icon={<AccessTimeIcon />} 
+              iconPosition="start"
+            />
+            <Tab 
+              label="Feedback" 
+              icon={<FeedbackIcon />} 
+              iconPosition="start"
+            />
+          </Tabs>
+        </Paper>
+        
+        {/* Activity Tab Content */}
+        {activeTab === 0 && (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <StyledCard sx={{ 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                borderRadius: 4,
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                }
+              }}>
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    <InsightsIcon sx={{ mr: 1, verticalAlign: 'middle', color: theme.palette.primary.main }} />
+                    Your Queue Activity
                   </Typography>
-                  <Typography variant="h5" fontWeight={700}>
-                    {analyticsData.totalQueues}
-                  </Typography>
+                  <UserActivityChart queueHistory={analyticsData.queueHistory} timeRange={timeRange} />
                 </Box>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Queue Entries
-                  </Typography>
-                  <Typography variant="h5" fontWeight={700}>
-                    {analyticsData.totalQueues - 
-                     (analyticsData.queueHistory.filter(q => 
-                       q.service_type === 'appointment').length)}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Appointments
-                  </Typography>
-                  <Typography variant="h5" fontWeight={700}>
-                    {analyticsData.queueHistory.filter(q => 
-                      q.service_type === 'appointment').length}
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Completed
-                  </Typography>
-                  <Typography variant="h5" fontWeight={700}>
-                    {analyticsData.completedQueues}
-                  </Typography>
-                </Box>
-              </Grid>
+              </StyledCard>
             </Grid>
-          </Paper>
-        </Box>
+            
+            <Grid item xs={12} md={6}>
+              <StyledCard sx={{ 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                borderRadius: 4,
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                },
+                height: '100%'
+              }}>
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Most Visited Services
+                  </Typography>
+                  <FrequentServicesChart services={analyticsData.mostVisitedServices} />
+                </Box>
+              </StyledCard>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 3, 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+                  height: '100%',
+                  transition: 'transform 0.3s ease',
+                  '&:hover': {
+                    transform: 'translateY(-5px)',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                  }
+                }}
+              >
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Summary
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Entries
+                      </Typography>
+                      <Typography variant="h5" fontWeight={700}>
+                        {analyticsData.totalQueues}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Queue Entries
+                      </Typography>
+                      <Typography variant="h5" fontWeight={700}>
+                        {analyticsData.totalQueues - analyticsData.appointmentCount}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Appointments
+                      </Typography>
+                      <Typography variant="h5" fontWeight={700}>
+                        {analyticsData.appointmentCount}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Completed
+                      </Typography>
+                      <Typography variant="h5" fontWeight={700}>
+                        {analyticsData.completedQueues}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
+        
+        {/* Wait Times Tab Content */}
+        {activeTab === 1 && (
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <StyledCard sx={{ 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                borderRadius: 4,
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                }
+              }}>
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Wait Time by Day of Week
+                  </Typography>
+                  <WaitTimeStats data={analyticsData.waitTimeByDay} type="day" />
+                </Box>
+              </StyledCard>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <StyledCard sx={{ 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                borderRadius: 4,
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                }
+              }}>
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Wait Time by Hour of Day
+                  </Typography>
+                  <WaitTimeStats data={analyticsData.waitTimeByHour} type="hour" />
+                </Box>
+              </StyledCard>
+            </Grid>
+
+            <Grid item xs={12}>
+              <StyledCard sx={{ 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                borderRadius: 4,
+                transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                '&:hover': {
+                  transform: 'translateY(-5px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+                }
+              }}>
+                <Box sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Wait Time Trends
+                  </Typography>
+                  <Box sx={{ height: 300, mt: 2 }}>
+                    {analyticsData.waitTimeByDay.some(day => day.avgWait > 0) ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={analyticsData.waitTimeByDay}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={alpha('#000', 0.1)} />
+                          <XAxis 
+                            dataKey="day" 
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                            tickFormatter={(value) => value.substring(0, 3)}
+                          />
+                          <YAxis 
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                            label={{ 
+                              value: 'Minutes', 
+                              angle: -90, 
+                              position: 'insideLeft',
+                              fill: theme.palette.text.secondary,
+                              fontSize: 12
+                            }}
+                          />
+                          <Tooltip
+                            formatter={(value, name) => {
+                              if (name === "avgWait") return [`${value} min`, 'Avg. Wait Time'];
+                              if (name === "count") return [value, 'Visit Count'];
+                              return [value, name];
+                            }}
+                            labelFormatter={(label) => `${label}`}
+                            contentStyle={{ 
+                              borderRadius: 8,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                              border: 'none'
+                            }}
+                          />
+                          <Legend verticalAlign="top" height={36} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="avgWait" 
+                            name="Avg. Wait Time" 
+                            stroke={theme.palette.primary.main} 
+                            strokeWidth={3}
+                            dot={{ 
+                              fill: theme.palette.primary.main, 
+                              strokeWidth: 2, 
+                              r: 5,
+                              strokeDasharray: '' 
+                            }}
+                            activeDot={{ r: 7, strokeWidth: 0 }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="count" 
+                            name="Visit Count" 
+                            stroke={theme.palette.secondary.main} 
+                            strokeWidth={2}
+                            dot={{ 
+                              fill: theme.palette.secondary.main,  
+                              r: 4,
+                              strokeDasharray: '' 
+                            }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        height: '100%',
+                        flexDirection: 'column'
+                      }}>
+                        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+                          No wait time data available
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Try changing the time period or check back later
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              </StyledCard>
+            </Grid>
+          </Grid>
+        )}
+        
+        {/* Feedback Tab Content */}
+        {activeTab === 2 && (
+          <FeedbackAnalyticsSection 
+            userFeedback={analyticsData.userFeedback || []} 
+            averageRating={analyticsData.averageRating || 0}
+            userId={user!.id}
+          />
+        )}
       </Container>
     </Box>
   );

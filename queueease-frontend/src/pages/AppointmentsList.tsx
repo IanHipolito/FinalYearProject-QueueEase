@@ -2,18 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
-import {
-  Box,
-  Grid,
-  Alert,
-  Snackbar,
-  Typography,
-  Stack,
-  useTheme
-} from '@mui/material';
+import { Grid, Alert, Snackbar, Typography, Stack, useTheme } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-
-// Import components
 import PageContainer from '../components/common/PageContainer';
 import PageHeader from '../components/common/PageHeader';
 import StyledCard from '../components/common/StyledCard';
@@ -21,14 +11,7 @@ import StyledButton from '../components/common/StyledButton';
 import AppointmentCard from '../components/appointments/AppointmentCard';
 import { formatDate } from '../utils/formatters';
 import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
-
-interface Appointment {
-  order_id: string;
-  appointment_date: string;
-  appointment_time: string;
-  service_name: string;
-  appointment_title: string;
-}
+import { Appointment } from 'types/appointmentTypes';
 
 const AppointmentsList: React.FC = () => {
   const { user } = useAuth();

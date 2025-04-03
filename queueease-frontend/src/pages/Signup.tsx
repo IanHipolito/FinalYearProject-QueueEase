@@ -1,23 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
-  Button,
-  Container,
-  Divider,
-  Paper,
-  TextField,
-  Typography,
-  ThemeProvider,
-  createTheme,
-  CssBaseline,
-  useMediaQuery,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  InputAdornment,
-  IconButton
+  Box, Button, Container, Divider, Paper, TextField,
+  Typography, ThemeProvider, createTheme, CssBaseline,
+  useMediaQuery, FormControl, Select, MenuItem, InputAdornment
 } from "@mui/material";
 import { API } from '../services/api';
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';

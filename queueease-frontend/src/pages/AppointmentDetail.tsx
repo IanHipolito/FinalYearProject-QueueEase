@@ -1,24 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
-import {
-  Box,
-  Container,
-  Typography,
-  Divider,
-  CardContent
-} from '@mui/material';
+import { Box, Container, Typography, Divider, CardContent } from '@mui/material';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-
-// Custom components
 import DetailCard from '../components/common/DetailCard';
 import AppointmentInfoGrid from '../components/appointments/AppointmentInfoGrid';
 import TimeProgress from '../components/common/TimeProgress';
 import ActionButton from '../components/common/ActionButton';
 import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
-
-// Utils
 import { formatDate } from '../utils/formatters';
 
 interface AppointmentDetail {

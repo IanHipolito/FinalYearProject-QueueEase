@@ -1,18 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Grid,
-  Typography,
-  TextField,
-  Button,
-  Card,
-  CardContent,
-  Divider,
-  IconButton,
-  InputAdornment,
-  Switch,
-  FormControlLabel,
-  Avatar
+  Box, Grid, Typography, TextField, Button, Card, CardContent,
+  Divider, IconButton, InputAdornment, Switch, FormControlLabel, Avatar
 } from '@mui/material';
 import SecurityIcon from '@mui/icons-material/Security';
 import BusinessIcon from '@mui/icons-material/Business';

@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Box, Container, Typography, Paper, CircularProgress, useTheme, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { Box, Container, Typography, Paper, CircularProgress, ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { keyframes } from '@emotion/react';
 import { API } from '../services/api';
-
-interface QRCodeScreenProps {
-  queueId: number;
-}
+import { QRCodeScreenProps } from "types/queueTypes";
 
 const theme = createTheme({
   palette: {

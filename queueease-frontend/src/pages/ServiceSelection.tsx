@@ -3,26 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
 import { useAuth } from "./AuthContext";
 import {
-  Box,
-  Container,
-  Typography,
-  TextField,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
-  Button,
-  Chip,
-  InputAdornment,
-  Alert,
-  CircularProgress,
-  Divider,
-  Paper,
-  Pagination,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel
+  Box, Container, Typography, TextField, Grid, Card, CardContent, CardActions, 
+  Button, Chip, InputAdornment, Alert, CircularProgress, Divider, Paper, Pagination,
+  MenuItem, Select, FormControl, InputLabel
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
@@ -40,10 +23,10 @@ interface Service {
   requires_sequence?: boolean;
 }
 
-interface QueueSequenceItem {
-  serviceId: number;
-  position: number;
-}
+// interface QueueSequenceItem {
+//   serviceId: number;
+//   position: number;
+// }
 
 const ServiceSelection: React.FC = () => {
   const navigate = useNavigate();

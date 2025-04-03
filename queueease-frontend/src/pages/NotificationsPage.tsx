@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Card,
-  CardContent,
-  Switch,
-  FormControlLabel,
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  IconButton,
-  Chip,
-  FormHelperText
+  Box, Grid, Typography, TextField, Button, Card, CardContent, Switch,
+  FormControlLabel, Divider, FormControl, InputLabel, Select,
+  MenuItem, IconButton, Chip, FormHelperText
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -33,20 +18,14 @@ const NotificationsPage: React.FC = () => {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [notificationType, setNotificationType] = useState<string>('sms');
 
-  // Optionally, fetch current settings from your backend on mount:
   useEffect(() => {
-    // fetch('/api/notification-settings')...
-    // For demo, we'll use default values.
     setFrequency(5);
     setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
     setEnabled(true);
   }, []);
 
   const handleSave = () => {
-    // Save the settings via your backend API
     console.log({ frequency, messageTemplate, enabled, notificationType });
-    // Example:
-    // fetch('/api/notification-settings', { method: 'POST', body: JSON.stringify({frequency, messageTemplate, enabled}), headers: { 'Content-Type': 'application/json' } })
   };
 
   return (

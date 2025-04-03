@@ -9,16 +9,7 @@ import StorefrontIcon from '@mui/icons-material/Storefront';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { keyframes } from '@emotion/react';
 import { API } from '../services/api';
-
-interface QueueData {
-  queue_id: number;
-  service_name: string;
-  current_position: number | null;
-  status: string;
-  expected_ready_time: string | null;
-  total_wait?: number;
-  time_created?: string;
-}
+import { QueueData } from 'types/queueTypes';
 
 const theme = createTheme({
   palette: {

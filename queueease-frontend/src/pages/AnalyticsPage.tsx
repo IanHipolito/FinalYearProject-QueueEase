@@ -3,12 +3,7 @@ import { useAuth } from './AuthContext';
 import { API } from '../services/api';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
-import {
-  Box,
-  Grid,
-  Typography,
-  SelectChangeEvent
-} from '@mui/material';
+import { Box, Grid, Typography, SelectChangeEvent } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';

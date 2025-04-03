@@ -1,36 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { API } from '../services/api';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  user_type?: string;
-  is_admin?: boolean;
-}
-
-interface ManagedService {
-  id: number;
-  name: string;
-  is_owner: boolean;
-  service_type: 'immediate' | 'appointment';
-  location?: string;
-  business_hours?: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  adminLogin: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  loading: boolean;
-  isAdmin: boolean;
-  managedServices: ManagedService[];
-  currentService: ManagedService | null;
-  setCurrentService: (service: ManagedService) => void;
-  refreshServiceData: (serviceId: number) => Promise<any>;
-  switchService: (serviceId: number) => boolean;
-}
+import { User, ManagedService, AuthContextType } from '../types/authContextTypes';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

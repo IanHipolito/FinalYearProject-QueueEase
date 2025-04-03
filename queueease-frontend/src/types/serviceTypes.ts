@@ -9,3 +9,13 @@ export interface Service {
   wait_time?: number;
   service_type?: 'immediate' | 'appointment';
 }
+
+export interface ServiceAdmin {
+  id: number;
+  name: string;
+  description: string;
+  category?: string;
+  location?: string;
+  business_hours?: string;
+  has_admin?: boolean;
+}

@@ -2,30 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
 import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
-  AppBar,
-  Toolbar,
-  Avatar,
-  IconButton,
-  Menu,
-  MenuItem,
-  Badge,
-  Divider,
-  CircularProgress,
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogContentText, 
-  DialogActions, 
-  Snackbar,
-  Alert
+  Box, Container, Typography, Button, Grid, Card, CardContent,
+  CardActions, AppBar, Toolbar, Avatar, IconButton, Menu,
+  MenuItem, Badge, Divider, CircularProgress, Dialog, DialogTitle, 
+  DialogContent,  DialogContentText, DialogActions, Snackbar, Alert
 } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -40,16 +20,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InsightsIcon from '@mui/icons-material/Insights';
 import { useAuth } from '../pages/AuthContext';
-
-interface Queue {
-  id?: number;
-  service_name?: string;
-  position?: number;
-  total_wait?: number;
-  expected_ready_time?: string;
-  estimated_time?: number;
-  status?: string;
-}
+import { UserMainPageQueue } from '../types/queueTypes';
 
 const UserMainPage: React.FC = () => {
   const navigate = useNavigate();
@@ -57,7 +28,7 @@ const UserMainPage: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const [remainingTime, setRemainingTime] = useState<number>(0);
-  const [initialTime, setInitialTime] = useState<number>(0);
+  // const [initialTime, setInitialTime] = useState<number>(0);
   const [autoCompletionAttempted, setAutoCompletionAttempted] = useState<boolean>(false);
   
   // Separate loading states
@@ -66,7 +37,7 @@ const UserMainPage: React.FC = () => {
   const [isLeavingQueue, setIsLeavingQueue] = useState<boolean>(false);
 
   // Active queue state
-  const [activeQueue, setActiveQueue] = useState<Queue | null>(null);
+  const [activeQueue, setActiveQueue] = useState<UserMainPageQueue | null>(null);
 
   // Mock notification count for demo purposes
   const [notificationCount, setNotificationCount] = useState(3);
@@ -97,7 +68,7 @@ const UserMainPage: React.FC = () => {
             return;
           }
           
-          setActiveQueue((prev: Queue | null) => ({
+          setActiveQueue((prev: UserMainPageQueue | null) => ({
             ...(prev || {}),
             id: detailData.queue_id,
             service_name: detailData.service_name,
@@ -781,42 +752,42 @@ const handleLeaveQueue = () => {
               description: "Scan a QR code to join a queue instantly",
               icon: <QrCodeScannerIcon sx={{ fontSize: 48, color: '#6f42c1' }} />,
               action: () => navigate('/qrscanner'),
-              color: "linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
+              color: "linear-gradient(135deg, #A020F0 0%, #6f42c1 100%)"
             },
             {
               title: "View Appointments",
               description: "Schedule your visit to avoid the wait",
               icon: <CalendarTodayIcon sx={{ fontSize: 48, color: '#0d6efd' }} />,
               action: () => navigate('/appointments'),
-              color: "linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
+              color: "linear-gradient(135deg, #3d8bfd 0%, #3373C4 100%)"
             },
             {
               title: "Find Location",
               description: "Find the nearest QueueEase location",
               icon: <MapIcon sx={{ fontSize: 48, color: '#198754' }} />,
               action: () => navigate('/mapproximity'),
-              color: "linear-gradient(135deg, #198754 0%, #28a745 100%)"
+              color: "linear-gradient(135deg, #28a745 0%, #198754 100%)"
             },
             {
               title: "Queue History",
               description: "View your previous queue activity",
               icon: <HistoryIcon sx={{ fontSize: 48, color: '#6c757d' }} />,
               action: () => navigate('/history'),
-              color: "linear-gradient(135deg, #6c757d 0%, #919ca6 100%)"
+              color: "linear-gradient(135deg, #919ca6 0%, #6c757d 100%)"
             },
             {
               title: "Give Feedback",
               description: "Share your experience with us",
               icon: <FeedbackIcon sx={{ fontSize: 48, color: '#fd7e14' }} />,
               action: () => navigate('/feedback'),
-              color: "linear-gradient(135deg, #fd7e14 0%, #ffb066 100%)"
+              color: "linear-gradient(135deg, #ffb066 0%, #ff8c00 100%)"
             },
             {
               title: "View Analytics",
               description: "See insights about your queue usage patterns",
-              icon: <InsightsIcon sx={{ fontSize: 48, color: '#6f42c1' }} />,
+              icon: <InsightsIcon sx={{ fontSize: 48, color: '#FFD300' }} />,
               action: () => navigate('/analytics'),
-              color: "linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
+              color: "linear-gradient(135deg, #FFD300 0%, #BA8E23 100%)"
             }
           ].map((feature, index) => (
             <Grid item xs={12} sm={6} md={4} key={index}>
