@@ -7,6 +7,7 @@ import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import QueueIcon from '@mui/icons-material/Queue';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import LogoutIcon from '@mui/icons-material/Logout';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { keyframes } from '@emotion/react';
 import { API } from '../services/api';
 import { QueueData } from 'types/queueTypes';
@@ -108,6 +109,10 @@ const SuccessPage: React.FC = () => {
     message: '',
     severity: 'info'
   });
+  
+  // Transfer status states
+  const [isTransferred, setIsTransferred] = useState<boolean>(false);
+  const [originalQueueId, setOriginalQueueId] = useState<number | null>(null);
 
   const fetchQueueDetails = async () => {
     if (!queueId) return;
@@ -118,6 +123,14 @@ const SuccessPage: React.FC = () => {
       }
       const data: QueueData = await response.json();
       setQueueData(data);
+
+      // Check if this is a transferred queue
+      if (data.is_transferred) {
+        setIsTransferred(true);
+        if (data.original_queue_id) {
+          setOriginalQueueId(data.original_queue_id);
+        }
+      }
 
       // Set queue join time if not already set
       if (data.time_created && !queueJoinTime) {
@@ -292,6 +305,28 @@ const SuccessPage: React.FC = () => {
               <Typography variant="body1" color="primary" fontWeight="medium" sx={{ mb: 4 }}>
                 Thank you for using our service!
               </Typography>
+              
+              {/* Show transferred indicator */}
+              {isTransferred && (
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mt: 1,
+                  mb: 3,
+                  p: 1.5,
+                  bgcolor: 'rgba(25, 118, 210, 0.1)',
+                  borderRadius: 2,
+                  width: 'fit-content',
+                  mx: 'auto'
+                }}>
+                  <SwapHorizIcon sx={{ mr: 1, color: '#1976d2' }} />
+                  <Typography variant="body2" sx={{ color: '#1976d2' }}>
+                    Queue was transferred from another location
+                  </Typography>
+                </Box>
+              )}
+              
               <Button 
                 variant="contained" 
                 size="large"
@@ -356,6 +391,24 @@ const SuccessPage: React.FC = () => {
                   We're preparing your order. Please check the details below for real-time updates.
                 </Typography>
               </Box>
+              
+              {/* Show transferred indicator */}
+              {isTransferred && (
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 3,
+                  p: 2,
+                  bgcolor: 'rgba(25, 118, 210, 0.1)',
+                  borderRadius: 2
+                }}>
+                  <SwapHorizIcon sx={{ mr: 1, color: '#1976d2' }} />
+                  <Typography variant="body2" sx={{ color: '#1976d2' }}>
+                    Queue transferred from another location
+                  </Typography>
+                </Box>
+              )}
               
               <Grid container spacing={2.5} sx={{ mb: 4 }}>
                 <Grid item xs={12}>

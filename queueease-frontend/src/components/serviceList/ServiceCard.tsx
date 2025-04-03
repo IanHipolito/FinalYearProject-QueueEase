@@ -10,6 +10,7 @@ import {
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
 import AddIcon from '@mui/icons-material/Add';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { getCategoryIcon } from '../map/mapUtils';
 import { getCategoryColor } from '../../utils/mapUtils';
 
@@ -30,6 +31,8 @@ interface ServiceCardProps {
   isSelected?: boolean;
   onCardClick: (service: any) => void;
   onJoinClick?: (serviceId: number) => void;
+  onTransferClick?: (serviceId: number) => void;
+  showTransferButton?: boolean;
   theme?: any;
 }
 
@@ -38,6 +41,8 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
   isSelected = false,
   onCardClick,
   onJoinClick,
+  onTransferClick,
+  showTransferButton = false,
   theme: propTheme
 }) => {
   const defaultTheme = useTheme();
@@ -80,8 +85,32 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
               </Box>
             </Box>
 
-            {/* Join queue button */}
-            {onJoinClick && (
+            {/* Transfer Button */}
+            {showTransferButton && onTransferClick ? (
+              <Button
+                variant="contained"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.stopPropagation();
+                  onTransferClick(service.id);
+                }}
+                size="small"
+                startIcon={<SwapHorizIcon fontSize="small" />}
+                sx={{
+                  borderRadius: 1.5,
+                  py: 0.25,
+                  px: 1,
+                  ml: 1,
+                  minWidth: 'auto',
+                  fontSize: '0.75rem',
+                  backgroundColor: theme.palette.info.main,
+                  '&:hover': {
+                    backgroundColor: theme.palette.info.dark,
+                  }
+                }}
+              >
+                Transfer
+              </Button>
+            ) : (onJoinClick && service.service_type === 'appointment') && (
               <Button
                 variant="contained"
                 onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
@@ -103,7 +132,7 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
                   }
                 }}
               >
-                {service.service_type === 'appointment' ? 'Book' : 'Join'}
+                Book
               </Button>
             )}
           </Box>

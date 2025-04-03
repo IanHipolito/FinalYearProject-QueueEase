@@ -6,7 +6,7 @@ from .queue_views import (
     create_queue, queue_detail, complete_queue, active_queue,
     get_qr_code, validate_qr, update_queue_position,
     check_and_complete_queue, leave_queue, queue_history, service_queues,
-    user_analytics
+    user_analytics, transfer_queue
 )
 
 from .service_views import (

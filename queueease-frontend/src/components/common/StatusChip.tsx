@@ -20,6 +20,8 @@ const StatusChip: React.FC<StatusChipProps> = ({ status, size = 'small', ...rest
         return 'error';
       case 'in_queue':
         return 'primary';
+      case 'transferred':
+        return 'info';
       default:
         return 'default';
     }

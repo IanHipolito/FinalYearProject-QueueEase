@@ -16,8 +16,10 @@ import PeopleIcon from '@mui/icons-material/People';
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
-import AddIcon from '@mui/icons-material/Add';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloseIcon from '@mui/icons-material/Close';
+import { useNavigate } from 'react-router-dom';
 import { Service } from '../../types/serviceTypes';
 import { getCategoryIcon } from '../map/mapUtils';
 import { getCategoryColor } from '../../utils/mapUtils';
@@ -25,8 +27,10 @@ import { getCategoryColor } from '../../utils/mapUtils';
 interface ServiceDetailProps {
   service: Service | null;
   onClose: () => void;
-  onJoinQueue: (serviceId: number) => void;
+  onTransferClick: (serviceId: number) => void;
   userLocation: { latitude: number; longitude: number } | null;
+  canTransfer: boolean;
+  activeQueue: any | null;
 }
 
 interface RouteInfo {
@@ -39,8 +43,10 @@ interface RouteInfo {
 const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
   service,
   onClose,
-  onJoinQueue,
-  userLocation
+  onTransferClick,
+  userLocation,
+  canTransfer,
+  activeQueue
 }) => {
   const [activeTab, setActiveTab] = useState<'walking' | 'driving' | 'cycling'>('walking');
   const [routeInfo, setRouteInfo] = useState<Record<string, RouteInfo>>({
@@ -48,6 +54,8 @@ const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
     driving: { type: 'driving', distance: '', duration: '', loading: false },
     cycling: { type: 'cycling', distance: '', duration: '', loading: false }
   });
+  
+  const navigate = useNavigate();
   
   useEffect(() => {
     if (!service || !userLocation) return;
@@ -128,6 +136,10 @@ const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
     const profile = mode === 'walking' ? 'walking' : mode === 'cycling' ? 'cycling' : 'driving';
     const url = `https://www.google.com/maps/dir/?api=1&destination=${service.latitude},${service.longitude}&travelmode=${profile}`;
     window.open(url, '_blank');
+  };
+
+  const handleBookAppointment = () => {
+    navigate(`/book-appointment/${service.id}`);
   };
   
   return (
@@ -276,23 +288,56 @@ const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
           </>
         )}
 
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<AddIcon />}
-          size="medium"
-          sx={{ 
-            borderRadius: 2,
-            py: 0.75,
-            bgcolor: '#6f42c1',
-            '&:hover': {
-              bgcolor: '#5e35b1',
-            }
-          }}
-          onClick={() => onJoinQueue(service.id)}
-        >
-          {service.service_type === 'appointment' ? 'Book Appointment' : 'Join Queue'}
-        </Button>
+        {/* Conditional rendering based on service type */}
+        {service.service_type === 'immediate' ? (
+          <>
+            <Button
+              variant="contained"
+              fullWidth
+              startIcon={<SwapHorizIcon />}
+              size="medium"
+              sx={{ 
+                borderRadius: 2,
+                py: 0.75,
+                bgcolor: '#6f42c1',
+                '&:hover': {
+                  bgcolor: '#5e35b1',
+                },
+                opacity: canTransfer ? 1 : 0.6,
+              }}
+              onClick={() => canTransfer && onTransferClick(service.id)}
+              disabled={!canTransfer}
+            >
+              Transfer Queue
+            </Button>
+            
+            {!canTransfer && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'center' }}>
+                {activeQueue ? 
+                  "Transfer only available for same service types within 2 minutes of joining" : 
+                  "You need to be in an active queue to transfer"}
+              </Typography>
+            )}
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<CalendarTodayIcon />}
+            size="medium"
+            sx={{ 
+              borderRadius: 2,
+              py: 0.75,
+              bgcolor: '#4caf50',
+              '&:hover': {
+                bgcolor: '#388e3c',
+              },
+            }}
+            onClick={handleBookAppointment}
+          >
+            Book Appointment
+          </Button>
+        )}
       </Box>
     </Paper>
   );

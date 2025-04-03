@@ -133,6 +133,7 @@ class Queue(models.Model):
         ('pending', 'Pending'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
+        ('transferred', 'Transferred'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -148,6 +149,8 @@ class Queue(models.Model):
     date_valid_to = models.DateTimeField(null=True, blank=True)
     date_deleted = models.DateTimeField(null=True, blank=True)
     expected_ready_time = models.DateTimeField(null=True, blank=True)
+    transferred_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_to')
+
 
     class Meta:
         ordering = ['sequence_number']
@@ -193,7 +196,7 @@ class AppointmentDetails(models.Model):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"Appointment {self.order_id} - {self.user.username}"
+        return f"Appointment {self.order_id} - {self.user.name}"
 
 class ServiceWaitTime(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE)

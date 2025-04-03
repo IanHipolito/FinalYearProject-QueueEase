@@ -5,7 +5,7 @@ from .views.auth_views import (
 from .views.queue_views import (
     create_queue, queue_detail, complete_queue, active_queue,
     get_qr_code, validate_qr, update_queue_position, check_and_complete_queue,
-    leave_queue, queue_history, service_queues, user_analytics
+    leave_queue, queue_history, service_queues, user_analytics, transfer_queue
 )
 
 from .views.service_views import (
@@ -15,7 +15,7 @@ from .views.service_views import (
 
 from .views.appointment_views import (
     user_appointments, appointment_detail, get_or_create_appointment,
-    generate_demo_appointments, delete_appointment, create_appointment,
+    delete_appointment, create_appointment,
     check_and_update_appointments, check_appointment_status
 )
 

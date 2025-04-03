@@ -20,29 +20,9 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingIcon from '@mui/icons-material/Pending';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { API } from '../../services/api';
-
-interface HistoryEntry {
-    id: number;
-    service_name: string;
-    service_type: 'immediate' | 'appointment';
-    category?: string;
-    date_created: string;
-    status: 'completed' | 'pending' | 'cancelled';
-    waiting_time?: number;
-    position?: number;
-    order_id?: string;
-    appointment_date?: string;
-    appointment_time?: string;
-}
-
-interface HistoryCardProps {
-    entry: HistoryEntry;
-    onViewDetails: (entry: HistoryEntry) => void;
-    formatDate: (dateString: string) => string;
-    formatTime: (timeString?: string) => string;
-    onRefresh?: () => void;
-}
+import { HistoryCardProps } from '../../types/historyTypes';
 
 const HistoryCard: React.FC<HistoryCardProps> = ({
     entry,
@@ -61,6 +41,8 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 return theme.palette.warning.main;
             case 'cancelled':
                 return theme.palette.error.main;
+            case 'transferred':
+                return theme.palette.info.main;
             default:
                 return theme.palette.grey[500];
         }
@@ -74,6 +56,8 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 return <PendingIcon sx={{ fontSize: 16 }} />;
             case 'cancelled':
                 return <CancelIcon sx={{ fontSize: 16 }} />;
+            case 'transferred':
+                return <SwapHorizIcon sx={{ fontSize: 16 }} />;
             default:
                 return null;
         }
@@ -114,20 +98,18 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 <Grid container spacing={2}>
                     <Grid item xs={12} sm={8}>
                         <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                            <Box
-                                sx={{
-                                    mr: 2,
-                                    bgcolor: entry.service_type === 'immediate' ?
-                                        'rgba(111, 66, 193, 0.12)' : 'rgba(13, 110, 253, 0.12)',
-                                    color: entry.service_type === 'immediate' ?
-                                        theme.palette.primary.main : '#0d6efd',
-                                    borderRadius: '50%',
-                                    p: 1.5,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}
-                            >
+                            <Box sx={{ 
+                                mr: 2,
+                                bgcolor: entry.service_type === 'immediate' ?
+                                    'rgba(111, 66, 193, 0.12)' : 'rgba(13, 110, 253, 0.12)',
+                                color: entry.service_type === 'immediate' ?
+                                    theme.palette.primary.main : '#0d6efd',
+                                borderRadius: '50%',
+                                p: 1.5,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
                                 {entry.service_type === 'immediate' ?
                                     <QrCodeIcon fontSize="medium" /> :
                                     <CalendarTodayIcon fontSize="medium" />
@@ -163,6 +145,40 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                                         }}
                                     />
                                 </Box>
+
+                                {/* Show transferred information */}
+                                {entry.status === 'transferred' && entry.transferred_to && (
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        mb: 1,
+                                        p: 0.75,
+                                        borderRadius: 1,
+                                        bgcolor: 'rgba(25, 118, 210, 0.1)'
+                                    }}>
+                                        <SwapHorizIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.info.main }} />
+                                        <Typography variant="body2" color={theme.palette.info.main}>
+                                            Transferred to another location
+                                        </Typography>
+                                    </Box>
+                                )}
+                                
+                                {/* Show received transfer information */}
+                                {entry.transferred_from && (
+                                    <Box sx={{ 
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        mb: 1,
+                                        p: 0.75,
+                                        borderRadius: 1,
+                                        bgcolor: 'rgba(25, 118, 210, 0.1)'
+                                    }}>
+                                        <SwapHorizIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.info.main }} />
+                                        <Typography variant="body2" color={theme.palette.info.main}>
+                                            Transferred from another location
+                                        </Typography>
+                                    </Box>
+                                )}
 
                                 {entry.category && (
                                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>

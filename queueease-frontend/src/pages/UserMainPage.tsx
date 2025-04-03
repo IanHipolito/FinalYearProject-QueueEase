@@ -19,6 +19,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InsightsIcon from '@mui/icons-material/Insights';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { useAuth } from '../pages/AuthContext';
 import { UserMainPageQueue } from '../types/queueTypes';
 
@@ -38,6 +39,9 @@ const UserMainPage: React.FC = () => {
 
   // Active queue state
   const [activeQueue, setActiveQueue] = useState<UserMainPageQueue | null>(null);
+  
+  // Transfer status state
+  const [isTransferred, setIsTransferred] = useState<boolean>(false);
 
   // Mock notification count for demo purposes
   const [notificationCount, setNotificationCount] = useState(3);
@@ -63,6 +67,14 @@ const UserMainPage: React.FC = () => {
         const detailRes = await API.queues.getDetails(queueId);
         if (detailRes.ok) {
           const detailData = await detailRes.json();
+          
+          // Check if the queue was transferred
+          if (detailData.is_transferred) {
+            setIsTransferred(true);
+          } else {
+            setIsTransferred(false);
+          }
+          
           if (detailData.status !== 'pending') {
             setActiveQueue(null);
             return;
@@ -71,11 +83,13 @@ const UserMainPage: React.FC = () => {
           setActiveQueue((prev: UserMainPageQueue | null) => ({
             ...(prev || {}),
             id: detailData.queue_id,
+            service_id: detailData.service_id,
             service_name: detailData.service_name,
             position: detailData.current_position,
             total_wait: detailData.total_wait,
             expected_ready_time: detailData.expected_ready_time,
             status: detailData.status,
+            time_created: detailData.time_created
           }));
         } else {
           if (isInitialLoad) {
@@ -135,6 +149,7 @@ const UserMainPage: React.FC = () => {
           const basicQueue = {
             ...(activeQueue || {}),
             id: data.queue_id,
+            service_id: data.service_id,
             service_name: data.service_name,
             position: data.current_position,
             status: 'pending'
@@ -252,6 +267,7 @@ const refreshQueueData = async (showLoading = true) => {
       const basicQueue = {
         ...(activeQueue || {}),
         id: data.queue_id,
+        service_id: data.service_id,
         service_name: data.service_name,
         position: data.current_position,
         status: 'pending'
@@ -264,16 +280,25 @@ const refreshQueueData = async (showLoading = true) => {
         if (detailRes.ok) {
           const detailData = await detailRes.json();
           
+          // Check if the queue was transferred
+          if (detailData.is_transferred) {
+            setIsTransferred(true);
+          } else {
+            setIsTransferred(false);
+          }
+          
           if (detailData.status === 'pending') {
-            setActiveQueue({
-              ...(activeQueue || {}),
+            setActiveQueue((prev: UserMainPageQueue | null) => ({
+              ...(prev || {}),
               id: detailData.queue_id,
+              service_id: detailData.service_id, // Make sure this is included
               service_name: detailData.service_name,
               position: detailData.current_position,
               total_wait: detailData.total_wait,
               expected_ready_time: detailData.expected_ready_time,
-              status: detailData.status
-            });
+              status: detailData.status,
+              time_created: detailData.time_created,
+            }));
           } else {
             setActiveQueue(null);
           }
@@ -337,6 +362,12 @@ const handleLeaveQueue = () => {
       setConfirmDialogOpen(false);
     });
 };
+
+  const handleNavigateToTransfer = () => {
+    if (activeQueue && activeQueue.id) {
+      navigate('/mapproximity');
+    }
+  };
 
   if (!user) {
     navigate('/login');
@@ -553,6 +584,25 @@ const handleLeaveQueue = () => {
                       </Box>
                     </Grid>
                   )}
+                  
+                {/* Show transferred indicator if applicable */}
+                {isTransferred && (
+                  <Grid item xs={12}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      mt: 2, 
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      p: 1,
+                      borderRadius: 1
+                    }}>
+                      <SwapHorizIcon sx={{ mr: 1 }} />
+                      <Typography variant="body2">
+                        This queue was transferred from another location
+                      </Typography>
+                    </Box>
+                  </Grid>
+                )}
               </Grid>
             </CardContent>
             <CardActions sx={{ bgcolor: 'rgba(0,0,0,0.1)', p: 2 }}>
@@ -565,11 +615,32 @@ const handleLeaveQueue = () => {
                   color: '#6f42c1',
                   '&:hover': { bgcolor: '#f0f0f0' },
                   borderRadius: 2,
-                  fontWeight: 600
+                  fontWeight: 600,
+                  mr: 1
                 }}
               >
                 View Details
               </Button>
+              
+              {/* Add Transfer Button - only for immediate services */}
+              {activeQueue.service_id && (
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  onClick={handleNavigateToTransfer}
+                  startIcon={<SwapHorizIcon />}
+                  sx={{
+                    borderColor: '#fff',
+                    color: '#fff',
+                    mr: 1,
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    borderRadius: 2
+                  }}
+                >
+                  Transfer
+                </Button>
+              )}
+              
               <Button
                 variant="outlined"
                 size="medium"
@@ -578,7 +649,6 @@ const handleLeaveQueue = () => {
                 sx={{
                   borderColor: '#fff',
                   color: '#fff',
-                  ml: 1,
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
                   borderRadius: 2,
                   position: 'relative'

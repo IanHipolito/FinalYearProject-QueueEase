@@ -103,6 +103,16 @@ export const API = {
             fetch(`${API_BASE}/get-qr-code/${queueId}/`),
         getUserAnalytics: (userId: number, timeRange: string = 'month') =>
             fetch(`${API_BASE}/user-analytics/${userId}/?time_range=${timeRange}`),
+        transferQueue: (originalQueueId: number, targetServiceId: number, userId: number): Promise<Response> => 
+            fetch(`${API_BASE}/transfer-queue/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                original_queue_id: originalQueueId, 
+                target_service_id: targetServiceId,
+                user_id: userId
+            }),
+        }),
     },
 
     // Appointment management

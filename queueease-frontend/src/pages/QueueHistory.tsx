@@ -94,7 +94,9 @@ const QueueHistory: React.FC = () => {
                     date_created: queue.date_created || new Date().toISOString(),
                     status: queue.status || 'pending',
                     waiting_time: queue.waiting_time || 0,
-                    position: queue.position || null
+                    position: queue.position || null,
+                    transferred_from: queue.transferred_from || null,
+                    transferred_to: queue.transferred_to || null
                 })) : [];
 
                 // Process appointment data with defensive coding

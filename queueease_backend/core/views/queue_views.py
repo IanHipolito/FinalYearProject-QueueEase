@@ -18,7 +18,7 @@ import numpy as np
 
 from ..models import (
     Queue, QRCode, User, Service, Feedback, ServiceWaitTime, 
-    QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken, ServiceQueue
+    QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken, ServiceQueue, AppointmentDetails
 )
 from ..services.notifications import send_queue_update_notification
 
@@ -307,6 +307,22 @@ def queue_detail(request, queue_id):
     if queue_item.expected_ready_time:
         total_wait = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds())
 
+    # Check for transferred queues
+    if queue_item.status == 'transferred':
+        new_queue = Queue.objects.filter(transferred_from=queue_item).first()
+        if new_queue:
+            return Response({
+                "queue_id": new_queue.id,
+                "original_queue_id": queue_item.id,
+                "service_name": new_queue.service.name,
+                "status": new_queue.status,
+                "is_transferred": True,
+                "current_position": None,
+                "expected_ready_time": new_queue.expected_ready_time.isoformat() if new_queue.expected_ready_time else None,
+                "total_wait": total_wait,
+                "time_created": queue_item.date_created.isoformat()
+            })
+    
     # Auto-complete check: If pending and expected time has passed, mark as completed
     if queue_item.status == 'pending' and queue_item.expected_ready_time and queue_item.expected_ready_time <= timezone.now():
         queue_item.status = 'completed'
@@ -479,7 +495,7 @@ def update_queue_position(request, queue_id):
             service_queue = queue.service_queue if hasattr(queue, 'service_queue') else None
             if not is_active and service_queue:
                 # If queue has no customers, mark it as inactive
-                if queue.customers == 0:
+                if service_queue.current_member_count == 0:
                     queue.status = 'inactive'
                     
                     # Update the service queue
@@ -674,11 +690,25 @@ def queue_history(request, user_id):
                     "date_created": queue.date_created.isoformat() if hasattr(queue, 'date_created') else "",
                     "status": queue.status if hasattr(queue, 'status') else "unknown",
                     "waiting_time": queue.waiting_time if hasattr(queue, 'waiting_time') else 0,
-                    "position": queue.position if hasattr(queue, 'position') else None
+                    "position": queue.position if hasattr(queue, 'position') else None,
+                    "service_type": queue.service.service_type if hasattr(queue, 'service') and queue.service else "immediate",
+                    "transferred_from": queue.transferred_from.id if hasattr(queue, 'transferred_from') and queue.transferred_from else None,
+                    "transferred_to": Queue.objects.filter(transferred_from=queue).first().id if Queue.objects.filter(transferred_from=queue).exists() else None
                 }
+                
+                if hasattr(queue, 'service') and queue.service and queue.service.service_type == 'appointment':
+                    appointment = AppointmentDetails.objects.filter(service=queue.service, user=user).order_by('-appointment_date').first()
+                    if appointment:
+                        queue_data.update({
+                            "appointment_date": appointment.appointment_date.isoformat() if appointment.appointment_date else None,
+                            "appointment_time": appointment.appointment_time.strftime('%H:%M') if appointment.appointment_time else None,
+                            "order_id": appointment.order_id
+                        })
+                
                 serialized_data.append(queue_data)
             except Exception as e:
                 print(f"Error serializing queue {queue.id}: {str(e)}")
+                print(traceback.format_exc())
                 continue
         
         return Response(serialized_data)
@@ -849,3 +879,97 @@ def user_analytics(request, user_id):
     
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+    
+@api_view(['POST'])
+def transfer_queue(request):
+    try:
+        original_queue_id = request.data.get('original_queue_id')
+        target_service_id = request.data.get('target_service_id')
+        
+        if not all([original_queue_id, target_service_id]):
+            return Response({"error": "Missing required parameters"}, status=400)
+        
+        original_queue = get_object_or_404(Queue, id=original_queue_id)
+        target_service = get_object_or_404(Service, id=target_service_id)
+        
+        if original_queue.user.id != request.data.get('user_id'):
+            return Response({"error": "Not authorized to transfer this queue"}, status=403)
+        
+        time_window = timedelta(minutes=2)
+        if timezone.now() - original_queue.date_created > time_window:
+            return Response(
+                {"error": "You can only transfer a queue within the first 2 minutes of joining"}, 
+                status=400
+            )
+        
+        if original_queue.service.service_type != 'immediate' or target_service.service_type != 'immediate':
+            return Response({"error": "Can only transfer between immediate-type services"}, status=400)
+        
+        if original_queue.service.name != target_service.name:
+            return Response({"error": "Can only transfer between the same service types"}, status=400)
+        
+        if original_queue.service.id == target_service.id:
+            return Response({"error": "Cannot transfer to the same service location"}, status=400)
+        
+        original_queue.status = 'transferred'
+        original_queue.save()
+        
+        pending_queues = Queue.objects.filter(
+            service=target_service,
+            status='pending',
+            is_active=True
+        ).order_by('date_created')
+        
+        position = pending_queues.count() + 1
+        
+        service_queue = ServiceQueue.objects.filter(
+            service=target_service,
+            is_active=True
+        ).first()
+        
+        if not service_queue:
+            service_queue = ServiceQueue.objects.create(
+                service=target_service,
+                current_member_count=0
+            )
+        
+        service_queue.current_member_count += 1
+        service_queue.save()
+        
+        historical_data = fetch_historical_data(target_service.id)
+        
+        new_queue = Queue.objects.create(
+            user=original_queue.user,
+            service=target_service,
+            service_queue=service_queue,
+            sequence_number=position,
+            status='pending',
+            transferred_from=original_queue
+        )
+        
+        new_queue.expected_ready_time = compute_expected_ready_time(target_service, position, historical_data)
+        new_queue.save()
+        
+        qr_code = QRCode.objects.get(queue=original_queue)
+        qr_code.queue = new_queue
+        qr_code.save()
+        
+        now = timezone.now()
+        wait_minutes = 0
+        if new_queue.expected_ready_time:
+            wait_seconds = max(0, (new_queue.expected_ready_time - now).total_seconds())
+            wait_minutes = int(wait_seconds / 60)
+        
+        return Response({
+            "message": "Queue transferred successfully",
+            "queue_id": new_queue.id,
+            "service_name": target_service.name,
+            "position": position,
+            "expected_ready_time": new_queue.expected_ready_time.isoformat() if new_queue.expected_ready_time else None,
+            "estimated_wait_minutes": wait_minutes,
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in transfer_queue: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)

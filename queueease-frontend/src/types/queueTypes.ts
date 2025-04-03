@@ -12,12 +12,15 @@ export interface Queue {
 
 export interface UserMainPageQueue {
   id?: number;
+  service_id?: number;
   service_name?: string;
   position?: number;
   total_wait?: number;
   expected_ready_time?: string;
   estimated_time?: number;
   status?: string;
+  time_created?: string;
+  is_transferred?: boolean;
 }
 
 export interface QueueFormData {
@@ -33,10 +36,13 @@ export interface QRCodeScreenProps {
 
 export interface QueueData {
   queue_id: number;
+  service_id?: number;
   service_name: string;
   current_position: number | null;
   status: string;
   expected_ready_time: string | null;
   total_wait?: number;
   time_created?: string;
+  is_transferred?: boolean;
+  original_queue_id?: number;
 }

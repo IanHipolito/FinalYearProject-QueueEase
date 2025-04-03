@@ -2,7 +2,10 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
-import { Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button } from '@mui/material';
+import { 
+  Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button, Dialog,
+  DialogTitle, DialogContent, DialogContentText, DialogActions 
+} from '@mui/material';
 import ServiceMap from '../components/map/ServiceMap';
 import ServiceCard from '../components/serviceList/ServiceCard';
 import BottomSheet from '../components/serviceList/BottomSheet';
@@ -12,6 +15,8 @@ import SearchBar from '../components/map/SearchBar';
 import CategoryFilter from '../components/map/CategoryFilter';
 import { generateRandomDublinCoordinates } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import { UserMainPageQueue } from '../types/queueTypes';
 
 const MapProximity: React.FC = () => {
   const navigate = useNavigate();
@@ -30,11 +35,17 @@ const MapProximity: React.FC = () => {
   const [snackbarState, setSnackbarState] = useState<{
     open: boolean,
     message: string,
-    severity: "success" | "error" | "info"
+    severity: "success" | "error" | "info" | "warning"
   }>({ open: false, message: "", severity: "success" });
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [searchRadius, setSearchRadius] = useState(2); // Default 2km radius
   const debounceTimerRef = useRef<number | null>(null);
+  
+  // Add new state variables for transfer functionality
+  const [activeQueue, setActiveQueue] = useState<UserMainPageQueue | null>(null);
+  const [transferDialogOpen, setTransferDialogOpen] = useState<boolean>(false);
+  const [targetService, setTargetService] = useState<Service | null>(null);
+  const [transferring, setTransferring] = useState<boolean>(false);
 
   // Calculate distance between two points (haversine formula)
   const calculateDistance = useCallback((
@@ -54,67 +65,147 @@ const MapProximity: React.FC = () => {
               Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // in meters
+    return R * c;
   }, []);
 
-  // Handlers
+  // Fetch the active queue for the logged-in user
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchActiveQueue = async () => {
+      try {
+        const res = await API.queues.getActive(user.id);
+        
+        if (!res.ok) {
+          setActiveQueue(null);
+          return;
+        }
+
+        const data = await res.json();
+        
+        if (data && data.queue_id) {
+          // Get detailed queue information
+          const detailRes = await API.queues.getDetails(data.queue_id);
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            
+            if (detailData.status === 'pending') {
+              setActiveQueue({
+                id: data.queue_id,
+                service_id: detailData.service_id || data.service_id,
+                service_name: detailData.service_name || data.service_name,
+                position: data.position || detailData.current_position,
+                expected_ready_time: data.expected_ready_time || detailData.expected_ready_time,
+                status: 'pending',
+                time_created: detailData.time_created || new Date().toISOString(),
+              });
+            } else {
+              setActiveQueue(null);
+            }
+          }
+        } else {
+          setActiveQueue(null);
+        }
+      } catch (error) {
+        console.error("Error fetching active queue:", error);
+        setActiveQueue(null);
+      }
+    };
+
+    fetchActiveQueue();
+    
+    // Refresh active queue every 15 seconds
+    const intervalId = setInterval(fetchActiveQueue, 15000);
+    return () => clearInterval(intervalId);
+  }, [user]);
+
   const handleMarkerClick = useCallback((service: Service) => {
-    setSelectedService(service);
-    if (window.innerWidth < 960) setSheetHeight('partial');
-  }, []);
-
-  const handleJoinQueue = useCallback(async (serviceId: number) => {
-    if (!user) {
-      navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
-      return;
+    if (isEligibleForTransfer(service)) {
+      handleTransferClick(service);
+    } else {
+      setSelectedService(service);
+      if (window.innerWidth < 960) setSheetHeight('partial');
     }
+  }, []);
   
+  const isEligibleForTransfer = useCallback((service: Service) => {
+    if (!activeQueue || !activeQueue.service_name || !activeQueue.id) return false;
+    
+    const creationTime = new Date(activeQueue.time_created || '').getTime();
+    const now = new Date().getTime();
+    const twoMinutesInMs = 2 * 60 * 1000;
+    const isWithin2Minutes = now - creationTime < twoMinutesInMs;
+    
+    return isWithin2Minutes && 
+           service.name === activeQueue.service_name && 
+           service.id !== activeQueue.service_id &&
+           service.service_type === 'immediate';
+  }, [activeQueue]);
+  
+  // Handle transfer initiation
+  const handleTransferClick = useCallback((service: Service) => {
+    if (!activeQueue || !user) return;
+    
+    setTargetService(service);
+    setTransferDialogOpen(true);
+  }, [activeQueue, user]);
+  
+  // Handle transfer confirmation
+  const handleConfirmTransfer = async () => {
+    if (!activeQueue || !targetService || !user) return;
+    
+    setTransferring(true);
+    
     try {
-      const serviceToJoin = services.find(s => s.id === serviceId);
-      if (!serviceToJoin) {
-        throw new Error('Service not found');
+      const response = await API.queues.transferQueue(
+        activeQueue.id!,
+        targetService.id,
+        user.id
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        setSnackbarState({
+          open: true,
+          message: 'Queue transferred successfully!',
+          severity: 'success'
+        });
+        
+        // Update the active queue with the new queue information
+        setActiveQueue({
+          id: data.queue_id,
+          service_id: targetService.id,
+          service_name: targetService.name,
+          position: data.position,
+          expected_ready_time: data.expected_ready_time,
+          status: 'pending',
+        });
+        
+        // Navigate to the success page for the new queue
+        navigate(`/success/${data.queue_id}`);
+      } else {
+        const errorData = await response.json();
+        setSnackbarState({
+          open: true,
+          message: errorData.error || 'Failed to transfer queue',
+          severity: 'error'
+        });
       }
-  
-      // Check if this is a service that requires appointments
-      if (serviceToJoin.service_type === 'appointment') {
-        // Route to booking page for appointment-based services
-        navigate(`/book-appointment/${serviceId}`);
-        return;
-      }
-  
-      // For immediate services, create a queue entry
+    } catch (error) {
+      console.error("Error transferring queue:", error);
       setSnackbarState({
         open: true,
-        message: "Creating your queue entry...",
-        severity: "info"
-      });
-  
-      const response = await API.queues.createQueue(user.id, serviceId);
-  
-      if (!response.ok) {
-        throw new Error(`Failed to create queue: ${response.status}`);
-      }
-  
-      const data = await response.json();
-      setSnackbarState({
-        open: true,
-        message: "Successfully joined queue!",
-        severity: "success"
-      });
-  
-      // Navigate to QR code screen with the queue ID
-      navigate(`/qrcodescreen/${data.queue_id}`);
-    } catch (err) {
-      console.error('Error joining queue:', err);
-      setSnackbarState({
-        open: true,
-        message: `Failed to join queue: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        message: 'An error occurred while transferring the queue',
         severity: 'error'
       });
+    } finally {
+      setTransferring(false);
+      setTransferDialogOpen(false);
     }
-  }, [navigate, user, services]);
+  };
 
-  // Handle user location change
+  // User location change
   const handleUserLocationChange = useCallback((location: { latitude: number; longitude: number } | null) => {
     setUserLocation(location);
     if (location) {
@@ -332,19 +423,49 @@ const MapProximity: React.FC = () => {
     setSearchRadius(2);
   }, []);
 
-  // Render service row
   const renderServiceRow = useCallback((service: Service) => {
     const isSelected = selectedService?.id === service.id;
+    const canTransfer = isEligibleForTransfer(service);
+    
     return (
       <ServiceCard
         key={service.id}
         service={service}
         isSelected={isSelected}
         onCardClick={handleMarkerClick}
-        onJoinClick={handleJoinQueue}
+        showTransferButton={canTransfer}
+        onTransferClick={() => handleTransferClick(service)}
+        onJoinClick={service.service_type === 'appointment' ? handleJoinQueue : undefined}
       />
     );
-  }, [handleJoinQueue, handleMarkerClick, selectedService?.id]);
+  }, [selectedService, isEligibleForTransfer, handleTransferClick, handleMarkerClick]);
+  
+  // Handle join queue - only for appointment services
+  const handleJoinQueue = useCallback(async (serviceId: number) => {
+    if (!user) {
+      navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
+      return;
+    }
+  
+    try {
+      const serviceToJoin = services.find(s => s.id === serviceId);
+      if (!serviceToJoin) {
+        throw new Error('Service not found');
+      }
+  
+      // Only for appointment services
+      if (serviceToJoin.service_type === 'appointment') {
+        navigate(`/book-appointment/${serviceId}`);
+      }
+    } catch (err) {
+      console.error('Error handling queue action:', err);
+      setSnackbarState({
+        open: true,
+        message: `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        severity: 'error'
+      });
+    }
+  }, [navigate, user, services]);
 
   // Render service list
   const renderServiceList = useCallback(() => {
@@ -372,6 +493,53 @@ const MapProximity: React.FC = () => {
 
     return visibleServices.map(renderServiceRow);
   }, [filteredServices.length, handleResetFilters, loading, renderServiceRow, visibleServices]);
+  
+  // Render transfer dialog
+  const renderTransferDialog = () => (
+    <Dialog
+      open={transferDialogOpen}
+      onClose={() => !transferring && setTransferDialogOpen(false)}
+    >
+      <DialogTitle>Transfer Queue?</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          Are you sure you want to transfer your queue from {activeQueue?.service_name} to {targetService?.name}?
+          This action cannot be undone.
+        </DialogContentText>
+        <Box sx={{ 
+          mt: 2,
+          p: 2,
+          bgcolor: 'rgba(25, 118, 210, 0.1)',
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <SwapHorizIcon sx={{ mr: 1, color: '#1976d2' }} />
+          <Typography variant="body2">
+            You will keep your place in line relative to the new location's queue.
+          </Typography>
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button 
+          onClick={() => setTransferDialogOpen(false)} 
+          color="primary"
+          disabled={transferring}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleConfirmTransfer} 
+          color="primary" 
+          variant="contained"
+          disabled={transferring}
+          startIcon={transferring ? <CircularProgress size={16} color="inherit" /> : <SwapHorizIcon />}
+        >
+          {transferring ? 'Transferring...' : 'Transfer Queue'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   return (
     <Box
@@ -453,8 +621,12 @@ const MapProximity: React.FC = () => {
     <ServiceDetailPanel
       service={selectedService}
       onClose={() => setSelectedService(null)}
-      onJoinQueue={handleJoinQueue}
+      onTransferClick={(serviceId) => handleTransferClick(
+        services.find(s => s.id === serviceId) || selectedService!
+      )}
       userLocation={userLocation}
+      canTransfer={selectedService ? isEligibleForTransfer(selectedService) : false}
+      activeQueue={activeQueue}
     />
 
     {/* Loading State */}
@@ -526,6 +698,9 @@ const MapProximity: React.FC = () => {
         {snackbarState.message}
       </Alert>
     </Snackbar>
+    
+    {/* Transfer confirmation dialog */}
+    {renderTransferDialog()}
   </Box>
 );
 };
