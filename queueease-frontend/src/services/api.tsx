@@ -118,7 +118,6 @@ export const API = {
     queues: {
         getActive: (userId: number) => fetch(`${API_BASE}/active-queue/${userId}/`),
         getDetails: (queueId: number) => fetch(`${API_BASE}/queue-detail/${queueId}/`),
-        getHistory: (userId: number) => fetch(`${API_BASE}/queue-history/${userId}/`),
         getUserQueues: (userId: number) => fetch(`${API_BASE}/user-queues/${userId}/`),
         createQueue: (userId: number, serviceId: number) =>
             fetch(`${API_BASE}/create-queue/`, {
@@ -171,6 +170,10 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId }),
             }),
+        checkAndUpdateAppointments: () =>
+            fetch(`${API_BASE}/check-appointments/`),
+        checkStatus: (orderId: string) =>
+            fetch(`${API_BASE}/appointment/check-status/${orderId}/`),
     },
 
     // Feedback management

@@ -23,6 +23,7 @@ interface HistoryListProps {
     formatDate: (dateString: string) => string;
     formatTime: (timeString?: string) => string;
     filteredHistory: HistoryEntry[];
+    onRefresh?: () => void;
 }
 
 const HistoryList: React.FC<HistoryListProps> = ({
@@ -30,7 +31,8 @@ const HistoryList: React.FC<HistoryListProps> = ({
     handleViewDetails,
     formatDate,
     formatTime,
-    filteredHistory
+    filteredHistory,
+    onRefresh
 }) => {
     const theme = useTheme();
 
@@ -62,6 +64,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                     onViewDetails={handleViewDetails}
                                     formatDate={formatDate}
                                     formatTime={formatTime}
+                                    onRefresh={onRefresh}
                                 />
                             </Grid>
                         ))}

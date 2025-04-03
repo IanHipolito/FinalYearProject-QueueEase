@@ -34,6 +34,13 @@ def appointment_detail(request, order_id):
     try:
         appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
 
+        # Check if the appointment date has passed and update status if needed
+        current_date = timezone.now().date()
+        if appointment.status == 'pending' and appointment.appointment_date < current_date:
+            # Update the appointment status to completed
+            appointment.status = 'completed'
+            appointment.save()
+
         same_day_appointments = AppointmentDetails.objects.filter(
             appointment_date=appointment.appointment_date,
             service=appointment.service
@@ -56,7 +63,6 @@ def appointment_detail(request, order_id):
         data['service_name'] = appointment.service.name
         data['appointment_title'] = f"{appointment.service.name} Appointment"
 
-        # Fix timezone handling - explicitly handle naive datetimes
         try:
             naive_appointment_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
             naive_expected_start = naive_appointment_start + timedelta(minutes=estimated_waiting_time)
@@ -222,3 +228,51 @@ def create_appointment(request):
             "error": "Failed to create appointment",
             "detail": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['GET'])
+def check_and_update_appointments(request):
+    try:
+        current_date = timezone.now().date()
+        
+        # Find all pending appointments with dates in the past
+        outdated_appointments = AppointmentDetails.objects.filter(
+            status='pending',
+            appointment_date__lt=current_date
+        )
+        
+        # Update all these appointments to completed
+        count = outdated_appointments.count()
+        outdated_appointments.update(status='completed')
+        
+        return Response({
+            "message": f"Updated {count} appointments to completed status",
+            "count": count
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
+@api_view(['GET'])
+def check_appointment_status(request, order_id):
+    try:
+        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+        
+        # Check if the appointment date has passed
+        current_date = timezone.now().date()
+        current_time = timezone.now().time()
+        
+        if appointment.status == 'pending':
+            if appointment.appointment_date < current_date:
+                # Past day
+                appointment.status = 'completed'
+                appointment.save()
+            elif appointment.appointment_date == current_date and appointment.appointment_time < current_time:
+                # Same day but time has passed
+                appointment.status = 'completed'
+                appointment.save()
+        
+        return Response({
+            "success": True,
+            "status": appointment.status
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

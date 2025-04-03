@@ -19,6 +19,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import PendingIcon from '@mui/icons-material/Pending';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { API } from '../../services/api';
 
 interface HistoryEntry {
     id: number;
@@ -39,13 +41,15 @@ interface HistoryCardProps {
     onViewDetails: (entry: HistoryEntry) => void;
     formatDate: (dateString: string) => string;
     formatTime: (timeString?: string) => string;
+    onRefresh?: () => void;
 }
 
-const HistoryCard: React.FC<HistoryCardProps> = ({ 
+const HistoryCard: React.FC<HistoryCardProps> = ({
     entry,
     onViewDetails,
     formatDate,
-    formatTime 
+    formatTime,
+    onRefresh
 }) => {
     const theme = useTheme();
 
@@ -72,6 +76,23 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                 return <CancelIcon sx={{ fontSize: 16 }} />;
             default:
                 return null;
+        }
+    };
+
+    const handleRefreshStatus = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!entry.order_id) return;
+
+        try {
+            const response = await API.appointments.checkStatus(entry.order_id);
+
+            if (response.ok) {
+                if (onRefresh) {
+                    onRefresh();
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing appointment status:', error);
         }
     };
 
@@ -207,6 +228,25 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
 
                     {/* Action buttons */}
                     <Grid item xs={12} sm={4} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                        {entry.service_type === 'appointment' && entry.status === 'pending' && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<RefreshIcon />}
+                                onClick={handleRefreshStatus}
+                                sx={{
+                                    mr: 1,
+                                    borderRadius: 2,
+                                    borderColor: theme.palette.info.main,
+                                    color: theme.palette.info.main,
+                                    '&:hover': {
+                                        bgcolor: 'rgba(13, 110, 253, 0.08)',
+                                        borderColor: theme.palette.info.dark
+                                    },
+                                }}
+                            >
+                                Refresh
+                            </Button>
+                        )}
                         <Button
                             variant="outlined"
                             startIcon={<VisibilityIcon />}

@@ -16,7 +16,8 @@ from .views.service_views import (
 
 from .views.appointment_views import (
     user_appointments, appointment_detail, get_or_create_appointment,
-    generate_demo_appointments, delete_appointment, create_appointment
+    generate_demo_appointments, delete_appointment, create_appointment,
+    check_and_update_appointments, check_appointment_status
 )
 
 from .views.admin_views import (
