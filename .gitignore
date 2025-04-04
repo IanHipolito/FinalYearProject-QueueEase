@@ -57,3 +57,5 @@ queueease_backend/queueease-5945e-firebase-adminsdk-fbsvc-3b7f51bf7a.json
 
 # Ignore all service account files
 *-firebase-adminsdk-*.json
+
+queueease-frontend/build/

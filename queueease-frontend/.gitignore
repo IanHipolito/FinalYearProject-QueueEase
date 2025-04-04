@@ -67,3 +67,11 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Build files
+/build
+asset-manifest.json
+*.chunk.js
+*.js.map
+main.*.js
+static/
