@@ -1,7 +1,7 @@
 const API_BASE =
     window.location.hostname === "localhost"
         ? "http://127.0.0.1:8000/api"
-        : "https://m2xb3cv3-8000.eun1.devtunnels.ms/api";
+        : "C21436494.pythonanywhere.com/api";
 
 export const API = {
     // Authentication endpoints

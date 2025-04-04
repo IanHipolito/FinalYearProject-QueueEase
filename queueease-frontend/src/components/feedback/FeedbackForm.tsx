@@ -20,6 +20,7 @@ import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDiss
 import SentimentNeutralIcon from '@mui/icons-material/SentimentNeutral';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { FeedbackCategory, FeedbackData } from '../../types/feedbackTypes';
+import { API } from 'services/api';
 
 interface FeedbackFormProps {
   serviceId: number;
@@ -106,11 +107,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setError('');
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/feedback/submit/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(feedbackData),
-      });
+      const response = await API.feedback.submitFeedback(feedbackData);
 
       if (response.ok) {
         setSuccess(true);
