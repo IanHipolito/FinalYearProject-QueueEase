@@ -1,10 +1,6 @@
 import React from 'react';
 import { Box, Badge, BadgeProps } from '@mui/material';
-
-interface IconBadgeProps extends Omit<BadgeProps, 'children'> {
-  icon: React.ReactNode;
-  badgeContent?: React.ReactNode;
-}
+import { IconBadgeProps } from 'types/commonTypes';
 
 const IconBadge: React.FC<IconBadgeProps> = ({ 
   icon, 

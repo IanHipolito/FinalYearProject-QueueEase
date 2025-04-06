@@ -2,12 +2,7 @@ import React from 'react';
 import { Box, Typography, Button, Paper } from '@mui/material';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import { keyframes } from '@emotion/react';
-
-interface EmptyStateProps {
-  message: string;
-  buttonText?: string;
-  buttonAction?: () => void;
-}
+import { EmptyStateProps } from 'types/commonTypes';
 
 const pulse = keyframes`
   0% { transform: scale(1); }

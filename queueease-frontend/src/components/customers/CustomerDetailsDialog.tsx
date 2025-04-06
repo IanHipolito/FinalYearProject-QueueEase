@@ -1,16 +1,7 @@
 import React from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Box,
-  Typography,
-  Avatar,
-  Chip,
-  Grid,
-  Button,
-  IconButton
+  Dialog, DialogTitle, DialogContent, DialogActions, 
+  Box, Typography, Avatar, Chip, Grid, Button, IconButton
 } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
@@ -18,24 +9,7 @@ import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string;
-  status: string;
-  orders: number;
-  avatar?: string;
-  is_active: boolean;
-  last_visit?: string;
-}
-
-interface CustomerDetailsDialogProps {
-  open: boolean;
-  onClose: () => void;
-  customer: Customer | null;
-}
+import { CustomerDetailsDialogProps } from 'types/customerTypes';
 
 const CustomerDetailsDialog: React.FC<CustomerDetailsDialogProps> = ({
   open,

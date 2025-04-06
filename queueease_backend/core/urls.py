@@ -19,11 +19,11 @@ from .views import (
     
     # Admin views
     admin_dashboard_data, admin_customers, admin_create_customer,
-    test_notification, admin_get_analytics,
+    test_notification, admin_get_analytics, notification_settings,
     
     # Feedback views
     submit_feedback, get_feedback_categories, get_user_feedback_history,
-    get_eligible_services
+    get_eligible_services,
 )
 from django.http import JsonResponse
 
@@ -48,7 +48,6 @@ urlpatterns = [
     path('service_queues/<int:service_id>/', service_queues, name='service_queues'),
     path('user-analytics/<int:user_id>/', user_analytics, name='user-analytics'),
     path('transfer-queue/', transfer_queue, name='transfer-queue'),
-
     
     # Authentication endpoints
     path('signup/', signup_view, name='signup'),
@@ -78,6 +77,7 @@ urlpatterns = [
     path('admin/customers/create/', admin_create_customer, name='admin-create-customer'),
     path('test-notification/', test_notification, name='test-notification'),
     path('admin-get-analytics/', admin_get_analytics, name='admin-get-analytics'),
+    path('admin/notification-settings/', notification_settings, name='notification-settings'),
     
     # Feedback endpoints
     path('feedback/submit/', submit_feedback, name='submit_feedback'),

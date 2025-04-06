@@ -7,23 +7,7 @@ import {
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CategoryIcon from '@mui/icons-material/Category';
 import BusinessIcon from '@mui/icons-material/Business';
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  category?: string;
-  location?: string;
-  business_hours?: string;
-  has_admin?: boolean;
-}
-
-interface ServiceDetailDialogProps {
-  open: boolean;
-  onClose: () => void;
-  service: Service | null;
-  onSelect?: (service: Service) => void;
-}
+import { ServiceDetailDialogProps } from 'types/serviceTypes';
 
 const ServiceDetailDialog: React.FC<ServiceDetailDialogProps> = ({
   open,

@@ -1,7 +1,7 @@
 const API_BASE =
     window.location.hostname === "localhost"
         ? "http://127.0.0.1:8000/api"
-        : "C21436494.pythonanywhere.com/api";
+        : "https://c21436494.pythonanywhere.com/api";
 
 export const API = {
     // Authentication endpoints
@@ -29,6 +29,15 @@ export const API = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
+            }),
+        saveFcmToken: (userId: number, fcmToken: string) =>
+            fetch(`${API_BASE}/save-fcm-token/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    user_id: userId, 
+                    fcm_token: fcmToken 
+                }),
             }),
     },
 
@@ -62,6 +71,14 @@ export const API = {
                     service_id: serviceId,
                     ...data
                 }),
+            }),
+        getNotificationSettings: (serviceId: number) =>
+            fetch(`${API_BASE}/admin/notification-settings/?service_id=${serviceId}`),
+        updateNotificationSettings: (data: any) =>
+            fetch(`${API_BASE}/admin/notification-settings/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
             }),
     },
 

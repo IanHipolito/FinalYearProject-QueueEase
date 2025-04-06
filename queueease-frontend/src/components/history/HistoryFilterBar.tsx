@@ -1,22 +1,9 @@
 import React from 'react';
-import {
-    Grid,
-    TextField,
-    Button,
-    InputAdornment
-} from '@mui/material';
+import { Grid, TextField, Button, InputAdornment } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SortIcon from '@mui/icons-material/Sort';
-
-interface HistoryFilterBarProps {
-    searchQuery: string;
-    handleSearch: (event: React.ChangeEvent<HTMLInputElement>) => void;
-    showFilters: boolean;
-    toggleFilters: () => void;
-    sortOrder: 'newest' | 'oldest';
-    setSortOrder: (order: 'newest' | 'oldest') => void;
-}
+import { HistoryFilterBarProps } from 'types/historyTypes';
 
 const HistoryFilterBar: React.FC<HistoryFilterBarProps> = ({
     searchQuery,

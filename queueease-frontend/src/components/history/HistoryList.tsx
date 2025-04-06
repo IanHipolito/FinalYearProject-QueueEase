@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography, Grid, useTheme } from '@mui/material';
 import HistoryCard from './HistoryCard';
 import HistorySummary from './HistorySummary';
-import { HistoryEntry, HistoryListProps } from '../../types/historyTypes';
+import { HistoryListProps } from 'types/historyTypes';
 
 const HistoryList: React.FC<HistoryListProps> = ({
     dateGroups,

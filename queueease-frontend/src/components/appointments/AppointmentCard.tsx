@@ -7,19 +7,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
-
-interface AppointmentCardProps {
-  appointment: {
-    order_id: string;
-    appointment_date: string;
-    appointment_time: string;
-    service_name: string;
-    appointment_title: string;
-  };
-  onView: (orderId: string) => void;
-  onRemove: (orderId: string) => void;
-  formatDate: (dateString: string) => string;
-}
+import { AppointmentCardProps } from 'types/appointmentTypes';
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment, onView, onRemove, formatDate

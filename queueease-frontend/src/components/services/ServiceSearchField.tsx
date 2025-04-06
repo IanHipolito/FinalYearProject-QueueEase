@@ -2,13 +2,7 @@ import React from 'react';
 import { TextField, InputAdornment, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
-
-interface ServiceSearchFieldProps {
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onClear: () => void;
-  placeholder?: string;
-}
+import { ServiceSearchFieldProps } from 'types/serviceTypes';
 
 const ServiceSearchField: React.FC<ServiceSearchFieldProps> = ({
   value,

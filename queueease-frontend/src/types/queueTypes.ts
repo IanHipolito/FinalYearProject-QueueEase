@@ -46,3 +46,64 @@ export interface QueueData {
   is_transferred?: boolean;
   original_queue_id?: number;
 }
+
+export interface QueueEntry {
+  id: number;
+  service_name: string;
+  date_created: string;
+  status: string;
+}
+
+export interface UserActivityChartProps {
+  queueHistory: QueueEntry[];
+  timeRange: string;
+}
+
+export interface CreateQueueDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onCreate: () => void;
+  formData: QueueFormData;
+  setFormData: (data: QueueFormData) => void;
+}
+
+export interface QueueManagementProps {
+  queues: Queue[];
+  loading: boolean;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
+}
+
+export interface QueueSearchProps {
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+}
+
+export interface QueueStatCardProps {
+  title: string;
+  value: number | string;
+  icon: React.ReactNode;
+  bgColor: string;
+  iconColor: string;
+}
+
+export interface QueueStatsOverviewProps {
+  totalQueues: number;
+  activeQueues: number;
+  inactiveQueues: number;
+  totalCustomersInActiveQueues: number;
+}
+
+export interface QueueStatusToggleProps {
+  activeQueues: number;
+  inactiveQueues: number;
+  bgColor: string;
+  iconColor: string;
+}
+
+export interface QueueTableProps {
+  queues: Queue[];
+  loading: boolean;
+  onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
+}

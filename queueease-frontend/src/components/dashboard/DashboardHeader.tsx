@@ -1,13 +1,6 @@
 import React from 'react';
-import { Box, Typography, FormControl, Select, MenuItem, SelectChangeEvent } from '@mui/material';
-
-interface DashboardHeaderProps {
-  title: string;
-  serviceName?: string;
-  services?: Array<{id: number, name: string, is_owner?: boolean}>;
-  onServiceChange: (event: SelectChangeEvent<number>) => void;
-  currentServiceId?: number;
-}
+import { Box, Typography, FormControl, Select, MenuItem } from '@mui/material';
+import { DashboardHeaderProps } from 'types/dashboardTypes';
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   title,

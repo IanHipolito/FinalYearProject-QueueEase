@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/api/**",
+        "destination": "https://c21436494.pythonanywhere.com/api/**"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

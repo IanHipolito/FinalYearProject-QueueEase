@@ -1,26 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../pages/AuthContext';
 import { useNavigate, Link, Routes, Route, Navigate } from 'react-router-dom';
-import {
-  Box,
-  CssBaseline,
-  AppBar,
-  Toolbar,
-  Typography,
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  IconButton,
-  Avatar,
-  Badge,
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
+import { 
+  Box, CssBaseline, AppBar, Toolbar, Typography, 
+  Drawer, List, ListItemButton, ListItemIcon, ListItemText, 
+  IconButton, Avatar, Divider, FormControl, InputLabel, 
+  Select, MenuItem, SelectChangeEvent,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
@@ -28,8 +13,6 @@ import QueueIcon from '@mui/icons-material/Queue';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
-import MenuIcon from '@mui/icons-material/Menu';
-import SearchIcon from '@mui/icons-material/Search';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardPage from '../pages/DashboardPage';
 import CustomersPage from '../pages/CustomersPage';
@@ -305,9 +288,7 @@ const AdminLayout: React.FC = () => {
             onClick={handleDrawerToggle}
             sx={{ mr: 2, display: { sm: 'none' } }}
           >
-            <MenuIcon />
           </IconButton>
-          
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center',
@@ -317,25 +298,8 @@ const AdminLayout: React.FC = () => {
             borderRadius: 10,
             px: 2
           }}>
-            <SearchIcon sx={{ color: '#9e9e9e', mr: 1 }} />
-            <input
-              style={{
-                border: 'none',
-                outline: 'none',
-                width: '100%',
-                padding: '10px',
-                background: 'transparent',
-                fontSize: '14px'
-              }}
-              placeholder="Search..."
-            />
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton>
-              <Badge badgeContent={4} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
             <Avatar 
               sx={{ ml: 2, width: 40, height: 40 }} 
               alt={user?.name || "Admin"} 
@@ -356,7 +320,7 @@ const AdminLayout: React.FC = () => {
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },

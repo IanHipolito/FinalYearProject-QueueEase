@@ -1,17 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Rating,
-  Chip,
-  Divider,
-  Collapse,
-  IconButton,
-  Tooltip
+  Box, Card, CardContent, Typography, Rating, Chip, Divider, Collapse, IconButton, Tooltip
 } from '@mui/material';
-import { UserFeedbackHistory } from '../../types/feedbackTypes';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import SentimentNeutralIcon from '@mui/icons-material/SentimentNeutral';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
@@ -19,10 +9,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import EventIcon from '@mui/icons-material/Event';
 import StoreIcon from '@mui/icons-material/Store';
-
-interface FeedbackHistoryCardProps {
-  feedback: UserFeedbackHistory;
-}
+import { FeedbackHistoryCardProps } from 'types/feedbackTypes';
 
 const FeedbackHistoryCard: React.FC<FeedbackHistoryCardProps> = ({ feedback }) => {
   const [expanded, setExpanded] = useState(false);

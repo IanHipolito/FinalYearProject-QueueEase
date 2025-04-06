@@ -1,29 +1,14 @@
 import React, { useCallback } from 'react';
-import {
-  Box,
-  TextField,
-  InputAdornment,
-  IconButton,
-  Paper,
-  Divider,
-  Badge,
-  Collapse,
-  useTheme
+import { 
+  Box, TextField, InputAdornment, IconButton, Paper, 
+  Divider, Badge, Collapse, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
-
-interface SearchBarProps {
-  filterText: string;
-  onFilterTextChange: (text: string) => void;
-  showFilters: boolean;
-  toggleFilters: () => void;
-  hasActiveFilters: boolean;
-  children?: React.ReactNode;
-}
+import { SearchBarProps } from 'types/mapTypes';
 
 const SearchBar: React.FC<SearchBarProps> = ({
   filterText,

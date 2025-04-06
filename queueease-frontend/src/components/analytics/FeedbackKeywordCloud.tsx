@@ -1,23 +1,6 @@
 import React, { useMemo } from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Tooltip, 
-  Skeleton,
-  useTheme
-} from '@mui/material';
-
-interface KeywordData {
-  text: string;
-  value: number;
-  sentiment: string;
-}
-
-interface FeedbackKeywordCloudProps {
-  keywords: KeywordData[];
-}
+import {  Box, Card, CardContent, Typography, Tooltip, Skeleton, useTheme } from '@mui/material';
+import { FeedbackKeywordCloudProps } from 'types/feedbackTypes';
 
 const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = [] }) => {
   const theme = useTheme();

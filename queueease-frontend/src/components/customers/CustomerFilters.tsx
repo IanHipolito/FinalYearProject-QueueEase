@@ -1,25 +1,12 @@
 import React from 'react';
 import {
-  Box,
-  TextField,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  InputAdornment
+  Box, TextField, Button, FormControl, 
+  InputLabel, Select, MenuItem, InputAdornment
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-
-interface CustomerFiltersProps {
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  filterStatus: string;
-  setFilterStatus: (status: string) => void;
-  onCreateCustomer: () => void;
-}
+import { CustomerFiltersProps } from 'types/customerTypes';
 
 const CustomerFilters: React.FC<CustomerFiltersProps> = ({
   searchTerm,

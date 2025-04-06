@@ -1,22 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  Container,
-  Grid,
-  Typography
-} from '@mui/material';
+import { Box, Button, Container, Grid, Typography } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import LoginIcon from '@mui/icons-material/Login';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-interface HeroSectionProps {
-  displayText: string;
-  fadeIn: boolean;
-}
+import { HeroSectionProps } from 'types/commonTypes';
 
 const HeroSection: React.FC<HeroSectionProps> = ({ displayText, fadeIn }) => {
   const navigate = useNavigate();

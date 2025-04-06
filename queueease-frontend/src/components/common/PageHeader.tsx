@@ -2,12 +2,7 @@ import React from 'react';
 import { Box, IconButton, Typography, useTheme } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useNavigate } from 'react-router-dom';
-
-interface PageHeaderProps {
-  title: string;
-  backUrl?: string;
-  onBack?: () => void;
-}
+import { PageHeaderProps } from 'types/commonTypes';
 
 const PageHeader: React.FC<PageHeaderProps> = ({ title, backUrl, onBack }) => {
   const navigate = useNavigate();

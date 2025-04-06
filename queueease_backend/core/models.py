@@ -150,7 +150,7 @@ class Queue(models.Model):
     date_deleted = models.DateTimeField(null=True, blank=True)
     expected_ready_time = models.DateTimeField(null=True, blank=True)
     transferred_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_to')
-
+    last_notification_time = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['sequence_number']
@@ -271,3 +271,14 @@ class Feedback(models.Model):
         
     def __str__(self):
         return f"Feedback from {self.user.name} for {self.service.name}"
+    
+class NotificationSettings(models.Model):
+    service = models.OneToOneField('Service', on_delete=models.CASCADE, related_name='notification_settings')
+    is_enabled = models.BooleanField(default=True)
+    frequency_minutes = models.IntegerField(default=5)
+    message_template = models.TextField(default="Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Notification Settings for {self.service.name}"

@@ -1,30 +1,9 @@
 import React from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography
+  Box, Card, CardContent, Paper, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Typography
 } from '@mui/material';
-
-interface FeedbackCategory {
-  id: number;
-  category: string;
-  satisfied: number;
-  neutral: number;
-  dissatisfied: number;
-  total?: number;
-}
-
-interface FeedbackTableProps {
-  data: FeedbackCategory[];
-}
+import { FeedbackTableProps } from 'types/analyticsTypes';
 
 const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
   return (

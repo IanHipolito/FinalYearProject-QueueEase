@@ -1,12 +1,6 @@
 import React from 'react';
 import { Box, Card, CardContent, Typography } from '@mui/material';
-
-interface AnalyticsSummaryCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-}
+import { AnalyticsSummaryCardProps } from 'types/analyticsTypes';
 
 const AnalyticsSummaryCard: React.FC<AnalyticsSummaryCardProps> = ({
   title,

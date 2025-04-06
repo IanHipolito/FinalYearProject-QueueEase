@@ -1,25 +1,9 @@
 import React from 'react';
-import {
-  Paper,
-  Box,
-  Typography,
-  Button,
-  IconButton
-} from '@mui/material';
+import { Paper, Box, Typography, Button, IconButton } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-
-interface BottomSheetProps {
-  height: 'collapsed' | 'partial' | 'full';
-  toggleHeight: () => void;
-  collapseSheet: () => void;
-  title: string;
-  filteredCount: number;
-  showResetButton: boolean;
-  onReset: () => void;
-  children: React.ReactNode;
-}
+import { BottomSheetProps } from 'types/mapTypes';
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
   height,

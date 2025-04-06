@@ -3,12 +3,7 @@ import { Box, Alert } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import FormTextField from '../form/FormTextField';
 import StyledButton from '../common/StyledButton';
-
-interface AppointmentFormProps {
-  onSubmit: (orderID: string) => Promise<void>;
-  initialValue?: string;
-  buttonText?: string;
-}
+import { AppointmentFormProps } from 'types/appointmentTypes';
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({
   onSubmit,

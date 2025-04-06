@@ -1,17 +1,8 @@
 import React from 'react';
-import { 
-  Box, 
-  Chip, 
-  useTheme,
-  Paper
-} from '@mui/material';
+import {  Box,  Chip,  useTheme, Paper } from '@mui/material';
 import { CATEGORIES } from '../../utils/mapUtils';
 import { getCategoryIcon } from './mapUtils';
-
-interface CategoryFilterProps {
-  selectedCategory: string;
-  onCategoryChange: (category: string) => void;
-}
+import { CategoryFilterProps } from 'types/mapTypes';
 
 const CategoryFilter: React.FC<CategoryFilterProps> = ({
   selectedCategory,

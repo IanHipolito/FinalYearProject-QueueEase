@@ -1,35 +1,12 @@
 import React from 'react';
 import {
-    Paper,
-    Typography,
-    Grid,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    SelectChangeEvent,
-    Button,
-    Box,
-    useTheme
+    Paper, Typography, Grid, FormControl, InputLabel, Select,
+    MenuItem, SelectChangeEvent, Button, Box, useTheme
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-
-interface AdvancedFiltersProps {
-    startDate: Date | null;
-    setStartDate: (date: Date | null) => void;
-    endDate: Date | null;
-    setEndDate: (date: Date | null) => void;
-    statusFilter: string;
-    setStatusFilter: (status: string) => void;
-    categoryFilter: string;
-    setCategoryFilter: (category: string) => void;
-    serviceTypeFilter: string;
-    setServiceTypeFilter: (type: string) => void;
-    categories: string[];
-    clearFilters: () => void;
-}
+import { AdvancedFiltersProps } from 'types/historyTypes';
 
 const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     startDate,

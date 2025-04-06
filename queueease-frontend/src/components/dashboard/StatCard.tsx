@@ -1,14 +1,7 @@
-import React, { ReactNode } from 'react';
+import React from 'react';
 import { Box, Card, CardContent, Typography, IconButton } from '@mui/material';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-
-interface StatCardProps {
-  title: string;
-  value: ReactNode;
-  icon: ReactNode;
-  color: string;
-  children?: ReactNode;
-}
+import { StatCardProps } from 'types/dashboardTypes';
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, children }) => {
   return (

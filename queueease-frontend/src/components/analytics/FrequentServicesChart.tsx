@@ -1,14 +1,6 @@
 import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
-
-interface ServiceData {
-  name: string;
-  count: number;
-}
-
-interface FrequentServicesChartProps {
-  services: ServiceData[];
-}
+import { FrequentServicesChartProps } from 'types/analyticsTypes';
 
 const FrequentServicesChart: React.FC<FrequentServicesChartProps> = ({ services }) => {
   const theme = useTheme();

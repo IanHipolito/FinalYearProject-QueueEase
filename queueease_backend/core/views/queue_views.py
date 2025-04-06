@@ -11,8 +11,7 @@ import logging
 import traceback
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework import status
-from datetime import datetime, timedelta
+from datetime import timedelta
 import random
 import numpy as np
 
@@ -20,7 +19,7 @@ from ..models import (
     Queue, QRCode, User, Service, Feedback, ServiceWaitTime, 
     QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken, ServiceQueue, AppointmentDetails
 )
-from ..services.notifications import send_queue_update_notification
+from ..services.notifications import send_queue_update_notification, send_push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -404,19 +403,43 @@ def complete_queue(request, queue_id):
         wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
         ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
         
-        # Update service queue status
+        # Send completion notification
+        try:
+            fcm_token = FCMToken.objects.filter(
+                user=queue_item.user, 
+                is_active=True
+            ).latest('updated_at')
+            
+            send_push_notification(
+                token=fcm_token.token,
+                title=f"Your order is ready!",
+                body=f"Your order at {queue_item.service.name} is now ready for collection.",
+                data={
+                    "type": "queue_completed",
+                    "queue_id": str(queue_item.id),
+                    "url": f"/success/{queue_item.id}"
+                }
+            )
+        except FCMToken.DoesNotExist:
+            pass
+        
+        # Update other queues that may change position
         if service_queue:
-            # Update positions for members behind this one
-            Queue.objects.filter(
+            affected_queues = Queue.objects.filter(
                 service_queue=service_queue,
                 sequence_number__gt=queue_item.sequence_number,
                 status='pending',
                 is_active=True
-            ).update(sequence_number=F('sequence_number')-1)
+            )
+            
+            # Update their sequence numbers
+            for affected_queue in affected_queues:
+                affected_queue.sequence_number = F('sequence_number') - 1
+                affected_queue.save(update_fields=['sequence_number'])
             
             update_service_queue_status(service_queue.id)
         
-        return Response({"status": "completed"})
+        return Response({"status": "completed", "notification_sent": True})
     except Exception as e:
         return Response({"error": str(e)}, status=500)
     

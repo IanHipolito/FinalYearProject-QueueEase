@@ -7,15 +7,7 @@ import {
   Typography
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-
-interface StatisticCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: string | number;
-  bgGradient: string;
-  chart?: React.ReactNode;
-}
+import { StatisticCardProps } from 'types/analyticsTypes';
 
 const StatisticCard: React.FC<StatisticCardProps> = ({ 
   title, 

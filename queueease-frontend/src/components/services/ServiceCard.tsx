@@ -1,25 +1,6 @@
 import React from 'react';
 import { Card, CardContent, Typography, Box, Chip, Button } from '@mui/material';
-
-interface ServiceCardProps {
-  service: {
-    id: number;
-    name: string;
-    description?: string;
-    category?: string;
-    wait_time?: number;
-    queue_length?: number;
-    service_type?: 'immediate' | 'appointment';
-  };
-  isSelected?: boolean;
-  onCardClick: (service: any) => void;
-  onJoinClick?: (serviceId: number) => void;
-  theme: any;
-}
-
-const getSafeCategory = (category?: string): string => {
-  return category || 'default';
-};
+import { ServiceCardProps } from 'types/mapTypes';
 
 const ServiceCard: React.FC<ServiceCardProps> = ({
   service,

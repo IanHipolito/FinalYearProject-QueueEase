@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, Container } from '@mui/material';
 import { Outlet } from 'react-router-dom';
-
-interface MainLayoutProps {
-  children?: React.ReactNode;
-  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-}
+import { MainLayoutProps } from 'types/commonTypes';
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children, maxWidth = 'md' }) => {
   return (

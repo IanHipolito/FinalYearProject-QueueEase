@@ -1,18 +1,7 @@
 import React from 'react';
 import { Box, Typography, CircularProgress, Button } from '@mui/material';
 import ServiceCard from './ServiceCard';
-import { Service } from '../../types/serviceTypes';
-
-interface ServiceListProps {
-  services: Service[];
-  loading: boolean;
-  selectedService: Service | null;
-  onServiceClick: (service: Service) => void;
-  onJoinClick: (serviceId: number) => void;
-  theme: any;
-  emptyMessage?: string;
-  onClearFilters?: () => void;
-}
+import { ServiceListProps } from 'types/serviceTypes';
 
 const ServiceList: React.FC<ServiceListProps> = ({
   services,

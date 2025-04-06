@@ -1,13 +1,7 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography, Switch, FormControlLabel } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
-
-interface QueueStatusToggleProps {
-  activeQueues: number;
-  inactiveQueues: number;
-  bgColor: string;
-  iconColor: string;
-}
+import { QueueStatusToggleProps } from 'types/queueTypes';
 
 const QueueStatusToggle: React.FC<QueueStatusToggleProps> = ({ 
   activeQueues, 

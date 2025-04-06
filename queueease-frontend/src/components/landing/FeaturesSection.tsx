@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Container,
-  Grid,
-  Paper,
-  Typography
-} from '@mui/material';
+import { Box, Container, Grid, Paper, Typography } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import LoyaltyIcon from '@mui/icons-material/Loyalty';

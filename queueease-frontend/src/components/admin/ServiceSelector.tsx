@@ -11,32 +11,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CategoryIcon from '@mui/icons-material/Category';
-
-interface Service {
-  id: number;
-  name: string;
-  description: string;
-  category?: string;
-  location?: string;
-  business_hours?: string;
-  has_admin?: boolean;
-}
-
-interface ServiceSelectorProps {
-  selectedService: Service | null;
-  onSelectService: (service: Service | null) => void;
-  loading: boolean;
-  services: Service[];
-  visibleServices: Service[];
-  filteredServices: Service[];
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  visibleStart: number;
-  ITEMS_PER_PAGE: number;
-  onScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  viewServiceDetails: (service: Service, e?: React.MouseEvent) => void;
-  submitting: boolean;
-}
+import { ServiceAdmin, ServiceSelectorProps } from 'types/serviceTypes';
 
 const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedService,
@@ -59,7 +34,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     setServiceDialogOpen(true);
   };
 
-  const handleServiceSelect = (service: Service | null) => {
+  const handleServiceSelect = (service: ServiceAdmin | null) => {
     onSelectService(service);
   };
 

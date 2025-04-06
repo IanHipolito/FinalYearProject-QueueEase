@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Container,
-  Grid,
-  Typography
-} from '@mui/material';
+import { Box, Container, Grid, Typography } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import MapIcon from '@mui/icons-material/Map';

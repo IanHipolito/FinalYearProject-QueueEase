@@ -1,11 +1,7 @@
 import React from 'react';
 import { TextField, InputAdornment } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-
-interface QueueSearchProps {
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-}
+import { QueueSearchProps } from 'types/queueTypes';
 
 const QueueSearch: React.FC<QueueSearchProps> = ({ searchTerm, setSearchTerm }) => {
   return (

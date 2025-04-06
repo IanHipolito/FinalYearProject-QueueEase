@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  Chip,
-  Divider,
-  Tabs,
-  Tab,
-  CircularProgress,
-  IconButton
-} from '@mui/material';
+import { Box, Typography, Button, Paper, Chip, Divider, Tabs, Tab, CircularProgress, IconButton } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
@@ -20,25 +9,10 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
-import { Service } from '../../types/serviceTypes';
+import { ServiceDetailProps } from 'types/serviceTypes';
 import { getCategoryIcon } from '../map/mapUtils';
-import { getCategoryColor } from '../../utils/mapUtils';
-
-interface ServiceDetailProps {
-  service: Service | null;
-  onClose: () => void;
-  onTransferClick: (serviceId: number) => void;
-  userLocation: { latitude: number; longitude: number } | null;
-  canTransfer: boolean;
-  activeQueue: any | null;
-}
-
-interface RouteInfo {
-  type: 'walking' | 'driving' | 'cycling';
-  distance: string;
-  duration: string;
-  loading: boolean;
-}
+import { getCategoryColor } from 'utils/mapUtils';
+import { RouteInfo } from 'types/mapTypes';
 
 const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
   service,

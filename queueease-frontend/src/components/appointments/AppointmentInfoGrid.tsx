@@ -6,17 +6,7 @@ import StorefrontIcon from '@mui/icons-material/Storefront';
 import QueueIcon from '@mui/icons-material/Queue';
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-interface AppointmentInfoGridProps {
-  appointment: {
-    service_name: string;
-    queue_status: string;
-    appointment_date: string;
-    appointment_time: string;
-    queue_position: number;
-  };
-  formatDate: (date: string) => string;
-}
+import { AppointmentInfoGridProps } from 'types/appointmentTypes';
 
 const AppointmentInfoGrid: React.FC<AppointmentInfoGridProps> = ({ appointment, formatDate }) => {
   return (

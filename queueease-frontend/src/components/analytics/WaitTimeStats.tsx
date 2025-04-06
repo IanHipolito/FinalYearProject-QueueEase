@@ -1,22 +1,6 @@
 import React from 'react';
 import { Box, Typography, useTheme, Tooltip, alpha } from '@mui/material';
-
-interface DayStats {
-    day: string;
-    avgWait: number;
-    count: number;
-}
-
-interface HourStats {
-    hour: number;
-    avgWait: number;
-    count: number;
-}
-
-interface WaitTimeStatsProps {
-    data: (DayStats | HourStats)[];
-    type: 'day' | 'hour';
-}
+import { DayStats, HourStats, WaitTimeStatsProps } from 'types/userAnalyticsTypes';
 
 const WaitTimeStats: React.FC<WaitTimeStatsProps> = ({ data, type }) => {
     const theme = useTheme();

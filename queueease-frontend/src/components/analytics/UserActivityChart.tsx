@@ -1,17 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, useTheme, Typography, Tooltip, Paper, CircularProgress, alpha } from '@mui/material';
-
-interface QueueEntry {
-  id: number;
-  service_name: string;
-  date_created: string;
-  status: string;
-}
-
-interface UserActivityChartProps {
-  queueHistory: QueueEntry[];
-  timeRange: string;
-}
+import { UserActivityChartProps } from 'types/queueTypes';
 
 const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, timeRange }) => {
   const theme = useTheme();

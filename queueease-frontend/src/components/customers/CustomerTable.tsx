@@ -1,41 +1,10 @@
 import React from 'react';
 import {
-  Paper,
-  TableContainer,
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-  Typography,
-  Box,
-  Avatar,
-  Chip,
-  IconButton,
-  Button
+  Paper, TableContainer, Table, TableHead, TableBody, TableRow, 
+  TableCell, Typography, Box, Avatar, Chip, IconButton, Button
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string;
-  status: string;
-  orders: number;
-  avatar?: string;
-  is_active: boolean;
-  last_visit?: string;
-}
-
-interface CustomerTableProps {
-  customers: Customer[];
-  loading: boolean;
-  renderSkeletons: () => React.ReactNode;
-  onShowDetails: (customer: Customer) => void;
-  searchTerm: string;
-  onClearFilter: () => void;
-}
+import { CustomerTableProps } from 'types/customerTypes';
 
 const CustomerTable: React.FC<CustomerTableProps> = ({
   customers,

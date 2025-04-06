@@ -1,25 +1,10 @@
 import React from 'react';
-import {
-  Box,
-  Slider,
-  Typography,
-  Paper,
-  Stack,
-  Chip,
-  useTheme
-} from '@mui/material';
+import { Box, Slider, Typography, Paper, Stack, useTheme } from '@mui/material';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DirectionsWalkIcon from '@mui/icons-material/DirectionsWalk';
 import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-
-interface DistanceFilterProps {
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-}
+import { DistanceFilterProps } from 'types/mapTypes';
 
 const DistanceFilter: React.FC<DistanceFilterProps> = ({
   value,

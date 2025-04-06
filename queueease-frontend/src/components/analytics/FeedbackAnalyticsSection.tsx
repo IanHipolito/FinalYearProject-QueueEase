@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Paper, 
-  Card, 
-  CardContent, 
-  useTheme, 
-  alpha, 
-  Divider, 
-  Chip,
-  Rating,
-  Tabs,
-  Tab,
-  CircularProgress
+  Box,  Typography,  Grid, Paper, Card, CardContent, useTheme, 
+  alpha, Divider, Chip, Rating, Tabs, Tab, CircularProgress
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -22,23 +10,7 @@ import SentimentNeutralIcon from '@mui/icons-material/SentimentNeutral';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
 import { API } from '../../services/api';
 import EmptyState from '../feedback/EmptyState';
-
-interface UserFeedback {
-  id: number;
-  service_name: string;
-  order_details: string;
-  rating: number;
-  date: string;
-  comment: string;
-  categories: string[];
-  sentiment: string;
-}
-
-interface FeedbackAnalyticsSectionProps {
-  userFeedback: UserFeedback[];
-  averageRating: number;
-  userId: number;
-}
+import { UserFeedback, FeedbackAnalyticsSectionProps } from 'types/feedbackTypes';
 
 const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({ 
   userFeedback: initialFeedback,

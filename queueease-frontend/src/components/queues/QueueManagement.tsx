@@ -2,26 +2,7 @@ import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
 import QueueSearch from './QueueSearch';
 import QueueTable from './QueueTable';
-
-interface Queue {
-  id: number;
-  name: string;
-  department: string;
-  status: string;
-  customers: number;
-  description?: string;
-  max_capacity?: number;
-  sequence_number?: number;
-  is_active?: boolean;
-}
-
-interface QueueManagementProps {
-  queues: Queue[];
-  loading: boolean;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
-}
+import { QueueManagementProps } from 'types/queueTypes';
 
 const QueueManagement: React.FC<QueueManagementProps> = ({
   queues,

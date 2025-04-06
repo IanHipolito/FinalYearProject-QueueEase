@@ -1,33 +1,10 @@
 import React from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  TextField,
-  Button,
-  Box,
-  Alert,
-  CircularProgress
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
+  TextField, Button, Box, Alert, CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-
-interface CustomerFormData {
-  name: string;
-  email: string;
-  phone: string;
-}
-
-interface CreateCustomerDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: () => void;
-  formData: CustomerFormData;
-  setFormData: React.Dispatch<React.SetStateAction<CustomerFormData>>;
-  formError: string;
-  formLoading: boolean;
-}
+import { CreateCustomerDialogProps } from 'types/customerTypes';
 
 const CreateCustomerDialog: React.FC<CreateCustomerDialogProps> = ({
   open,

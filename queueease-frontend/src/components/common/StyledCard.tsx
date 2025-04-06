@@ -1,10 +1,6 @@
 import React from 'react';
-import { Paper, PaperProps } from '@mui/material';
-
-interface StyledCardProps extends PaperProps {
-  children: React.ReactNode;
-  hoverEffect?: boolean;
-}
+import { Paper } from '@mui/material';
+import { StyledCardProps } from 'types/commonTypes';
 
 const StyledCard: React.FC<StyledCardProps> = ({ 
   children, 

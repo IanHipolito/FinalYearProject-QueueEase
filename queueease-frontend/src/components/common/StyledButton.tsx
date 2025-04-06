@@ -1,10 +1,6 @@
 import React from 'react';
 import { Button, ButtonProps, useTheme } from '@mui/material';
-
-interface StyledButtonProps extends ButtonProps {
-  children: React.ReactNode;
-  hoverAnimation?: boolean;
-}
+import { StyledButtonProps } from 'types/commonTypes';
 
 const StyledButton: React.FC<StyledButtonProps> = ({ 
   children, 

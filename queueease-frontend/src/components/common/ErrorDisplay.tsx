@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, Alert, Button } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-interface ErrorDisplayProps {
-  error: string;
-  onRetry?: () => void;
-}
+import { ErrorDisplayProps } from 'types/commonTypes';
 
 const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry }) => {
   return (

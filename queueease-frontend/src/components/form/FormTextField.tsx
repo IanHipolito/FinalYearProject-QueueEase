@@ -1,10 +1,6 @@
 import React from 'react';
 import { TextField, TextFieldProps as MuiTextFieldProps, InputAdornment } from '@mui/material';
-
-type FormTextFieldProps = MuiTextFieldProps & {
-  startIcon?: React.ReactNode;
-  endIcon?: React.ReactNode;
-};
+import { FormTextFieldProps } from 'types/commonTypes';
 
 const FormTextField: React.FC<FormTextFieldProps> = ({ 
   startIcon, 

@@ -21,8 +21,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
-# SECRET_KEY = 'django-insecure-nd!t0p79rj(u%jo)@&g(w)tyg_==s-ua7)xt&+%c(+4_4syh-m'
+# SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = 'django-insecure-nd!t0p79rj(u%jo)@&g(w)tyg_==s-ua7)xt&+%c(+4_4syh-m'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
@@ -104,27 +104,27 @@ WSGI_APPLICATION = 'queueease_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'queueease_db',
-#         'USER': 'queueease_user',
-#         'PASSWORD': 'fyp123',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'queueease_db',
         'USER': 'queueease_user',
         'PASSWORD': 'fyp123',
-        'HOST': 'C21436494-4463.postgres.pythonanywhere-services.com',
-        'PORT': '14463',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'queueease_db',
+#         'USER': 'queueease_user',
+#         'PASSWORD': 'fyp123',
+#         'HOST': 'C21436494-4463.postgres.pythonanywhere-services.com',
+#         'PORT': '14463',
+#     }
+# }
 
 
 # Password validation

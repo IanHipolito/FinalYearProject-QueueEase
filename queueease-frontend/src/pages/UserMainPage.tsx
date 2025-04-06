@@ -397,12 +397,6 @@ const handleLeaveQueue = () => {
               QueueEase
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton sx={{ mr: 2 }} onClick={() => navigate('/notifications')}>
-                <Badge badgeContent={notificationCount} color="error">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-
               <Box
                 onClick={handleProfileMenuClick}
                 sx={{
@@ -440,12 +434,6 @@ const handleLeaveQueue = () => {
                 transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
               >
-                <MenuItem onClick={() => navigate('/profile')}>
-                  <PersonIcon sx={{ mr: 2 }} /> Profile
-                </MenuItem>
-                <MenuItem onClick={() => navigate('/tickets')}>
-                  <ReceiptLongIcon sx={{ mr: 2 }} /> My Tickets
-                </MenuItem>
                 <Divider />
                 <MenuItem onClick={handleLogout}>
                   <LogoutIcon sx={{ mr: 2 }} /> Logout
@@ -561,7 +549,7 @@ const handleLeaveQueue = () => {
                           <Typography variant="body2">
                             {activeQueue.position === 1 ?
                               "You're next!" :
-                              `${activeQueue.position} people ahead of you`}
+                              `${activeQueue.position - 1} people ahead of you`}
                           </Typography>
                         </Box>
                         <Box sx={{

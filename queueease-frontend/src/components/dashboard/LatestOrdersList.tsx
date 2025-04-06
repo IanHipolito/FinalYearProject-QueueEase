@@ -9,26 +9,7 @@ import {
   IconButton
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-interface Order {
-  id: number | string;
-  customer_name: string;
-  date: string;
-  status: string;
-  service_name?: string;
-  time?: string;
-  type?: 'immediate' | 'appointment';
-}
-
-interface LatestOrdersListProps {
-  orders: Order[];
-  loading: boolean;
-  isImmediateService: () => boolean;
-  onRefresh: () => void;
-  onOrderClick: (order: Order) => void;
-  onViewAll: () => void;
-  getStatusColor: (status?: string) => string;
-}
+import { LatestOrdersListProps } from 'types/dashboardTypes';
 
 const LatestOrdersList: React.FC<LatestOrdersListProps> = ({
   orders,

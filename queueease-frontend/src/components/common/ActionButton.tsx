@@ -1,12 +1,6 @@
-import React, { ReactNode } from 'react';
-import { Button, ButtonProps, useTheme } from '@mui/material';
-
-interface ActionButtonProps extends ButtonProps {
-  children: ReactNode;
-  startIcon?: ReactNode;
-  endIcon?: ReactNode;
-  elevated?: boolean;
-}
+import React from 'react';
+import { Button, useTheme } from '@mui/material';
+import { ActionButtonProps } from 'types/commonTypes';
 
 const ActionButton: React.FC<ActionButtonProps> = ({ 
   children, 

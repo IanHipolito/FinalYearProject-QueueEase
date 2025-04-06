@@ -1,14 +1,6 @@
-import React, { ReactNode } from 'react';
+import React from 'react';
 import { Card, Box, Typography, useTheme } from '@mui/material';
-
-interface DetailCardProps {
-  title: string;
-  subtitle?: ReactNode;
-  icon?: ReactNode;
-  children: ReactNode;
-  subtitleIcon?: ReactNode;
-  headerColor?: string;
-}
+import { DetailCardProps } from 'types/commonTypes';
 
 const DetailCard: React.FC<DetailCardProps> = ({ 
   title, 

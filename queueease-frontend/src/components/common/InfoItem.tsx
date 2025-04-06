@@ -1,11 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
-
-interface InfoItemProps {
-  icon: ReactNode;
-  label: string;
-  value: ReactNode;
-}
+import { InfoItemProps } from 'types/commonTypes';
 
 const InfoItem: React.FC<InfoItemProps> = ({ icon, label, value }) => {
   return (

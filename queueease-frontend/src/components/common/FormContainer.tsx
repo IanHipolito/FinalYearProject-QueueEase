@@ -2,14 +2,7 @@ import React from 'react';
 import {
   Box, Paper, Container, Typography, Alert, ThemeProvider, createTheme, CssBaseline
 } from '@mui/material';
-
-interface FormContainerProps {
-  title: string;
-  children: React.ReactNode;
-  error?: string;
-  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  theme?: ReturnType<typeof createTheme>;
-}
+import { FormContainerProps } from 'types/commonTypes';
 
 const defaultTheme = createTheme({
   palette: {

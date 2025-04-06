@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography
-} from '@mui/material';
-
-interface SatisfactionDonutChartProps {
-  satisfactionRate: number;
-}
+import { Box, Card, CardContent, Typography } from '@mui/material';
+import { SatisfactionDonutChartProps } from 'types/analyticsTypes';
 
 const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({ satisfactionRate }) => {
   return (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Skeleton, Grid, Card, CardContent, Paper } from '@mui/material';
+import { LoadingSkeletonProps } from 'types/commonTypes';
 
 export const StatCardSkeleton = () => (
   <Card sx={{ borderRadius: 4, height: '100%' }}>
@@ -57,10 +58,6 @@ export const DashboardSkeleton = () => (
     </Grid>
   </Box>
 );
-
-interface LoadingSkeletonProps {
-  variant?: 'detail' | 'list' | 'card';
-}
 
 export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ variant = 'detail' }) => {
   if (variant === 'detail') {

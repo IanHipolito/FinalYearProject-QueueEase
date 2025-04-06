@@ -1,39 +1,12 @@
 import React from 'react';
 import { 
-  TableContainer, 
-  Paper, 
-  Table, 
-  TableHead, 
-  TableRow, 
-  TableCell, 
-  TableBody, 
-  Chip, 
-  IconButton,
-  Tooltip,
-  Switch 
+  TableContainer, Paper, Table, TableHead, TableRow, 
+  TableCell, TableBody, Chip, IconButton,Tooltip
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import { TableSkeleton } from '../skeletons/LoadingSkeletons';
-
-interface Queue {
-  id: number;
-  name: string;
-  department: string;
-  status: string;
-  customers: number;
-  description?: string;
-  max_capacity?: number;
-  sequence_number?: number;
-  is_active?: boolean;
-}
-
-interface QueueTableProps {
-  queues: Queue[];
-  loading: boolean;
-  onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
-}
+import { QueueTableProps } from 'types/queueTypes';
 
 const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleQueueStatus }) => {
   return (

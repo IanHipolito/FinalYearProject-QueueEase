@@ -1,13 +1,6 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography } from '@mui/material';
-
-interface QueueStatCardProps {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  bgColor: string;
-  iconColor: string;
-}
+import { QueueStatCardProps } from 'types/queueTypes';
 
 const QueueStatCard: React.FC<QueueStatCardProps> = ({ 
   title, 

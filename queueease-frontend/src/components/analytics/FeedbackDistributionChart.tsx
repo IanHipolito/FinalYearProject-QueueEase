@@ -1,30 +1,9 @@
 import React from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  FormControl,
-  Paper,
-  Select,
-  SelectChangeEvent,
-  MenuItem,
-  Typography
+  Box, Card, CardContent, FormControl, Paper,
+  Select, SelectChangeEvent, MenuItem, Typography
 } from '@mui/material';
-
-interface FeedbackCategory {
-  id: number;
-  category: string;
-  satisfied: number;
-  neutral: number;
-  dissatisfied: number;
-  total?: number;
-}
-
-interface FeedbackDistributionChartProps {
-  data: FeedbackCategory[];
-  timeRange: string;
-  onTimeRangeChange: (event: SelectChangeEvent) => void;
-}
+import { FeedbackDistributionChartProps } from 'types/analyticsTypes';
 
 const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({ 
   data, 

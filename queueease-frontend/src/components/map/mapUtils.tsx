@@ -1,10 +1,7 @@
-import React from 'react';
 import { FeatureCollection, Feature, Point } from 'geojson';
 import mapboxgl from 'mapbox-gl';
-import { Service } from '../../types/serviceTypes';
-import { MARKER_COLORS } from '../../utils/mapUtils';
-
-// Icons
+import { Service } from 'types/serviceTypes';
+import { MARKER_COLORS } from 'utils/mapUtils';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import FastfoodIcon from '@mui/icons-material/Fastfood';
 import LocalCafeIcon from '@mui/icons-material/LocalCafe';

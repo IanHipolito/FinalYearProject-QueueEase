@@ -1,15 +1,7 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo } from 'react';
 import { Box, Typography, Button, Paper } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-interface Props {
-  children: ReactNode;
-}
-
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
+import { Props, State } from 'types/commonTypes';
 
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {

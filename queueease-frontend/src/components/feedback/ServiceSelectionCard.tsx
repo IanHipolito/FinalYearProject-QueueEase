@@ -1,25 +1,13 @@
 import React from 'react';
 import {
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  Chip,
-  Tooltip
+  Card, CardContent, Typography, Box, Button, Chip, Tooltip
 } from '@mui/material';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { ServiceWithOrderDetails } from '../../types/feedbackTypes';
+import { ServiceSelectionCardProps } from 'types/feedbackTypes';
 import EventIcon from '@mui/icons-material/Event';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
-
-interface ServiceSelectionCardProps {
-  service: ServiceWithOrderDetails;
-  onSelect: () => void;
-  disabled?: boolean;
-}
 
 const ServiceSelectionCard: React.FC<ServiceSelectionCardProps> = ({ service, onSelect, disabled = false }) => {
   const formatDate = (dateString: string) => {

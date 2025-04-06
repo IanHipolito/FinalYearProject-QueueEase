@@ -4,13 +4,7 @@ import QueueStatCard from './QueueStatCard';
 import QueueStatusToggle from './QueueStatusToggle';
 import QueueIcon from '@mui/icons-material/Queue';
 import PersonIcon from '@mui/icons-material/Person';
-
-interface QueueStatsOverviewProps {
-  totalQueues: number;
-  activeQueues: number;
-  inactiveQueues: number;
-  totalCustomersInActiveQueues: number;
-}
+import { QueueStatsOverviewProps } from 'types/queueTypes';
 
 const QueueStatsOverview: React.FC<QueueStatsOverviewProps> = ({
   totalQueues,

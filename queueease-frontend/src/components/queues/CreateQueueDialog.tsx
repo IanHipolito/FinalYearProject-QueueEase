@@ -1,29 +1,7 @@
 import React from 'react';
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  Box,
-  TextField,
-  DialogActions,
-  Button
+import { Dialog, DialogTitle, DialogContent, DialogContentText, Box, TextField, DialogActions, Button
 } from '@mui/material';
-
-interface QueueFormData {
-  name: string;
-  department: string;
-  description: string;
-  max_capacity: number;
-}
-
-interface CreateQueueDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onCreate: () => void;
-  formData: QueueFormData;
-  setFormData: (data: QueueFormData) => void;
-}
+import { QueueFormData, CreateQueueDialogProps } from 'types/queueTypes';
 
 const CreateQueueDialog: React.FC<CreateQueueDialogProps> = ({
   open,

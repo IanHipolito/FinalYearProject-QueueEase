@@ -13,7 +13,7 @@ import traceback
 import numpy as np
 from collections import defaultdict
 
-from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence
+from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence, NotificationSettings
 from ..utils.keyword_extractor import KeywordExtractor
 from ..services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
 
@@ -639,3 +639,44 @@ def calculate_wait_time_trend(service, period):
             trend.append(trend[-1] if trend else 0)
     
     return trend
+
+@api_view(['GET', 'POST'])
+def notification_settings(request):
+    service_id = request.GET.get('service_id') or request.data.get('service_id')
+    if not service_id:
+        return Response({"error": "Service ID is required"}, status=400)
+    
+    try:
+        service = Service.objects.get(id=service_id)
+    except Service.DoesNotExist:
+        return Response({"error": "Service not found"}, status=404)
+    
+    # Get or create settings
+    settings, _ = NotificationSettings.objects.get_or_create(service=service)
+    
+    if request.method == 'GET':
+        return Response({
+            "service_id": service.id,
+            "is_enabled": settings.is_enabled,
+            "frequency_minutes": settings.frequency_minutes,
+            "message_template": settings.message_template
+        })
+    
+    elif request.method == 'POST':
+        # Update settings
+        if 'is_enabled' in request.data:
+            settings.is_enabled = request.data['is_enabled']
+        if 'frequency_minutes' in request.data:
+            settings.frequency_minutes = request.data['frequency_minutes']
+        if 'message_template' in request.data:
+            settings.message_template = request.data['message_template']
+        
+        settings.save()
+        
+        return Response({
+            "message": "Notification settings updated successfully",
+            "service_id": service.id,
+            "is_enabled": settings.is_enabled,
+            "frequency_minutes": settings.frequency_minutes,
+            "message_template": settings.message_template
+        })

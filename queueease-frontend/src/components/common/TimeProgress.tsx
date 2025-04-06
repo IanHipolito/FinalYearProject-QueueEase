@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, LinearProgress, Typography } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-interface TimeProgressProps {
-  remainingTime: string | number;
-  progressPercentage: number;
-}
+import { TimeProgressProps } from 'types/commonTypes';
 
 const TimeProgress: React.FC<TimeProgressProps> = ({ remainingTime, progressPercentage }) => {
   return (

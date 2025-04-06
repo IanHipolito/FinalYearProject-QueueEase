@@ -1,10 +1,6 @@
 import React from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
-
-interface LoadingOverlayProps {
-  message?: string;
-  transparent?: boolean;
-}
+import { LoadingOverlayProps } from 'types/commonTypes';
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   message = 'Loading...',

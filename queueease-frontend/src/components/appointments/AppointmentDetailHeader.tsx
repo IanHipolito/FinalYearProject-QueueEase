@@ -1,11 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
-
-interface AppointmentDetailHeaderProps {
-  title: string;
-  orderId: string;
-}
+import { AppointmentDetailHeaderProps } from 'types/appointmentTypes';
 
 const AppointmentDetailHeader: React.FC<AppointmentDetailHeaderProps> = ({ title, orderId }) => {
   return (

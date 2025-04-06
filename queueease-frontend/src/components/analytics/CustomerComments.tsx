@@ -1,35 +1,10 @@
 import React from 'react';
 import {
-  Avatar,
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  FormControl,
-  MenuItem,
-  Rating,
-  Select,
-  SelectChangeEvent,
-  Typography
+  Avatar, Box, Card, CardContent, Chip, Divider, 
+  FormControl, MenuItem, Rating, Select, Typography
 } from '@mui/material';
 import ChatIcon from '@mui/icons-material/Chat';
-
-interface CustomerComment {
-  id: number;
-  name: string;
-  date: string;
-  queue: string;
-  rating: number;
-  comment: string;
-  avatar?: string;
-}
-
-interface CustomerCommentsProps {
-  comments: CustomerComment[];
-  filter: string;
-  onFilterChange: (event: SelectChangeEvent) => void;
-}
+import { CustomerCommentsProps } from 'types/customerTypes';
 
 const CustomerComments: React.FC<CustomerCommentsProps> = ({ 
   comments, 

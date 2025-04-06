@@ -1,13 +1,6 @@
 import React from 'react';
 import {
-    Card,
-    CardContent,
-    Grid,
-    Box,
-    Typography,
-    Chip,
-    Button,
-    useTheme
+    Card, CardContent, Grid, Box, Typography, Chip, Button, useTheme
 } from '@mui/material';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -22,7 +15,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { API } from '../../services/api';
-import { HistoryCardProps } from '../../types/historyTypes';
+import { HistoryCardProps } from 'types/historyTypes';
 
 const HistoryCard: React.FC<HistoryCardProps> = ({
     entry,

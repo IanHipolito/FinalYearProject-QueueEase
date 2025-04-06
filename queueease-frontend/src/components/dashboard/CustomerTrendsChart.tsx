@@ -1,27 +1,10 @@
 import React from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  CircularProgress,
-  FormControl,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
-  IconButton,
-  Divider
+  Box, Typography, Button, CircularProgress, FormControl, 
+  Select, MenuItem, IconButton, Divider
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-
-interface CustomerTrendsChartProps {
-  customerStats: number[];
-  timeLabels: string[];
-  loading: boolean;
-  statsTimeRange: string;
-  onTimeRangeChange: (event: SelectChangeEvent) => void;
-  onRefresh: () => void;
-  isImmediateService: () => boolean;
-}
+import { CustomerTrendsChartProps } from 'types/customerTypes';
 
 const CustomerTrendsChart: React.FC<CustomerTrendsChartProps> = ({
   customerStats,

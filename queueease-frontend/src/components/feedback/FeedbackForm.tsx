@@ -1,37 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Rating,
-  TextField,
-  Chip,
-  Button,
-  FormControl,
-  FormHelperText,
-  CircularProgress,
-  Alert,
-  Paper,
-  Fade,
-  Grow,
-  Stack
+  Box, Typography, Rating, TextField, Chip, 
+  Button, FormControl, FormHelperText, Stack,
+  CircularProgress, Alert, Paper, Fade, Grow
 } from '@mui/material';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
 import SentimentNeutralIcon from '@mui/icons-material/SentimentNeutral';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { FeedbackCategory, FeedbackData } from '../../types/feedbackTypes';
 import { API } from 'services/api';
-
-interface FeedbackFormProps {
-  serviceId: number;
-  serviceName: string;
-  orderId: number;
-  orderDetails: string;
-  userId: number;
-  onSubmitSuccess: () => void;
-  availableCategories: FeedbackCategory[];
-  isLoading: boolean;
-}
+import { FeedbackData, FeedbackFormProps } from 'types/feedbackTypes';
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({
   serviceId,

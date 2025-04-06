@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Service } from '../types/serviceTypes';
-
-interface UseServiceFiltersProps {
-  services: Service[];
-  calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
-}
+import { Service, UseServiceFiltersProps } from '../types/serviceTypes';
 
 interface UseServiceFiltersReturn {
   filterText: string;

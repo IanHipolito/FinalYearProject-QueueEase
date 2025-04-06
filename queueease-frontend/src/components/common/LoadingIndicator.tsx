@@ -1,9 +1,6 @@
 import React from 'react';
 import { Backdrop, CircularProgress } from '@mui/material';
-
-interface LoadingIndicatorProps {
-  open: boolean;
-}
+import { LoadingIndicatorProps } from 'types/commonTypes';
 
 const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ open }) => {
   return (

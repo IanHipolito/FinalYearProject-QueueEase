@@ -1,14 +1,8 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { Service } from '../../types/serviceTypes';
+import { ServiceMarkerProps } from '../../types/serviceTypes';
 import { getCategoryColor } from '../../utils/mapUtils';
 import { getCategoryIcon } from './mapUtils';
-
-interface ServiceMarkerProps {
-  service: Service;
-  onClick: (service: Service) => void;
-  isSelected?: boolean;
-}
 
 const ServiceMarker: React.FC<ServiceMarkerProps> = ({ 
   service, 

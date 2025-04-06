@@ -1,10 +1,6 @@
 import React from 'react';
 import { Chip, ChipProps } from '@mui/material';
-
-interface StatusChipProps extends Omit<ChipProps, 'color'> {
-  status: string;
-  size?: 'small' | 'medium';
-}
+import { StatusChipProps } from 'types/commonTypes';
 
 const StatusChip: React.FC<StatusChipProps> = ({ status, size = 'small', ...rest }) => {
   const getStatusColor = (status: string): 'success' | 'warning' | 'info' | 'default' | 'error' | 'primary' | 'secondary' => {

@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  Box,
-  Container,
-  Typography
-} from '@mui/material';
+import { Box, Container, Typography } from '@mui/material';
 
 const Footer: React.FC = () => {
   return (
@@ -17,7 +13,7 @@ const Footer: React.FC = () => {
             A smart solution for efficient queue management
           </Typography>
           <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            © 2025 QueueEase. All rights reserved.
+            © 2025 QueueEase - Ian Rainier Hipolito. All rights reserved.
           </Typography>
         </Box>
       </Container>

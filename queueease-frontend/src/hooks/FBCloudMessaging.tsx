@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { messaging, getToken, onMessage, VAPID_KEY } from '../firebase/firebaseConfig';
 import { useAuth } from '../pages/AuthContext';
 import { Snackbar, Alert } from '@mui/material';
+import { API } from '../services/api';
 
 const FBCloudMessaging: React.FC = () => {
     const { user } = useAuth();
@@ -20,14 +21,7 @@ const FBCloudMessaging: React.FC = () => {
         if (!user?.id) return;
         
         try {
-            const response = await fetch('http://localhost:8000/api/save-fcm-token/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    user_id: user.id, 
-                    fcm_token: token 
-                }),
-            });
+            const response = await API.auth.saveFcmToken(user.id, token);
             
             if (response.ok) {
                 console.log('FCM token saved to server');

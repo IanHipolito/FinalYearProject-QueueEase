@@ -34,3 +34,27 @@ export interface HistoryListProps {
 export interface HistorySummaryProps {
     filteredHistory: HistoryEntry[];
 }
+
+export interface AdvancedFiltersProps {
+    startDate: Date | null;
+    setStartDate: (date: Date | null) => void;
+    endDate: Date | null;
+    setEndDate: (date: Date | null) => void;
+    statusFilter: string;
+    setStatusFilter: (status: string) => void;
+    categoryFilter: string;
+    setCategoryFilter: (category: string) => void;
+    serviceTypeFilter: string;
+    setServiceTypeFilter: (type: string) => void;
+    categories: string[];
+    clearFilters: () => void;
+}
+
+export interface HistoryFilterBarProps {
+    searchQuery: string;
+    handleSearch: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    showFilters: boolean;
+    toggleFilters: () => void;
+    sortOrder: 'newest' | 'oldest';
+    setSortOrder: (order: 'newest' | 'oldest') => void;
+}

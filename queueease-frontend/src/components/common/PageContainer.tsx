@@ -1,11 +1,6 @@
 import React from 'react';
-import { Box, Container, ContainerProps } from '@mui/material';
-
-interface PageContainerProps {
-  children: React.ReactNode;
-  maxWidth?: ContainerProps['maxWidth'];
-  centerContent?: boolean;
-}
+import { Box, Container } from '@mui/material';
+import { PageContainerProps } from 'types/commonTypes';
 
 const PageContainer: React.FC<PageContainerProps> = ({ 
   children, 

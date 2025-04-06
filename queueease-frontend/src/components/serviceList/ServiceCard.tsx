@@ -1,40 +1,16 @@
 import React from 'react';
-import {
-  Paper,
-  Box,
-  Typography,
-  Button,
-  Chip,
-  useTheme
-} from '@mui/material';
+import { Paper, Box, Typography, Button, useTheme } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
 import AddIcon from '@mui/icons-material/Add';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { getCategoryIcon } from '../map/mapUtils';
-import { getCategoryColor } from '../../utils/mapUtils';
+import { getCategoryColor } from 'utils/mapUtils';
+import { ServiceCardProps } from 'types/mapTypes';
 
 const getSafeCategory = (category?: string): string => {
   return category || 'default';
 };
-
-interface ServiceCardProps {
-  service: {
-    id: number;
-    name: string;
-    description?: string;
-    category?: string;
-    wait_time?: number;
-    queue_length?: number;
-    service_type?: 'immediate' | 'appointment';
-  };
-  isSelected?: boolean;
-  onCardClick: (service: any) => void;
-  onJoinClick?: (serviceId: number) => void;
-  onTransferClick?: (serviceId: number) => void;
-  showTransferButton?: boolean;
-  theme?: any;
-}
 
 const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
   service,

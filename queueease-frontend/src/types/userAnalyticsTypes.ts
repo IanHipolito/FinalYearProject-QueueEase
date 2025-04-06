@@ -68,3 +68,20 @@ export interface AnalyticsApiResponse {
   waitTimeByHour?: WaitTimeByHourEntry[];
   busyTimes?: BusyTimeEntry[];
 }
+
+export interface DayStats {
+  day: string;
+  avgWait: number;
+  count: number;
+}
+
+export interface HourStats {
+  hour: number;
+  avgWait: number;
+  count: number;
+}
+
+export interface WaitTimeStatsProps {
+  data: (DayStats | HourStats)[];
+  type: 'day' | 'hour';
+}

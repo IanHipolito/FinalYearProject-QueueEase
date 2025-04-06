@@ -1,3 +1,5 @@
+import { SelectChangeEvent } from '@mui/material/Select';
+
 export interface FeedbackCategory {
   id: number;
   category: string;
@@ -32,4 +34,47 @@ export interface AnalyticsData {
   wait_time_trend: number[];
   satisfaction_trend: number[];
   feedback_keywords: KeywordData[];
+}
+
+export interface AnalyticsSummaryCardProps {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+}
+
+export interface ServiceData {
+  name: string;
+  count: number;
+}
+
+export interface SatisfactionDonutChartProps {
+  satisfactionRate: number;
+}
+
+export interface StatisticCardProps {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  trend?: string | number;
+  bgGradient: string;
+  chart?: React.ReactNode;
+}
+
+export interface FeedbackDistributionChartProps {
+  data: FeedbackCategory[];
+  timeRange: string;
+  onTimeRangeChange: (event: SelectChangeEvent) => void;
+}
+
+export interface FeedbackKeywordCloudProps {
+  keywords: KeywordData[];
+}
+
+export interface FeedbackTableProps {
+  data: FeedbackCategory[];
+}
+
+export interface FrequentServicesChartProps {
+  services: ServiceData[];
 }

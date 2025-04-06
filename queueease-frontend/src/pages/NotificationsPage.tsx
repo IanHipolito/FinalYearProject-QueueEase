@@ -1,43 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Grid, Typography, TextField, Button, Card, CardContent, Switch,
-  FormControlLabel, Divider, FormControl, InputLabel, Select,
-  MenuItem, IconButton, Chip, FormHelperText
+  FormControlLabel, Divider, IconButton, Chip, FormHelperText, CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TimerIcon from '@mui/icons-material/Timer';
-import MessageIcon from '@mui/icons-material/Message';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { useAuth } from './AuthContext';
+import { API } from '../services/api';
 
 const NotificationsPage: React.FC = () => {
+  const { currentService } = useAuth();
   const [frequency, setFrequency] = useState<number>(5);
   const [messageTemplate, setMessageTemplate] = useState<string>('');
   const [enabled, setEnabled] = useState<boolean>(true);
-  const [notificationType, setNotificationType] = useState<string>('sms');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [saveLoading, setSaveLoading] = useState<boolean>(false);
+  const [alert, setAlert] = useState<{open: boolean, message: string, severity: 'success' | 'error'}>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   useEffect(() => {
-    setFrequency(5);
-    setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
-    setEnabled(true);
-  }, []);
+    if (currentService) {
+      loadSettings();
+    }
+  }, [currentService]);
 
-  const handleSave = () => {
-    console.log({ frequency, messageTemplate, enabled, notificationType });
+  const loadSettings = async () => {
+    if (!currentService?.id) return;
+    
+    setLoading(true);
+    try {
+      const response = await API.admin.getNotificationSettings(currentService.id);
+      if (response.ok) {
+        const data = await response.json();
+        setFrequency(data.frequency_minutes);
+        setMessageTemplate(data.message_template);
+        setEnabled(data.is_enabled);
+      } else {
+        // If settings don't exist yet, we'll use defaults
+        setFrequency(5);
+        setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
+        setEnabled(true);
+      }
+    } catch (error) {
+      console.error('Error loading notification settings:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    if (!currentService?.id) return;
+    
+    setSaveLoading(true);
+    try {
+      const response = await API.admin.updateNotificationSettings({
+        service_id: currentService.id,
+        is_enabled: enabled,
+        frequency_minutes: frequency,
+        message_template: messageTemplate
+      });
+      
+      if (response.ok) {
+        setAlert({
+          open: true,
+          message: 'Notification settings saved successfully',
+          severity: 'success'
+        });
+      } else {
+        setAlert({
+          open: true,
+          message: 'Failed to save notification settings',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+      setAlert({
+        open: true,
+        message: 'An error occurred while saving settings',
+        severity: 'error'
+      });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleCloseAlert = () => {
+    setAlert({...alert, open: false});
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
       <Typography variant="h5" fontWeight="500" gutterBottom>
-        Notifications
+        Push Notifications
       </Typography>
 
       {/* Top Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {/* Notifications Stats Card */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Card sx={{ 
             borderRadius: 4, 
             background: 'linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)',
@@ -68,7 +144,7 @@ const NotificationsPage: React.FC = () => {
         </Grid>
 
         {/* Frequency Card */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Card sx={{ 
             borderRadius: 4, 
             background: 'linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)',
@@ -96,35 +172,6 @@ const NotificationsPage: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Message Type Card */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ 
-            borderRadius: 4, 
-            background: 'linear-gradient(135deg, #198754 0%, #28a745 100%)',
-            color: '#fff',
-            height: '100%'
-          }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
-                  <MessageIcon />
-                </Box>
-                <IconButton sx={{ color: 'white' }}>
-                  <MoreVertIcon />
-                </IconButton>
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="h3" fontWeight="bold" sx={{ textTransform: 'uppercase' }}>
-                  {notificationType}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
-                  Notification Type
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
       </Grid>
 
       {/* Settings Card */}
@@ -133,7 +180,7 @@ const NotificationsPage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
             <SettingsIcon sx={{ mr: 1, color: '#6f42c1' }} />
             <Typography variant="h6" fontWeight="500">
-              Notification Configuration
+              Push Notification Configuration
             </Typography>
           </Box>
           
@@ -159,28 +206,11 @@ const NotificationsPage: React.FC = () => {
                 }
                 label={
                   <Typography variant="subtitle1" fontWeight="500">
-                    Enable Notifications
+                    Enable Push Notifications
                   </Typography>
                 }
                 sx={{ mb: 3 }}
               />
-              
-              <FormControl fullWidth variant="outlined" sx={{ mb: 3 }}>
-                <InputLabel id="notification-type-label">Notification Type</InputLabel>
-                <Select
-                  labelId="notification-type-label"
-                  id="notification-type"
-                  value={notificationType}
-                  onChange={(e) => setNotificationType(e.target.value)}
-                  label="Notification Type"
-                  sx={{ borderRadius: 2 }}
-                >
-                  <MenuItem value="sms">SMS</MenuItem>
-                  <MenuItem value="email">Email</MenuItem>
-                  <MenuItem value="push">Push Notification</MenuItem>
-                </Select>
-                <FormHelperText>Select how customers will receive notifications</FormHelperText>
-              </FormControl>
               
               <TextField
                 label="Notification Frequency (minutes)"
@@ -265,8 +295,9 @@ const NotificationsPage: React.FC = () => {
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
             <Button 
               variant="contained" 
-              startIcon={<SaveIcon />}
+              startIcon={saveLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
               onClick={handleSave}
+              disabled={saveLoading}
               sx={{ 
                 borderRadius: 2, 
                 bgcolor: '#6f42c1', 
@@ -276,11 +307,26 @@ const NotificationsPage: React.FC = () => {
                 }
               }}
             >
-              Save Settings
+              {saveLoading ? 'Saving...' : 'Save Settings'}
             </Button>
           </Box>
         </CardContent>
       </Card>
+
+      <Snackbar 
+        open={alert.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseAlert}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseAlert} 
+          severity={alert.severity} 
+          sx={{ width: '100%' }}
+        >
+          {alert.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

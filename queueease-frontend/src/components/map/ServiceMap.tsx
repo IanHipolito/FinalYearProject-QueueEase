@@ -3,21 +3,9 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Box, Button, CircularProgress } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
-import { Service } from '../../types/serviceTypes';
+import { Service, ServiceMapProps } from 'types/serviceTypes';
 import { prepareGeoJSON, getServicePointLayer, getServiceSymbolLayer, addMapStyles } from './mapUtils';
-import { DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN } from '../../utils/mapUtils';
-
-// Types
-interface ServiceMapProps {
-  services: Service[];
-  selectedService: Service | null;
-  onServiceClick: (service: Service) => void;
-  height?: string;
-  isMobile?: boolean;
-  maxDistance?: number;
-  userLocation: { latitude: number; longitude: number } | null;
-  onUserLocationChange: (location: { latitude: number; longitude: number } | null) => void;
-}
+import { DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN } from 'utils/mapUtils';
 
 const ServiceMap: React.FC<ServiceMapProps> = ({
   services,

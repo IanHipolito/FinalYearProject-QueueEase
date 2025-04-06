@@ -1,24 +1,10 @@
 import React from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Tooltip,
-  IconButton,
-  Skeleton
+  Box, Card, CardContent, Typography, 
+  Tooltip, IconButton, Skeleton
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
-
-interface CustomerStatsCardProps {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  description: string;
-  loading: boolean;
-  gradient: string;
-  chart?: React.ReactNode;
-}
+import { CustomerStatsCardProps } from 'types/customerTypes';
 
 const CustomerStatsCard: React.FC<CustomerStatsCardProps> = ({
   title,
