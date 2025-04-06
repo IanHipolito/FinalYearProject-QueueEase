@@ -6,7 +6,6 @@ import SignupPage from './pages/Signup';
 import LoginPage from './pages/Login';
 import QRScanner from './pages/QRScanner';
 import QRCodeScreenWrapper from './pages/QRCodeScreenWrapper';
-import GuestSignup from './pages/GuestSignup';
 import SuccessPage from './pages/SuccessPage';
 import MapProximity from './pages/MapProximity';
 import AppointmentsList from './pages/AppointmentsList';
@@ -14,15 +13,15 @@ import AppointmentDetail from './pages/AppointmentDetail';
 import OrderIDInput from './pages/OrderIDInput';
 import AddAppointment from './pages/AddAppointment';
 import ServiceSelection from './pages/ServiceSelection';
-import AdminLayout from './components/AdminLayout';
+import AdminLayout from './components/Layout/AdminLayout';
 import FBCloudMessaging from './hooks/FBCloudMessaging';
 import BookAppointment from './pages/BookAppointment';
 import QueueHistory from 'pages/QueueHistory';
 import AdminLogin from './pages/AdminLogin';
 import AdminSignup from './pages/AdminSignup';
 import { AuthProvider } from './pages/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
-import IOSInstallGuide from './components/IOSInstallGuide';
+import PrivateRoute from './components/Layout/PrivateRoute';
+import IOSInstallGuide from './components/common/IOSInstallGuide';
 import FeedbackPage from './pages/FeedbackPage';
 import UserAnalyticsPage from './pages/UserAnalyticsPage';
 
@@ -37,7 +36,6 @@ const App: React.FC = () => {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/guest" element={<GuestSignup />} />
           <Route path="/main" element={<MainPage />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-signup" element={<AdminSignup />} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../pages/AuthContext';
+import { useAuth } from 'pages/AuthContext';
 import { PrivateRouteProps } from 'types/commonTypes';
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, adminOnly = false }) => {

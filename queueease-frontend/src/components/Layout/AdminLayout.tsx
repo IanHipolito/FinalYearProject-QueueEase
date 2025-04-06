@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../pages/AuthContext';
+import { useAuth } from 'pages/AuthContext';
 import { useNavigate, Link, Routes, Route, Navigate } from 'react-router-dom';
 import { 
   Box, CssBaseline, AppBar, Toolbar, Typography, 
@@ -14,12 +14,12 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
-import DashboardPage from '../pages/DashboardPage';
-import CustomersPage from '../pages/CustomersPage';
-import QueuesPage from '../pages/QueuesPage';
-import AnalyticsPage from '../pages/AnalyticsPage';
-import NotificationsPage from '../pages/NotificationsPage';
-import SettingsPage from '../pages/SettingsPage';
+import DashboardPage from 'pages/DashboardPage';
+import CustomersPage from 'pages/CustomersPage';
+import QueuesPage from 'pages/QueuesPage';
+import AnalyticsPage from 'pages/AnalyticsPage';
+import NotificationsPage from 'pages/NotificationsPage';
+import SettingsPage from 'pages/SettingsPage';
 
 const drawerWidth = 260;
 

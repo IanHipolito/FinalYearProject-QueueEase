@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import {
   Box, Button, Checkbox, Container, Divider, FormControlLabel, Paper,
   TextField, Typography, Link, ThemeProvider, createTheme, CssBaseline,
-  useMediaQuery, IconButton, InputAdornment
+  useMediaQuery, IconButton, InputAdornment, Snackbar, Alert
 } from "@mui/material";
 import { API } from '../services/api';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -46,9 +46,20 @@ const Login: React.FC = () => {
     password: "",
     keepSignedIn: false,
   });
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
       const response = await API.auth.login(formData.email, formData.password);
@@ -56,16 +67,34 @@ const Login: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         await login(data.email, formData.password);
-        alert("Login successful!");
-        navigate("/usermainpage");
-        console.log("User data:", data);
+        
+        setSnackbar({
+          open: true,
+          message: 'Login successful!',
+          severity: 'success'
+        });
+        
+        // Navigate after a short delay to allow the user to see the success message
+        setTimeout(() => {
+          navigate("/usermainpage");
+        }, 1000);
       } else {
         const errorData = await response.json();
-        alert(`Login failed: ${errorData.error}`);
+        setSnackbar({
+          open: true,
+          message: `Login failed: ${errorData.error}`,
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error("Error during login:", error);
-      alert("An error occurred. Please try again.");
+      setSnackbar({
+        open: true,
+        message: "An error occurred. Please try again.",
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,6 +108,13 @@ const Login: React.FC = () => {
 
   const toggleShowPassword = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({
+      ...snackbar,
+      open: false
+    });
   };
 
   return (
@@ -96,9 +132,9 @@ const Login: React.FC = () => {
         }}
       >
         <Container maxWidth="xs" disableGutters={isMobile}>
-          <Paper 
-            elevation={3} 
-            sx={{ 
+          <Paper
+            elevation={3}
+            sx={{
               p: isMobile ? 2 : 4,
               borderRadius: 3,
               boxShadow: '0 4px 20px rgba(111,66,193,0.15)',
@@ -106,11 +142,11 @@ const Login: React.FC = () => {
             }}
           >
             <Box sx={{ textAlign: 'center', mb: isMobile ? 2 : 3 }}>
-              <Typography 
-                variant={isMobile ? "h4" : "h3"} 
-                component="h1" 
-                sx={{ 
-                  fontWeight: 'bold', 
+              <Typography
+                variant={isMobile ? "h4" : "h3"}
+                component="h1"
+                sx={{
+                  fontWeight: 'bold',
                   color: 'primary.main',
                   background: 'linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)',
                   WebkitBackgroundClip: 'text',
@@ -168,11 +204,11 @@ const Login: React.FC = () => {
                   ),
                 }}
               />
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                mt: 0.5, 
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mt: 0.5,
                 mb: 1,
                 flexDirection: isMobile ? 'column' : 'row',
               }}>
@@ -189,24 +225,16 @@ const Login: React.FC = () => {
                   label={<Typography variant={isMobile ? "caption" : "body2"}>Keep me signed in</Typography>}
                   sx={{ mr: 0 }}
                 />
-                <Link 
-                  component="button"
-                  variant={isMobile ? "caption" : "body2"}
-                  onClick={() => navigate("/forgot-password")}
-                  underline="hover"
-                  sx={{ mt: isMobile ? 0 : 'auto', alignSelf: isMobile ? 'flex-start' : 'center' }}
-                >
-                  Forgot Password
-                </Link>
               </Box>
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 color="primary"
-                sx={{ 
-                  mt: 1, 
-                  py: isMobile ? 0.8 : 1.2, 
+                disabled={loading}
+                sx={{
+                  mt: 1,
+                  py: isMobile ? 0.8 : 1.2,
                   borderRadius: 2,
                   background: 'linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)',
                   boxShadow: '0 4px 14px rgba(111,66,193,0.25)',
@@ -216,20 +244,20 @@ const Login: React.FC = () => {
                   }
                 }}
               >
-                Login
+                {loading ? 'Logging in...' : 'Login'}
               </Button>
-              
+
               <Box sx={{ mt: 2 }}>
                 <Divider sx={{ my: 1.5 }}>
                   <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
                     or
                   </Typography>
                 </Divider>
-                
+
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1.5 }}>
-                  <Button 
-                    variant="outlined" 
-                    color="primary" 
+                  <Button
+                    variant="outlined"
+                    color="primary"
                     onClick={() => navigate("/signup")}
                     fullWidth
                     size={isMobile ? "small" : "medium"}
@@ -245,26 +273,28 @@ const Login: React.FC = () => {
                   >
                     Create an account
                   </Button>
-                  
-                  <Button 
-                    variant="text" 
-                    color="secondary" 
-                    onClick={() => navigate("/main")}
-                    fullWidth
-                    size={isMobile ? "small" : "medium"}
-                    sx={{ 
-                      borderRadius: 2,
-                      py: isMobile ? 0.6 : 0.8
-                    }}
-                  >
-                    Continue as guest
-                  </Button>
                 </Box>
               </Box>
             </Box>
           </Paper>
         </Container>
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 };

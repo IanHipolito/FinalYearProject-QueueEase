@@ -712,7 +712,7 @@ def queue_history(request, user_id):
                     "category": queue.service.category if hasattr(queue, 'service') and queue.service else "uncategorized",
                     "date_created": queue.date_created.isoformat() if hasattr(queue, 'date_created') else "",
                     "status": queue.status if hasattr(queue, 'status') else "unknown",
-                    "waiting_time": queue.waiting_time if hasattr(queue, 'waiting_time') else 0,
+                    "waiting_time": int((queue.expected_ready_time - queue.date_created).total_seconds()) if queue.expected_ready_time and queue.date_created else None,
                     "position": queue.position if hasattr(queue, 'position') else None,
                     "service_type": queue.service.service_type if hasattr(queue, 'service') and queue.service else "immediate",
                     "transferred_from": queue.transferred_from.id if hasattr(queue, 'transferred_from') and queue.transferred_from else None,

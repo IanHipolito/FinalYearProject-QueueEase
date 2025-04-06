@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, Button, Container, Divider, Paper, TextField,
   Typography, ThemeProvider, createTheme, CssBaseline,
-  useMediaQuery, FormControl, Select, MenuItem, InputAdornment
+  useMediaQuery, FormControl, Select, MenuItem, InputAdornment,
+  Snackbar, Alert
 } from "@mui/material";
 import { API } from '../services/api';
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
@@ -64,6 +65,16 @@ const Signup: React.FC = () => {
   });
 
   const [isFormValid, setIsFormValid] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
 
   useEffect(() => {
     validateForm();
@@ -125,6 +136,7 @@ const Signup: React.FC = () => {
       return;
     }
 
+    setLoading(true);
     const fullPhoneNumber = `${formData.countryCode}${formData.phoneNumber}`;
 
     const { confirmPassword, countryCode, phoneNumber, ...otherData } = formData;
@@ -137,15 +149,33 @@ const Signup: React.FC = () => {
       const response = await API.auth.signup(dataToSend);
 
       if (response.ok) {
-        alert("Signup successful!");
-        navigate("/usermainpage");
+        setSnackbar({
+          open: true,
+          message: 'Signup successful!',
+          severity: 'success'
+        });
+        
+        // Navigate after a short delay to allow the user to see the success message
+        setTimeout(() => {
+          navigate("/usermainpage");
+        }, 1000);
       } else {
         const errorData = await response.json();
-        alert(`Signup failed: ${errorData.error || "Unknown error"}`);
+        setSnackbar({
+          open: true,
+          message: `Signup failed: ${errorData.error || "Unknown error"}`,
+          severity: 'error'
+        });
       }
     } catch (error) {
       console.error("Error during signup:", error);
-      alert("An error occurred. Please try again.");
+      setSnackbar({
+        open: true,
+        message: "An error occurred. Please try again.",
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -156,6 +186,13 @@ const Signup: React.FC = () => {
 
   const handleSelectChange = (e: any) => {
     setFormData({ ...formData, countryCode: e.target.value });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({
+      ...snackbar,
+      open: false
+    });
   };
 
   return (
@@ -314,7 +351,7 @@ const Signup: React.FC = () => {
                 fullWidth
                 variant="contained"
                 color="primary"
-                disabled={!isFormValid}
+                disabled={!isFormValid || loading}
                 sx={{ 
                   mt: 1, 
                   py: isMobile ? 0.8 : 1.2, 
@@ -327,36 +364,10 @@ const Signup: React.FC = () => {
                   }
                 }}
               >
-                Sign Up
+                {loading ? 'Signing up...' : 'Sign Up'}
               </Button>
 
               <Box sx={{ mt: 2 }}>
-                <Divider sx={{ my: 1.5 }}>
-                  <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
-                    or sign in as guest
-                  </Typography>
-                </Divider>
-                
-                <Button 
-                  variant="outlined" 
-                  color="secondary"
-                  onClick={() => navigate('/guest')} 
-                  fullWidth
-                  size={isMobile ? "small" : "medium"}
-                  sx={{
-                    borderRadius: 2,
-                    py: isMobile ? 0.6 : 0.8,
-                    mt: 1,
-                    borderColor: theme.palette.secondary.main,
-                    '&:hover': {
-                      borderColor: theme.palette.secondary.dark,
-                      backgroundColor: 'rgba(76,175,80,0.04)',
-                    }
-                  }}
-                >
-                  Continue as guest
-                </Button>
-
                 <Box sx={{ textAlign: 'center', mt: 2 }}>
                   <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">
                     Already have an account?{" "}
@@ -380,6 +391,23 @@ const Signup: React.FC = () => {
           </Paper>
         </Container>
       </Box>
+
+      {/* Add Snackbar component */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 };
