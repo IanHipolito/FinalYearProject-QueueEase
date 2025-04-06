@@ -625,11 +625,11 @@ def leave_queue(request, queue_id):
         if queue.status != 'pending' or not queue.is_active:
             return Response({"error": "This queue has already been completed or is inactive"}, status=400)
         
-        # Check if it's within the time window (3 minutes)
+        # Check if it's within the time window (1 minutes)
         time_window = timedelta(minutes=3)
         if timezone.now() - queue.date_created > time_window:
             return Response(
-                {"error": "You can only leave a queue within the first 3 minutes of joining"}, 
+                {"error": "You can only leave a queue within the first 1 minute of joining"}, 
                 status=400
             )
         

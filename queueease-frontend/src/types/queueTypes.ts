@@ -107,3 +107,7 @@ export interface QueueTableProps {
   loading: boolean;
   onToggleQueueStatus: (queueId: number, newStatus: boolean) => void;
 }
+
+export interface QueueProgressAnimationProps {
+  position: number;
+}

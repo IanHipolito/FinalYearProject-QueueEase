@@ -1,6 +1,6 @@
 import React from 'react';
 import { Paper, Typography, Grid, Box, useTheme } from '@mui/material';
-import { HistoryEntry, HistorySummaryProps } from 'types/historyTypes';
+import { HistorySummaryProps } from 'types/historyTypes';
 
 const HistorySummary: React.FC<HistorySummaryProps> = ({ filteredHistory }) => {
     const theme = useTheme();

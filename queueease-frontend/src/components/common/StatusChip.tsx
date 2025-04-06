@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chip, ChipProps } from '@mui/material';
+import { Chip } from '@mui/material';
 import { StatusChipProps } from 'types/commonTypes';
 
 const StatusChip: React.FC<StatusChipProps> = ({ status, size = 'small', ...rest }) => {

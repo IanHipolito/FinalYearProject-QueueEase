@@ -10,29 +10,17 @@ import TimeProgress from '../components/common/TimeProgress';
 import ActionButton from '../components/common/ActionButton';
 import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
 import { formatDate } from '../utils/formatters';
-
-interface AppointmentDetail {
-  order_id: string;
-  appointment_date: string;
-  appointment_time: string;
-  service_name: string;
-  queue_status: string;
-  status: string;
-  estimated_wait_time: number;
-  queue_position: number;
-  appointment_title: string;
-  expected_start_time: string;
-}
+import { AppointmentDetail as AppointmentDetailType } from 'types/appointmentTypes';
 
 const AppointmentDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
-  const [appointment, setAppointment] = useState<AppointmentDetail | null>(null);
+  const [appointment, setAppointment] = useState<AppointmentDetailType | null>(null);
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const [formattedRemainingTime, setFormattedRemainingTime] = useState<string>('');
   const navigate = useNavigate();
 
   // Function to update queue status based on time and other factors
-  const determineQueueStatus = (appointment: AppointmentDetail, currentTime: Date, timeRemaining: number): string => {
+  const determineQueueStatus = (appointment: AppointmentDetailType, currentTime: Date, timeRemaining: number): string => {
     const expectedStartTime = new Date(appointment.expected_start_time);
     const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}Z`);
     

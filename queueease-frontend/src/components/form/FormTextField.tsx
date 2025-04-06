@@ -1,5 +1,5 @@
 import React from 'react';
-import { TextField, TextFieldProps as MuiTextFieldProps, InputAdornment } from '@mui/material';
+import { TextField, InputAdornment } from '@mui/material';
 import { FormTextFieldProps } from 'types/commonTypes';
 
 const FormTextField: React.FC<FormTextFieldProps> = ({ 

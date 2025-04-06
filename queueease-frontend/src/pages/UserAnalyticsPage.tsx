@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
 import { useAuth } from './AuthContext';
@@ -57,17 +57,279 @@ const UserAnalyticsPage: React.FC = () => {
   });
   const [feedbackData, setFeedbackData] = useState<UserFeedback[]>([]);
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
+  const ensureAllDaysPresent = useCallback((dayStats: WaitTimeStatsEntry[]): WaitTimeStatsEntry[] => {
+    const days: string[] = [
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    ];
+    
+    const dayMap: {[key: string]: WaitTimeStatsEntry} = {};
+    
+    // Map existing data
+    dayStats.forEach(stat => {
+      dayMap[stat.day] = stat;
+    });
+    
+    // Ensure all days exist
+    const completeStats = days.map(day => {
+      return dayMap[day] || { day, avgWait: 0, count: 0 };
+    });
+    
+    return completeStats;
+  }, []);
+
+  const calculateWaitTimeByDay = useCallback((
+    history: AnalyticsHistoryEntry[]
+  ): WaitTimeStatsEntry[] => {
+    const days: string[] = [
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    ];
+    
+    // Initialize all days with zero values
+    const dayStats = days.map(day => ({ 
+      day, 
+      totalWait: 0, 
+      count: 0 
+    }));
+
+    history.forEach(queue => {
+      if (queue.waiting_time && queue.status === 'completed') {
+        const waitTime = typeof queue.waiting_time === 'string' 
+          ? parseInt(queue.waiting_time) 
+          : (queue.waiting_time || 0);
+          
+        if (waitTime > 0) {
+          const date: Date = new Date(queue.date_created);
+          const dayIndex: number = date.getDay();
+          dayStats[dayIndex].totalWait += waitTime;
+          dayStats[dayIndex].count++;
+        }
+      }
+    });
+
+    return dayStats.map(stat => ({
+      day: stat.day,
+      avgWait: stat.count > 0 ? Math.round(stat.totalWait / stat.count) : 0,
+      count: stat.count
+    }));
+  }, []);
+
+  const calculateWaitTimeByHour = useCallback((
+    history: AnalyticsHistoryEntry[]
+  ): WaitTimeByHourEntry[] => {
+    const hourStats = Array.from({ length: 24 }, (_, i) => ({ 
+      hour: i, 
+      totalWait: 0, 
+      count: 0 
+    }));
+
+    history.forEach(queue => {
+      if (queue.waiting_time && queue.status === 'completed') {
+        const waitTime = typeof queue.waiting_time === 'string' 
+          ? parseInt(queue.waiting_time) 
+          : (queue.waiting_time || 0);
+          
+        if (waitTime > 0) {
+          const date: Date = new Date(queue.date_created);
+          const hour: number = date.getHours();
+          hourStats[hour].totalWait += waitTime;
+          hourStats[hour].count++;
+        }
+      }
+    });
+
+    return hourStats
+      .filter(stat => stat.count > 0)
+      .map(stat => ({
+        hour: stat.hour,
+        avgWait: Math.round(stat.totalWait / stat.count),
+        count: stat.count
+      }));
+  }, []);
+
+  const calculateBusyTimes = useCallback((
+    history: AnalyticsHistoryEntry[]
+  ): BusyTimeEntry[] => {
+    const days: string[] = [
+      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+    ];
+    const busyTimes: BusyTimeEntry[] = [];
+    
+    // Group by day and hour
+    const dayHourMap: Record<string, { day: number; hour: number; count: number; }> = {};
+    
+    history.forEach(queue => {
+      const date: Date = new Date(queue.date_created);
+      const day: number = date.getDay();
+      const hour: number = date.getHours();
+      const key: string = `${day}-${hour}`;
+      
+      if (!dayHourMap[key]) {
+        dayHourMap[key] = { day, hour, count: 0 };
+      }
+      
+      dayHourMap[key].count++;
+    });
+    
+    // Convert to array and sort by count
+    Object.values(dayHourMap).forEach((item) => {
+      busyTimes.push({
+        dayName: days[item.day],
+        hour: item.hour,
+        count: item.count
+      });
+    });
+    
+    return busyTimes.sort((a, b) => b.count - a.count).slice(0, 5);
+  }, []);
+
+  const processAnalyticsData = useCallback((
+    historyData: AnalyticsHistoryEntry[],
+    timeRange: "week" | "month" | "year"
+  ): AnalyticsData => {
+    // Filter data based on time range
+    const now: Date = new Date();
+    let startDate: Date;
+    
+    switch(timeRange) {
+      case 'week':
+        startDate = new Date(now.getTime());
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime());
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getTime());
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate = new Date(now.getTime());
+        startDate.setMonth(now.getMonth() - 1);
     }
     
-    fetchAnalyticsData();
-    fetchFeedbackData();
-  }, [user, timeRange, refreshKey]);
+    const filteredHistory = historyData.filter(entry => 
+      new Date(entry.date_created) >= startDate
+    );
+    
+    // Calculate statistics from filtered data
+    const completedQueues = filteredHistory.filter(q => q.status === 'completed').length;
+    const canceledQueues = filteredHistory.filter(q => q.status === 'canceled' || q.status === 'cancelled').length;
+    
+    // Calculate average wait time from completed queues
+    const totalWaitTime = filteredHistory
+      .filter(q => q.status === 'completed' && q.waiting_time)
+      .reduce((sum, queue) => {
+        const waitTime = typeof queue.waiting_time === 'string' 
+          ? parseInt(queue.waiting_time) 
+          : (queue.waiting_time || 0);
+        return sum + waitTime;
+      }, 0);
+        
+    const averageWaitTime = completedQueues > 0 ? Math.round(totalWaitTime / completedQueues) : 0;
+    
+    // Get most visited services
+    const serviceVisits: { [key: string]: number } = {};
+    filteredHistory.forEach(q => {
+      if (!serviceVisits[q.service_name]) {
+        serviceVisits[q.service_name] = 0;
+      }
+      serviceVisits[q.service_name]++;
+    });
+    
+    const mostVisitedServices: ServiceVisit[] = Object.entries(serviceVisits)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+        
+    // Calculate wait time by day of week and hour of day
+    const waitTimeByDay: WaitTimeStatsEntry[] = ensureAllDaysPresent(calculateWaitTimeByDay(filteredHistory));
+    const waitTimeByHour: WaitTimeByHourEntry[] = calculateWaitTimeByHour(filteredHistory);
+    
+    // Calculate busy times
+    const busyTimes: BusyTimeEntry[] = calculateBusyTimes(filteredHistory);
+    
+    return {
+      totalQueues: filteredHistory.length,
+      completedQueues,
+      canceledQueues,
+      appointmentCount: 0, // Will be updated elsewhere
+      averageWaitTime,
+      queueHistory: filteredHistory,
+      mostVisitedServices,
+      waitTimeByDay,
+      waitTimeByHour,
+      busyTimes
+    };
+  }, [ensureAllDaysPresent, calculateWaitTimeByDay, calculateWaitTimeByHour, calculateBusyTimes]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchRawQueueData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const historyRes = await API.queues.getUserQueues(user.id);
+      
+      if (!historyRes.ok) {
+        throw new Error('Failed to fetch queue history');
+      }
+      
+      const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
+      
+      // Ensure proper status field values
+      const normalizedData = historyData.map((item: AnalyticsHistoryEntry) => ({
+        ...item,
+        status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
+      }));
+      
+      // Fetch appointments data
+      const appointmentsRes = await API.appointments.getAll(user.id);
+      let appointmentCount = 0;
+      
+      if (appointmentsRes.ok) {
+        const appointmentsData = await appointmentsRes.json();
+        appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
+      }
+      
+      const processedData = processAnalyticsData(normalizedData, timeRange);
+      setAnalyticsData({
+        ...processedData,
+        appointmentCount,
+        queueHistory: normalizedData
+      });
+    } catch (error) {
+      console.error("Error in fetchRawQueueData:", error);
+      throw error;
+    }
+  }, [user, timeRange, processAnalyticsData]);
+
+  const fetchFeedbackData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const feedbackRes = await API.feedback.getUserFeedbackHistory(user.id);
+      
+      if (feedbackRes.ok) {
+        const feedback = await feedbackRes.json();
+        setFeedbackData(feedback);
+        
+        // Calculate average rating if we have feedback data
+        if (Array.isArray(feedback) && feedback.length > 0) {
+          const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
+          const avgRating = Math.round((totalRating / feedback.length) * 10) / 10;
+          
+          setAnalyticsData(prev => ({
+            ...prev,
+            averageRating: avgRating,
+            userFeedback: feedback
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching feedback data:", err);
+    }
+  }, [user]);
+
+  const fetchAnalyticsData = useCallback(async () => {
     setLoading(true);
     setError('');
     
@@ -148,290 +410,7 @@ const UserAnalyticsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchFeedbackData = async () => {
-    if (!user) return;
-    
-    try {
-      const feedbackRes = await API.feedback.getUserFeedbackHistory(user.id);
-      
-      if (feedbackRes.ok) {
-        const feedback = await feedbackRes.json();
-        setFeedbackData(feedback);
-        
-        // Calculate average rating if we have feedback data
-        if (Array.isArray(feedback) && feedback.length > 0) {
-          const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
-          const avgRating = Math.round((totalRating / feedback.length) * 10) / 10;
-          
-          setAnalyticsData(prev => ({
-            ...prev,
-            averageRating: avgRating,
-            userFeedback: feedback
-          }));
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching feedback data:", err);
-    }
-  };
-
-  const fetchRawQueueData = async () => {
-    try {
-      const historyRes = await API.queues.getUserQueues(user!.id);
-      
-      if (!historyRes.ok) {
-        throw new Error('Failed to fetch queue history');
-      }
-      
-      const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
-      
-      // Ensure proper status field values
-      const normalizedData = historyData.map((item: AnalyticsHistoryEntry) => ({
-        ...item,
-        status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
-      }));
-      
-      // Fetch appointments data
-      const appointmentsRes = await API.appointments.getAll(user!.id);
-      let appointmentCount = 0;
-      
-      if (appointmentsRes.ok) {
-        const appointmentsData = await appointmentsRes.json();
-        appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
-      }
-      
-      const processedData = processAnalyticsData(normalizedData, timeRange);
-      setAnalyticsData({
-        ...processedData,
-        appointmentCount,
-        queueHistory: normalizedData
-      });
-    } catch (error) {
-      console.error("Error in fetchRawQueueData:", error);
-      throw error;
-    }
-  };
-
-  const processAnalyticsData = (
-    historyData: AnalyticsHistoryEntry[],
-    timeRange: "week" | "month" | "year"
-  ): AnalyticsData => {
-    // Filter data based on time range
-    const now: Date = new Date();
-    let startDate: Date;
-    
-    switch(timeRange) {
-      case 'week':
-        startDate = new Date(now.getTime());
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        startDate = new Date(now.getTime());
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case 'year':
-        startDate = new Date(now.getTime());
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        startDate = new Date(now.getTime());
-        startDate.setMonth(now.getMonth() - 1);
-    }
-    
-    const filteredHistory = historyData.filter(entry => 
-      new Date(entry.date_created) >= startDate
-    );
-    
-    // Calculate statistics from filtered data
-    const completedQueues = filteredHistory.filter(q => q.status === 'completed').length;
-    const canceledQueues = filteredHistory.filter(q => q.status === 'canceled' || q.status === 'cancelled').length;
-    
-    // Calculate average wait time from completed queues
-    const totalWaitTime = filteredHistory
-      .filter(q => q.status === 'completed' && q.waiting_time)
-      .reduce((sum, queue) => {
-        const waitTime = typeof queue.waiting_time === 'string' 
-          ? parseInt(queue.waiting_time) 
-          : (queue.waiting_time || 0);
-        return sum + waitTime;
-      }, 0);
-        
-    const averageWaitTime = completedQueues > 0 ? Math.round(totalWaitTime / completedQueues) : 0;
-    
-    // Get most visited services
-    const serviceVisits: { [key: string]: number } = {};
-    filteredHistory.forEach(q => {
-      if (!serviceVisits[q.service_name]) {
-        serviceVisits[q.service_name] = 0;
-      }
-      serviceVisits[q.service_name]++;
-    });
-    
-    const mostVisitedServices: ServiceVisit[] = Object.entries(serviceVisits)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-        
-    // Calculate wait time by day of week and hour of day
-    const waitTimeByDay: WaitTimeStatsEntry[] = ensureAllDaysPresent(calculateWaitTimeByDay(filteredHistory));
-    const waitTimeByHour: WaitTimeByHourEntry[] = calculateWaitTimeByHour(filteredHistory);
-    
-    // Calculate busy times
-    const busyTimes: BusyTimeEntry[] = calculateBusyTimes(filteredHistory);
-    
-    return {
-      totalQueues: filteredHistory.length,
-      completedQueues,
-      canceledQueues,
-      appointmentCount: 0, // Will be updated elsewhere
-      averageWaitTime,
-      queueHistory: filteredHistory,
-      mostVisitedServices,
-      waitTimeByDay,
-      waitTimeByHour,
-      busyTimes
-    };
-  };
-
-  // Ensure all days of the week are present in wait time data
-  const ensureAllDaysPresent = (dayStats: WaitTimeStatsEntry[]): WaitTimeStatsEntry[] => {
-    const days: string[] = [
-      'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
-    ];
-    
-    const dayMap: {[key: string]: WaitTimeStatsEntry} = {};
-    
-    // Map existing data
-    dayStats.forEach(stat => {
-      dayMap[stat.day] = stat;
-    });
-    
-    // Ensure all days exist
-    const completeStats = days.map(day => {
-      return dayMap[day] || { day, avgWait: 0, count: 0 };
-    });
-    
-    return completeStats;
-  };
-
-  const calculateWaitTimeByDay = (
-    history: AnalyticsHistoryEntry[]
-  ): WaitTimeStatsEntry[] => {
-    const days: string[] = [
-      'Sunday',
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday'
-    ];
-    
-    // Initialize all days with zero values
-    const dayStats = days.map(day => ({ 
-      day, 
-      totalWait: 0, 
-      count: 0 
-    }));
-
-    history.forEach(queue => {
-      if (queue.waiting_time && queue.status === 'completed') {
-        const waitTime = typeof queue.waiting_time === 'string' 
-          ? parseInt(queue.waiting_time) 
-          : (queue.waiting_time || 0);
-          
-        if (waitTime > 0) {
-          const date: Date = new Date(queue.date_created);
-          const dayIndex: number = date.getDay();
-          dayStats[dayIndex].totalWait += waitTime;
-          dayStats[dayIndex].count++;
-        }
-      }
-    });
-
-    return dayStats.map(stat => ({
-      day: stat.day,
-      avgWait: stat.count > 0 ? Math.round(stat.totalWait / stat.count) : 0,
-      count: stat.count
-    }));
-  };
-
-  const calculateWaitTimeByHour = (
-    history: AnalyticsHistoryEntry[]
-  ): WaitTimeByHourEntry[] => {
-    const hourStats = Array.from({ length: 24 }, (_, i) => ({ 
-      hour: i, 
-      totalWait: 0, 
-      count: 0 
-    }));
-
-    history.forEach(queue => {
-      if (queue.waiting_time && queue.status === 'completed') {
-        const waitTime = typeof queue.waiting_time === 'string' 
-          ? parseInt(queue.waiting_time) 
-          : (queue.waiting_time || 0);
-          
-        if (waitTime > 0) {
-          const date: Date = new Date(queue.date_created);
-          const hour: number = date.getHours();
-          hourStats[hour].totalWait += waitTime;
-          hourStats[hour].count++;
-        }
-      }
-    });
-
-    return hourStats
-      .filter(stat => stat.count > 0)
-      .map(stat => ({
-        hour: stat.hour,
-        avgWait: Math.round(stat.totalWait / stat.count),
-        count: stat.count
-      }));
-  };
-
-  const calculateBusyTimes = (
-    history: AnalyticsHistoryEntry[]
-  ): BusyTimeEntry[] => {
-    const days: string[] = [
-      'Sunday', 
-      'Monday', 
-      'Tuesday', 
-      'Wednesday', 
-      'Thursday', 
-      'Friday', 
-      'Saturday'
-    ];
-    const busyTimes: BusyTimeEntry[] = [];
-    
-    // Group by day and hour
-    const dayHourMap: Record<string, { day: number; hour: number; count: number; }> = {};
-    
-    history.forEach(queue => {
-      const date: Date = new Date(queue.date_created);
-      const day: number = date.getDay();
-      const hour: number = date.getHours();
-      const key: string = `${day}-${hour}`;
-      
-      if (!dayHourMap[key]) {
-        dayHourMap[key] = { day, hour, count: 0 };
-      }
-      
-      dayHourMap[key].count++;
-    });
-    
-    // Convert to array and sort by count
-    Object.values(dayHourMap).forEach((item) => {
-      busyTimes.push({
-        dayName: days[item.day],
-        hour: item.hour,
-        count: item.count
-      });
-    });
-    
-    return busyTimes.sort((a, b) => b.count - a.count).slice(0, 5);
-  };
+  }, [user, timeRange, fetchRawQueueData]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -440,6 +419,16 @@ const UserAnalyticsPage: React.FC = () => {
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    fetchAnalyticsData();
+    fetchFeedbackData();
+  }, [user, timeRange, refreshKey, fetchAnalyticsData, fetchFeedbackData, navigate]);
 
   if (loading) {
     return (

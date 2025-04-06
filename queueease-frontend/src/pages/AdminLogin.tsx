@@ -19,17 +19,13 @@ const theme = createTheme({
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { adminLogin } = useAuth();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+  const { adminLogin } = useAuth();  
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
-  
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Box, Card, CardContent, FormControl, Paper,
-  Select, SelectChangeEvent, MenuItem, Typography
+  Select, MenuItem, Typography
 } from '@mui/material';
 import { FeedbackDistributionChartProps } from 'types/analyticsTypes';
 

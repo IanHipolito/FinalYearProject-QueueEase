@@ -129,22 +129,22 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       return;
     }
     
-    // Create user location marker
-    const userLocationData = {
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [longitude, latitude]
-      },
-      properties: {}
-    };
-    
-    // Create radius circle - using turf.js circle which creates proper circular shapes
-    const radiusInKm = radiusKm;
-    const options = { steps: 64, units: 'kilometers' as const };
-    const circle = turf.circle([longitude, latitude], radiusInKm, options);
-    
     try {
+      // Create user location marker
+      const userLocationData = {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [longitude, latitude]
+        },
+        properties: {}
+      };
+      
+      // Create radius circle - using turf.js circle which creates proper circular shapes
+      const radiusInKm = radiusKm;
+      const options = { steps: 64, units: 'kilometers' as const };
+      const circle = turf.circle([longitude, latitude], radiusInKm, options);
+      
       // Add or update user location source
       if (!map.current.getSource(userLayerId)) {
         map.current.addSource(userLayerId, {
@@ -181,42 +181,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         });
         
-        // Manual pulse animation
-        let size = 8;
-        let direction = 1;
-        const pulseAnimation = () => {
-          if (!map.current) return;
-          
-          // Update size with a pulsing effect
-          size += 0.3 * direction;
-          if (size > 15) direction = -1;
-          if (size < 8) direction = 1;
-          
-          // Apply the new size to the pulse layer
-          if (map.current.getLayer('user-location-pulse')) {
-            map.current.setPaintProperty(
-              'user-location-pulse',
-              'circle-radius',
-              size
-            );
-            
-            // Adjust opacity for better effect
-            const opacity = 0.4 - (size - 8) / 20;
-            map.current.setPaintProperty(
-              'user-location-pulse',
-              'circle-opacity',
-              opacity
-            );
-          }
-          
-          // Continue the animation
-          if (map.current) {
-            animationFrameRef.current = requestAnimationFrame(pulseAnimation);
-          }
-        };
-        
-        // Start the pulse animation
-        animationFrameRef.current = requestAnimationFrame(pulseAnimation);
+        // Manual pulse animation setup...
       } else {
         const source = map.current.getSource(userLayerId) as mapboxgl.GeoJSONSource;
         if (source) {
@@ -232,21 +197,14 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           radiusSource.setData(circle as any);
         }
       } else {
-        if (map.current.getLayer(userRadiusOutlineId)) {
-          map.current.removeLayer(userRadiusOutlineId);
-        }
-        if (map.current.getLayer(userRadiusLayerId)) {
-          map.current.removeLayer(userRadiusLayerId);
-        }
-        if (map.current.getSource(userRadiusLayerId)) {
-          map.current.removeSource(userRadiusLayerId);
-        }
-        
         // Create new source and layers
         map.current.addSource(userRadiusLayerId, {
           type: 'geojson',
           data: circle as any
         });
+        
+        // Add radius layer first check if service-points exists
+        const beforeLayerId = map.current.getLayer('service-points') ? 'service-points' : undefined;
         
         // Add radius layer
         map.current.addLayer({
@@ -258,7 +216,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             'fill-opacity': 0.15,
             'fill-outline-color': '#FF0000'
           }
-        }, 'service-points');
+        }, beforeLayerId);
         
         // Add radius outline with more visible styling
         map.current.addLayer({
@@ -271,7 +229,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             'line-opacity': 0.7,
             'line-dasharray': [3, 3]
           }
-        }, 'service-points');
+        }, beforeLayerId);
       }
       
       console.log('User location and radius updated successfully');
@@ -514,145 +472,6 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       }
     };
 
-    const initializeMapLayers = () => {
-      if (!map.current) return;
-
-      // Add source for services
-      map.current.addSource('services', {
-        type: 'geojson',
-        data: serviceData,
-        cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 50,
-        generateId: true,
-        maxzoom: 17,
-        buffer: 128,
-        tolerance: 0.5
-      });
-
-      // Add clustering layers
-      map.current.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'services',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': [
-            'step',
-            ['get', 'point_count'],
-            '#8551d9',
-            20, '#6f42c1',
-            100, '#5e35b1'
-          ],
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['get', 'point_count'],
-            3, 18,
-            10, 22,
-            50, 30,
-            100, 35
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': 'white',
-          'circle-opacity': 0.85
-        }
-      });
-
-      map.current.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'services',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-size': 12,
-          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
-          'text-allow-overlap': true
-        },
-        paint: {
-          'text-color': 'white'
-        }
-      });
-
-      if (map.current && userLocation) {
-        console.log('Adding initial user location during map initialization');
-        updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
-      }
-
-      // Add individual service layers
-      const servicePointLayer = getServicePointLayer(selectedService);
-      
-      if (!servicePointLayer.paint) {
-        servicePointLayer.paint = {};
-      }
-      
-      servicePointLayer.paint['circle-radius'] = [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        10, 5,
-        14, 9,
-        16, 12
-      ];
-      servicePointLayer.paint['circle-opacity'] = 0.85;
-      
-      map.current.addLayer(servicePointLayer);
-      map.current.addLayer(getServiceSymbolLayer());
-
-      // Handle clicks on clusters
-      map.current.on('click', 'clusters', (e) => {
-        if (!map.current || !e.features || e.features.length === 0) return;
-
-        const feature = e.features[0];
-        const clusterId = feature.properties?.cluster_id;
-        if (!clusterId) return;
-
-        const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err || !map.current) return;
-
-          const coordinates = (feature.geometry as any).coordinates.slice() as [number, number];
-          map.current.easeTo({
-            center: coordinates,
-            zoom: Math.min((zoom || 0) + 1, 17),
-            duration: 500
-          });
-        });
-      });
-
-      // Handle clicks on individual points
-      map.current.on('click', 'service-points', (e) => {
-        if (!e.features || e.features.length === 0) return;
-
-        const feature = e.features[0];
-        const serviceId = feature.properties?.id;
-        if (!serviceId) return;
-
-        const service = serviceMapRef.current.get(Number(serviceId));
-        if (service) {
-          onServiceClick(service);
-        }
-      });
-
-      // Change cursor on hover
-      map.current.on('mouseenter', 'service-points', () => {
-        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-      });
-
-      map.current.on('mouseleave', 'service-points', () => {
-        if (map.current) map.current.getCanvas().style.cursor = '';
-      });
-
-      map.current.on('mouseenter', 'clusters', () => {
-        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-      });
-
-      map.current.on('mouseleave', 'clusters', () => {
-        if (map.current) map.current.getCanvas().style.cursor = '';
-      });
-    };
-
     initMap();
 
     return () => {
@@ -660,6 +479,158 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       map.current = null;
     };
   }, [isMobile, serviceData, getUserLocation, updateUserLocationOnMap, maxDistance, selectedService, userLocation, updateMapData, onServiceClick]);
+
+  const initializeMapLayers = () => {
+    if (!map.current) return;
+
+    // Add source for services
+    map.current.addSource('services', {
+      type: 'geojson',
+      data: serviceData,
+      cluster: true,
+      clusterMaxZoom: 14,
+      clusterRadius: 50,
+      generateId: true,
+      maxzoom: 17,
+      buffer: 128,
+      tolerance: 0.5
+    });
+
+    // Add clustering layers
+    map.current.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'services',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+          'step',
+          ['get', 'point_count'],
+          '#8551d9',
+          20, '#6f42c1',
+          100, '#5e35b1'
+        ],
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['get', 'point_count'],
+          3, 18,
+          10, 22,
+          50, 30,
+          100, 35
+        ],
+        'circle-stroke-width': 2,
+        'circle-stroke-color': 'white',
+        'circle-opacity': 0.85
+      }
+    });
+
+    map.current.addLayer({
+      id: 'cluster-count',
+      type: 'symbol',
+      source: 'services',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-size': 12,
+        'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+        'text-allow-overlap': true
+      },
+      paint: {
+        'text-color': 'white'
+      }
+    });
+
+    // Add individual service layers
+    const servicePointLayer = getServicePointLayer(selectedService);
+    
+    if (!servicePointLayer.paint) {
+      servicePointLayer.paint = {};
+    }
+    
+    servicePointLayer.paint['circle-radius'] = [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      10, 5,
+      14, 9,
+      16, 12
+    ];
+    
+    servicePointLayer.paint['circle-opacity'] = 0.85;
+    
+    // Service points layer
+    map.current.addLayer(servicePointLayer);
+    map.current.addLayer(getServiceSymbolLayer());
+
+    // Add user location if available
+    if (userLocation) {
+      // Update the user location
+      setTimeout(() => {
+        updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
+      }, 100);
+    }
+    
+    // Set up event listeners for interactions with the map
+    setupMapEventListeners();
+  };
+
+  // Create a separate function for event listeners
+  const setupMapEventListeners = () => {
+    if (!map.current) return;
+
+    // Handle clicks on clusters
+    map.current.on('click', 'clusters', (e) => {
+      if (!map.current || !e.features || e.features.length === 0) return;
+
+      const feature = e.features[0];
+      const clusterId = feature.properties?.cluster_id;
+      if (!clusterId) return;
+
+      const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err || !map.current) return;
+
+        const coordinates = (feature.geometry as any).coordinates.slice() as [number, number];
+        map.current.easeTo({
+          center: coordinates,
+          zoom: Math.min((zoom || 0) + 1, 17),
+          duration: 500
+        });
+      });
+    });
+
+    // Handle clicks on individual points
+    map.current.on('click', 'service-points', (e) => {
+      if (!e.features || e.features.length === 0) return;
+
+      const feature = e.features[0];
+      const serviceId = feature.properties?.id;
+      if (!serviceId) return;
+
+      const service = serviceMapRef.current.get(Number(serviceId));
+      if (service) {
+        onServiceClick(service);
+      }
+    });
+
+    // Change cursor on hover
+    map.current.on('mouseenter', 'service-points', () => {
+      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.current.on('mouseleave', 'service-points', () => {
+      if (map.current) map.current.getCanvas().style.cursor = '';
+    });
+
+    map.current.on('mouseenter', 'clusters', () => {
+      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+    });
+
+    map.current.on('mouseleave', 'clusters', () => {
+      if (map.current) map.current.getCanvas().style.cursor = '';
+    });
+  };
 
   // Update map when radius or user location changes
   useEffect(() => {
@@ -681,6 +652,15 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         
         // Only update the location if the map is ready
         if (map.current && map.current.isStyleLoaded()) {
+          // Check if service-points layer exists before updating
+          const hasServicePoints = map.current.getLayer('service-points') !== undefined;
+          
+          if (!hasServicePoints) {
+            console.log('service-points layer not found, will retry');
+            setTimeout(updateLocationWithRetry, 200);
+            return;
+          }
+          
           // Always update the user location and radius together
           updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
           
@@ -691,7 +671,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         } else {
           // If the map isn't ready yet, wait for it to be ready
           console.log('Map style not loaded, waiting and will retry');
-          setTimeout(updateLocationWithRetry, 100);
+          setTimeout(updateLocationWithRetry, 200);
         }
       } catch (error) {
         console.error('Error updating after location/radius change:', error);

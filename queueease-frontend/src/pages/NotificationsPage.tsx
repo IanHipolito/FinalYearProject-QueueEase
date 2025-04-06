@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Grid, Typography, TextField, Button, Card, CardContent, Switch,
-  FormControlLabel, Divider, IconButton, Chip, FormHelperText, CircularProgress, Alert, Snackbar
+  FormControlLabel, Divider, IconButton, Chip, CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -25,13 +25,8 @@ const NotificationsPage: React.FC = () => {
     severity: 'success'
   });
 
-  useEffect(() => {
-    if (currentService) {
-      loadSettings();
-    }
-  }, [currentService]);
-
-  const loadSettings = async () => {
+  // Wrap loadSettings with useCallback to memoize it
+  const loadSettings = useCallback(async () => {
     if (!currentService?.id) return;
     
     setLoading(true);
@@ -53,7 +48,14 @@ const NotificationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentService?.id]);
+
+  // Add loadSettings to the useEffect dependencies
+  useEffect(() => {
+    if (currentService) {
+      loadSettings();
+    }
+  }, [currentService, loadSettings]);
 
   const handleSave = async () => {
     if (!currentService?.id) return;

@@ -3,9 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
 import {
-  Box, Container, Typography, Paper, Grid, FormControl,
-  InputLabel, Select, MenuItem, Alert, IconButton,
-  useTheme, CircularProgress
+  Box, Container, Typography, Paper, Grid, FormControl, InputLabel, 
+  Select, MenuItem, Alert, useTheme, CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';

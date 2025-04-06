@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, useTheme, Typography, Tooltip, Paper, CircularProgress, alpha } from '@mui/material';
+import { Box, useTheme, Typography, Paper, CircularProgress, alpha } from '@mui/material';
 import { UserActivityChartProps } from 'types/queueTypes';
 
 const UserActivityChart: React.FC<UserActivityChartProps> = ({ queueHistory, timeRange }) => {

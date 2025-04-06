@@ -24,12 +24,6 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const getSentimentFromRating = (rating: number): string => {
-    if (rating >= 4) return 'positive';
-    if (rating <= 2) return 'negative';
-    return 'neutral';
-  };
-
   useEffect(() => {
     const fetchFeedbackData = async () => {
       if (!userId) return;

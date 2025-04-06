@@ -14,7 +14,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 const DashboardPage: React.FC = () => {
-  const { user, managedServices, currentService, switchService } = useAuth();
+  const { managedServices, currentService, switchService } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     customerCount: 0,
     queueCount: 0,
@@ -26,7 +26,6 @@ const DashboardPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [timeRange, setTimeRange] = useState('month');
   const [statsTimeRange, setStatsTimeRange] = useState('daily');
   const [timeLabels, setTimeLabels] = useState<string[]>([]);
 

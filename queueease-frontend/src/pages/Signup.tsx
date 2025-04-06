@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Button, Container, Divider, Paper, TextField,
+  Box, Button, Container, Paper, TextField,
   Typography, ThemeProvider, createTheme, CssBaseline,
   useMediaQuery, FormControl, Select, MenuItem, InputAdornment,
   Snackbar, Alert
@@ -76,11 +76,8 @@ const Signup: React.FC = () => {
     severity: 'info'
   });
 
-  useEffect(() => {
-    validateForm();
-  }, [formData]);
-
-  const validateForm = () => {
+  // Wrap validateForm in useCallback to memoize it
+  const validateForm = useCallback(() => {
     const newErrors = {
       email: "",
       name: "",
@@ -125,7 +122,11 @@ const Signup: React.FC = () => {
       formData.password !== "" &&
       formData.confirmPassword !== ""
     );
-  };
+  }, [formData]);
+
+  useEffect(() => {
+    validateForm();
+  }, [validateForm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -91,7 +91,7 @@ const AdminSignup: React.FC = () => {
       }
       setVisibleStart(0);
     }, 300),
-    [services]
+    [services, setFilteredServices, setVisibleStart]
   );
 
   // Apply search filtering

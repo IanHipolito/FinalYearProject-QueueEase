@@ -21,14 +21,13 @@ import { UserMainPageQueue } from '../types/queueTypes';
 const MapProximity: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const bottomSheetRef = useRef<HTMLDivElement>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterText, setFilterText] = useState("");
   const [debouncedFilterText, setDebouncedFilterText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [showFilters, setShowFilters] = useState(false); // Default to hidden for less clutter
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [visibleCount, setVisibleCount] = useState(10);
   const [sheetHeight, setSheetHeight] = useState<'collapsed' | 'partial' | 'full'>('partial');
@@ -119,15 +118,6 @@ const MapProximity: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [user]);
 
-  const handleMarkerClick = useCallback((service: Service) => {
-    if (isEligibleForTransfer(service)) {
-      handleTransferClick(service);
-    } else {
-      setSelectedService(service);
-      if (window.innerWidth < 960) setSheetHeight('partial');
-    }
-  }, []);
-  
   const isEligibleForTransfer = useCallback((service: Service) => {
     if (!activeQueue || !activeQueue.service_name || !activeQueue.id) return false;
     
@@ -142,13 +132,21 @@ const MapProximity: React.FC = () => {
            service.service_type === 'immediate';
   }, [activeQueue]);
   
-  // Handle transfer initiation
   const handleTransferClick = useCallback((service: Service) => {
     if (!activeQueue || !user) return;
     
     setTargetService(service);
     setTransferDialogOpen(true);
   }, [activeQueue, user]);
+
+  const handleMarkerClick = useCallback((service: Service) => {
+    if (isEligibleForTransfer(service)) {
+      handleTransferClick(service);
+    } else {
+      setSelectedService(service);
+      if (window.innerWidth < 960) setSheetHeight('partial');
+    }
+  }, [isEligibleForTransfer, handleTransferClick]);
   
   // Handle transfer confirmation
   const handleConfirmTransfer = async () => {
@@ -423,23 +421,6 @@ const MapProximity: React.FC = () => {
     setSearchRadius(2);
   }, []);
 
-  const renderServiceRow = useCallback((service: Service) => {
-    const isSelected = selectedService?.id === service.id;
-    const canTransfer = isEligibleForTransfer(service);
-    
-    return (
-      <ServiceCard
-        key={service.id}
-        service={service}
-        isSelected={isSelected}
-        onCardClick={handleMarkerClick}
-        showTransferButton={canTransfer}
-        onTransferClick={() => handleTransferClick(service)}
-        onJoinClick={service.service_type === 'appointment' ? handleJoinQueue : undefined}
-      />
-    );
-  }, [selectedService, isEligibleForTransfer, handleTransferClick, handleMarkerClick]);
-  
   // Handle join queue - only for appointment services
   const handleJoinQueue = useCallback(async (serviceId: number) => {
     if (!user) {
@@ -466,6 +447,23 @@ const MapProximity: React.FC = () => {
       });
     }
   }, [navigate, user, services]);
+
+  const renderServiceRow = useCallback((service: Service) => {
+    const isSelected = selectedService?.id === service.id;
+    const canTransfer = isEligibleForTransfer(service);
+    
+    return (
+      <ServiceCard
+        key={service.id}
+        service={service}
+        isSelected={isSelected}
+        onCardClick={handleMarkerClick}
+        showTransferButton={canTransfer}
+        onTransferClick={() => handleTransferClick(service)}
+        onJoinClick={service.service_type === 'appointment' ? handleJoinQueue : undefined}
+      />
+    );
+  }, [selectedService, isEligibleForTransfer, handleTransferClick, handleMarkerClick, handleJoinQueue]);
 
   // Render service list
   const renderServiceList = useCallback(() => {

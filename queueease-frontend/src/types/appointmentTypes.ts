@@ -6,6 +6,19 @@ export interface Appointment {
     appointment_title: string;
 }
 
+export interface AppointmentDetail {
+    order_id: string;
+    appointment_date: string;
+    appointment_time: string;
+    service_name: string;
+    queue_status: string;
+    status: string;
+    estimated_wait_time: number;
+    queue_position: number;
+    appointment_title: string;
+    expected_start_time: string;
+}
+
 export interface AppointmentCardProps {
     appointment: {
       order_id: string;

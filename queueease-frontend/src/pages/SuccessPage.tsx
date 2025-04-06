@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, ThemeProvider, createTheme, Card, CardContent, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
+import { Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, ThemeProvider, createTheme, Card, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
@@ -114,7 +114,7 @@ const SuccessPage: React.FC = () => {
   const [isTransferred, setIsTransferred] = useState<boolean>(false);
   const [originalQueueId, setOriginalQueueId] = useState<number | null>(null);
 
-  const fetchQueueDetails = async () => {
+  const fetchQueueDetails = useCallback(async () => {
     if (!queueId) return;
     try {
       const response = await API.queues.getDetails(parseInt(queueId));
@@ -137,9 +137,9 @@ const SuccessPage: React.FC = () => {
         setQueueJoinTime(new Date(data.time_created));
       }
 
-      // Check if user can leave the queue (within 3 minutes of joining)
+      // Check if user can leave the queue (within 1 minutes of joining)
       if (queueJoinTime) {
-        const threeMinutesInMs = 3 * 60 * 1000;
+        const threeMinutesInMs = 1 * 60 * 1000;
         const currentTime = new Date();
         const joinedTime = new Date(queueJoinTime);
         const timeElapsed = currentTime.getTime() - joinedTime.getTime();
@@ -160,13 +160,13 @@ const SuccessPage: React.FC = () => {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [queueId, queueJoinTime, initialTime]);
 
   useEffect(() => {
     fetchQueueDetails();
     const intervalId = setInterval(fetchQueueDetails, 30000);
     return () => clearInterval(intervalId);
-  }, [queueId, initialTime]);
+  }, [fetchQueueDetails]);
 
   useEffect(() => {
     if (remainingTime <= 0) return;
@@ -255,7 +255,7 @@ const SuccessPage: React.FC = () => {
     if (!canLeaveQueue) {
       setSnackbar({
         open: true,
-        message: 'You can only leave the queue within the first 3 minutes of joining',
+        message: 'You can only leave the queue within the first 1 minute of joining',
         severity: 'warning'
       });
       return;
@@ -571,7 +571,7 @@ const SuccessPage: React.FC = () => {
               
               {!canLeaveQueue && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  You can only leave the queue within the first 3 minutes of joining
+                  You can only leave the queue within the first 1 minute of joining
                 </Typography>
               )}
             </Box>

@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { 
   Box, TextField, InputAdornment, IconButton, Paper, 
-  Divider, Badge, Collapse, useTheme
+  Divider, Badge, Collapse
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -18,7 +18,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
   hasActiveFilters,
   children
 }) => {
-  const theme = useTheme();
   const navigate = useNavigate();
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

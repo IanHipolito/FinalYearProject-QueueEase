@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { messaging, getToken, onMessage, VAPID_KEY } from '../firebase/firebaseConfig';
 import { useAuth } from '../pages/AuthContext';
 import { Snackbar, Alert } from '@mui/material';
@@ -17,7 +17,7 @@ const FBCloudMessaging: React.FC = () => {
     });
 
     // Save token to backend
-    const saveTokenToServer = async (token: string) => {
+    const saveTokenToServer = useCallback(async (token: string) => {
         if (!user?.id) return;
         
         try {
@@ -31,7 +31,49 @@ const FBCloudMessaging: React.FC = () => {
         } catch (error) {
             console.error('Error saving FCM token:', error);
         }
-    };
+    }, [user]);
+
+    const setupFCM = useCallback(() => {
+        getToken(messaging, { 
+            vapidKey: VAPID_KEY 
+        }).then((token) => {
+            if (token) {
+                console.log('FCM Token:', token);
+                // Save token to localStorage for persistence
+                localStorage.setItem('fcmToken', token);
+                // Send to backend if user is logged in
+                if (user?.id) {
+                    saveTokenToServer(token);
+                }
+            } else {
+                console.log('No token received');
+            }
+        }).catch((err) => {
+            console.error('Error getting token:', err);
+        });
+
+        // Handle foreground messages
+        const unsubscribe = onMessage(messaging, (payload) => {
+            console.log('Message received in foreground:', payload);
+            
+            if (payload.notification) {
+                // Show toast notification for foreground messages
+                setNotification({
+                    open: true,
+                    message: payload.notification.body || 'New notification',
+                    severity: 'info'
+                });
+                
+                // Play notification sound if available
+                if ((payload.notification as any).sound) {
+                    const audio = new Audio((payload.notification as any).sound);
+                    audio.play().catch(e => console.error('Could not play notification sound', e));
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, [user, saveTokenToServer]);
 
     useEffect(() => {
         // Platform compatibility checks
@@ -81,49 +123,7 @@ const FBCloudMessaging: React.FC = () => {
         return () => {
             // Any cleanup needed
         };
-    }, [user]);
-
-    const setupFCM = () => {
-        getToken(messaging, { 
-            vapidKey: VAPID_KEY 
-        }).then((token) => {
-            if (token) {
-                console.log('FCM Token:', token);
-                // Save token to localStorage for persistence
-                localStorage.setItem('fcmToken', token);
-                // Send to backend if user is logged in
-                if (user?.id) {
-                    saveTokenToServer(token);
-                }
-            } else {
-                console.log('No token received');
-            }
-        }).catch((err) => {
-            console.error('Error getting token:', err);
-        });
-
-        // Handle foreground messages
-        const unsubscribe = onMessage(messaging, (payload) => {
-            console.log('Message received in foreground:', payload);
-            
-            if (payload.notification) {
-                // Show toast notification for foreground messages
-                setNotification({
-                    open: true,
-                    message: payload.notification.body || 'New notification',
-                    severity: 'info'
-                });
-                
-                // Play notification sound if available
-                if ((payload.notification as any).sound) {
-                    const audio = new Audio((payload.notification as any).sound);
-                    audio.play().catch(e => console.error('Could not play notification sound', e));
-                }
-            }
-        });
-
-        return unsubscribe;
-    };
+    }, [user, setupFCM]);
 
     const handleCloseNotification = () => {
         setNotification({...notification, open: false});
