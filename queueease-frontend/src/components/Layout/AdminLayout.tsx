@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from 'pages/AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { useNavigate, Link, Routes, Route, Navigate } from 'react-router-dom';
 import { 
   Box, CssBaseline, AppBar, Toolbar, Typography, 

@@ -19,7 +19,7 @@ import BookAppointment from './pages/BookAppointment';
 import QueueHistory from 'pages/QueueHistory';
 import AdminLogin from './pages/AdminLogin';
 import AdminSignup from './pages/AdminSignup';
-import { AuthProvider } from './pages/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import PrivateRoute from './components/Layout/PrivateRoute';
 import IOSInstallGuide from './components/common/IOSInstallGuide';
 import FeedbackPage from './pages/FeedbackPage';

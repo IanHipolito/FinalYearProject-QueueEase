@@ -18,7 +18,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import { useAuth } from '../pages/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { UserMainPageQueue } from '../types/queueTypes';
 
 const UserMainPage: React.FC = () => {

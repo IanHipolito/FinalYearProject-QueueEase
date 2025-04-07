@@ -9,7 +9,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 
 const NotificationsPage: React.FC = () => {

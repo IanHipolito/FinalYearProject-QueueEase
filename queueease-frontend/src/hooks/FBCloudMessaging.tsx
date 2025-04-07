@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { messaging, getToken, onMessage, VAPID_KEY } from '../firebase/firebaseConfig';
-import { useAuth } from '../pages/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { Snackbar, Alert } from '@mui/material';
 import { API } from '../services/api';
 

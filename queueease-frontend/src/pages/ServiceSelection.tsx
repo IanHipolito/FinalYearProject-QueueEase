@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
-import { useAuth } from "./AuthContext";
+import { useAuth } from "context/AuthContext";
 import {
   Box, Container, Typography, TextField, Grid, Card, CardContent, CardActions, 
   Button, Chip, InputAdornment, Alert, CircularProgress, Divider, Paper, Pagination,

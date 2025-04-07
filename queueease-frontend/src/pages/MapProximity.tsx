@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import { 
   Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button, Dialog,

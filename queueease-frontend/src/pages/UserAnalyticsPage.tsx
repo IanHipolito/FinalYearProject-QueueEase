@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import {
   Box, Container, Typography, Grid, Paper, FormControl,
   InputLabel, Select, MenuItem, Button, Alert,

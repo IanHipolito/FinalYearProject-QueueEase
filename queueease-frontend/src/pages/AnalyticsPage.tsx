@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';

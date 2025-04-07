@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import {
   Box, Button, Checkbox, Container, Divider, FormControlLabel, Paper,
   TextField, Typography, ThemeProvider, createTheme, CssBaseline,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import { Box, Grid, Card, SelectChangeEvent } from '@mui/material';
 import ErrorDisplay from '../components/common/ErrorDisplay';

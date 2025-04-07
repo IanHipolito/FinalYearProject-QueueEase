@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from 'context/AuthContext';
 import { Box, Typography, useTheme } from '@mui/material';
 import { API } from '../services/api';
 import PageContainer from '../components/common/PageContainer';
