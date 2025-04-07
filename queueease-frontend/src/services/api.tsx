@@ -80,6 +80,21 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             }),
+        getCompanyInfo: (userId: number) =>
+            fetch(`${API_BASE}/admin/company-info/${userId}/`),
+            
+        updateCompanyInfo: (formData: FormData) =>
+            fetch(`${API_BASE}/admin/update-company-info/`, {
+                method: 'POST',
+                body: formData,
+            }),
+            
+        changePassword: (data: any) =>
+            fetch(`${API_BASE}/admin/change-password/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            }),
     },
 
     // Service management

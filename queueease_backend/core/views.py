@@ -21,7 +21,8 @@ from .views.appointment_views import (
 
 from .views.admin_views import (
     admin_dashboard_data, admin_customers, notification_settings,
-    admin_create_customer, test_notification, admin_get_analytics
+    admin_create_customer, test_notification, admin_get_analytics,
+    admin_company_info, admin_update_company_info, admin_change_password
 )
 
 from .views.feedback_views import (

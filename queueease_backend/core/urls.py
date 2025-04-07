@@ -20,6 +20,7 @@ from .views import (
     # Admin views
     admin_dashboard_data, admin_customers, admin_create_customer,
     test_notification, admin_get_analytics, notification_settings,
+    admin_company_info, admin_update_company_info, admin_change_password,
     
     # Feedback views
     submit_feedback, get_feedback_categories, get_user_feedback_history,
@@ -78,6 +79,9 @@ urlpatterns = [
     path('test-notification/', test_notification, name='test-notification'),
     path('admin-get-analytics/', admin_get_analytics, name='admin-get-analytics'),
     path('admin/notification-settings/', notification_settings, name='notification-settings'),
+    path('admin/company-info/<int:user_id>/', admin_company_info, name='admin-company-info'),
+    path('admin/update-company-info/', admin_update_company_info, name='admin-update-company-info'),
+    path('admin/change-password/', admin_change_password, name='admin-change-password'),
     
     # Feedback endpoints
     path('feedback/submit/', submit_feedback, name='submit_feedback'),

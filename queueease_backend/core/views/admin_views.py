@@ -7,11 +7,15 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
-import random
 import logging
 import traceback
 import numpy as np
-from collections import defaultdict
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import os
+import uuid
+import json
 
 from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence, NotificationSettings
 from ..utils.keyword_extractor import KeywordExtractor
@@ -680,3 +684,158 @@ def notification_settings(request):
             "frequency_minutes": settings.frequency_minutes,
             "message_template": settings.message_template
         })
+    
+@api_view(['GET'])
+def admin_company_info(request, user_id):
+    """Get company information for an admin user"""
+    try:
+        user = get_object_or_404(User, id=user_id, user_type='admin')
+        
+        # Get the admin's service
+        service_admin = ServiceAdmin.objects.filter(user=user).first()
+        
+        if not service_admin or not service_admin.service:
+            return Response({"error": "No service found for this admin"}, status=404)
+        
+        service = service_admin.service
+        
+        # Initialize details if None
+        if service.details is None:
+            service.details = {}
+        elif isinstance(service.details, str):
+            try:
+                service.details = json.loads(service.details)
+            except json.JSONDecodeError:
+                service.details = {}
+        
+        # Return service details as company info
+        company_data = {
+            "name": service.name,
+            "email": service.details.get("email", user.email if user.email else ""),
+            "phone": service.details.get("phone", user.mobile_number if user.mobile_number else ""),
+            "address": service.details.get("address", ""),
+            "latitude": float(service.latitude) if service.latitude else 0.0,
+            "longitude": float(service.longitude) if service.longitude else 0.0,
+            "logo_base64": service.details.get("logo_base64", "")  # Use logo_base64 instead of logo_url
+        }
+        
+        logger.info(f"Returning company data for user {user_id} (without logo content for brevity)")
+        
+        return Response(company_data)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving company info: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def admin_update_company_info(request):
+    """Update company information for an admin user"""
+    try:
+        # Get data from request body instead of POST
+        data = request.data
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return Response({"error": "User ID is required"}, status=400)
+        
+        user = get_object_or_404(User, id=user_id, user_type='admin')
+        
+        # Get the admin's service
+        service_admin = ServiceAdmin.objects.filter(user=user).first()
+        
+        if not service_admin or not service_admin.service:
+            return Response({"error": "No service found for this admin"}, status=404)
+        
+        service = service_admin.service
+        
+        # Update basic fields
+        service.name = data.get('name', service.name)
+        
+        # Update latitude and longitude if provided
+        latitude = data.get('latitude')
+        longitude = data.get('longitude')
+        
+        if latitude and longitude:
+            try:
+                service.latitude = float(latitude)
+                service.longitude = float(longitude)
+            except ValueError:
+                return Response({"error": "Invalid latitude or longitude value"}, status=400)
+        
+        # Ensure details is a dictionary
+        if not service.details:
+            service.details = {}
+        elif isinstance(service.details, str):
+            # Sometimes JSONField might be stored as a string
+            try:
+                service.details = json.loads(service.details)
+            except json.JSONDecodeError:
+                service.details = {}
+        
+        # Update details fields
+        service.details['address'] = data.get('address', service.details.get('address', ''))
+        service.details['email'] = data.get('email', service.details.get('email', ''))
+        service.details['phone'] = data.get('phone', service.details.get('phone', ''))
+        
+        # Handle logo as Base64 string
+        logo_base64 = data.get('logoBase64')
+        if logo_base64:
+            service.details['logo_base64'] = logo_base64
+        
+        # Log update information without the Base64 content for brevity
+        logger.info(f"Updating service {service.id} with: name={service.name}, lat={service.latitude}, lng={service.longitude}, logo_provided={'yes' if logo_base64 else 'no'}")
+        
+        # Save changes
+        service.save()
+        logger.info(f"Service {service.id} updated successfully")
+        
+        # Return the updated data for confirmation
+        response_data = {
+            "message": "Company information updated successfully",
+            "data": {
+                "name": service.name,
+                "email": service.details.get('email', user.email if hasattr(user, 'email') else ''),
+                "phone": service.details.get('phone', user.mobile_number if hasattr(user, 'mobile_number') else ''),
+                "address": service.details.get('address', ''),
+                "latitude": float(service.latitude) if service.latitude else 0.0,
+                "longitude": float(service.longitude) if service.longitude else 0.0,
+                "logo_base64": service.details.get('logo_base64', '')  # Return the Base64 data
+            }
+        }
+        
+        return Response(response_data)
+    
+    except Exception as e:
+        logger.error(f"Error updating company info: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def admin_change_password(request):
+    """Change password for an admin user"""
+    try:
+        data = request.data
+        user_id = data.get('user_id')
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not all([user_id, current_password, new_password]):
+            return Response({"error": "All fields are required"}, status=400)
+        
+        user = get_object_or_404(User, id=user_id)
+        
+        # Verify current password
+        if not check_password(current_password, user.password):
+            return Response({"error": "Current password is incorrect"}, status=400)
+        
+        # Update password
+        user.password = make_password(new_password)
+        user.save()
+        
+        return Response({"message": "Password updated successfully"})
+    
+    except Exception as e:
+        logger.error(f"Error changing password: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
