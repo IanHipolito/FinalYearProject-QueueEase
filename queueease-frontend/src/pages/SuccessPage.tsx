@@ -547,6 +547,30 @@ const SuccessPage: React.FC = () => {
                   Return to Main Page
                 </Button>
                 
+                {/* Add Transfer Button - only for immediate services and when in pending state */}
+                {queueData && queueData.status === 'pending' && (
+                  <Button
+                    variant="outlined"
+                    size="medium"
+                    onClick={() => navigate('/mapproximity')}
+                    startIcon={<SwapHorizIcon />}
+                    sx={{
+                      borderColor: '#6f42c1',
+                      color: '#6f42c1',
+                      '&:hover': { 
+                        bgcolor: 'rgba(111, 66, 193, 0.08)',
+                        transform: 'translateY(-2px)'
+                      },
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1.5,
+                      transition: 'all 0.3s',
+                    }}
+                  >
+                    Transfer
+                  </Button>
+                )}
+                
                 <Button 
                   variant="outlined"
                   color="error"

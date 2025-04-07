@@ -15,7 +15,7 @@ from .views import (
     # Appointment views
     user_appointments, appointment_detail, get_or_create_appointment,
     delete_appointment, create_appointment, check_and_update_appointments, 
-    check_appointment_status,
+    check_appointment_status, cancel_appointment,
     
     # Admin views
     admin_dashboard_data, admin_customers, admin_create_customer,
@@ -65,7 +65,8 @@ urlpatterns = [
     path('available-times/<int:service_id>/', available_appointment_times, name='available-times'),
     path('check-appointments/', check_and_update_appointments, name='check-appointments'),
     path('appointment/check-status/<str:order_id>/', check_appointment_status, name='check-appointment-status'),
-    
+    path('appointment/cancel/<str:order_id>/', cancel_appointment, name='cancel-appointment'),
+
     # Service endpoints
     path('list_services/', list_services, name='list_services'),
     path('service/<int:service_id>/', service_detail, name='service-detail'),

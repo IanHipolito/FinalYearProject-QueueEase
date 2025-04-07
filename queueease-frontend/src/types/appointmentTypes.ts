@@ -4,6 +4,8 @@ export interface Appointment {
     appointment_time: string;
     service_name: string;
     appointment_title: string;
+    status: 'pending' | 'completed' | 'cancelled';
+    queue_status: 'not_started' | 'in_queue' | 'completed' | 'cancelled';
 }
 
 export interface AppointmentDetail {

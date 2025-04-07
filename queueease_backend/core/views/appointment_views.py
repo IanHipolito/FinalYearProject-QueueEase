@@ -250,3 +250,43 @@ def check_appointment_status(request, order_id):
         })
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+@api_view(['POST'])
+def cancel_appointment(request, order_id):
+    try:
+        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+        
+        # Convert appointment datetime to timezone aware datetime
+        appointment_datetime = timezone.make_aware(
+            datetime.combine(appointment.appointment_date, appointment.appointment_time)
+        )
+        
+        # Check if the appointment is within 24 hours
+        now = timezone.now()
+        time_difference = appointment_datetime - now
+        
+        # If less than 24 hours, don't allow cancellation
+        if time_difference.total_seconds() < 24 * 3600:
+            return Response({
+                "error": "Cannot cancel appointments within 24 hours of the scheduled time"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Ensure the appointment is still pending
+        if appointment.status != 'pending':
+            return Response({
+                "error": f"Cannot cancel appointment with status: {appointment.status}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update appointment status
+        appointment.status = 'cancelled'
+        appointment.save()
+        
+        return Response({
+            "message": "Appointment cancelled successfully",
+            "order_id": order_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error cancelling appointment: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)

@@ -165,12 +165,18 @@ export const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             }),
-        cancelAppointment: (appointmentId: number) =>
-            fetch(`${API_BASE}/appointment/${appointmentId}/cancel/`, { method: 'POST' }),
+        cancelAppointment: (orderId: string) => 
+            fetch(`${API_BASE}/appointment/cancel/${orderId}/`, {
+                method: 'POST',
+                headers: {
+                'Content-Type': 'application/json',
+                },
+            }),
         checkAndUpdateAppointments: () =>
             fetch(`${API_BASE}/check-appointments/`),
         checkStatus: (orderId: string) =>
             fetch(`${API_BASE}/appointment/check-status/${orderId}/`),
+        
     },
 
     // Feedback management

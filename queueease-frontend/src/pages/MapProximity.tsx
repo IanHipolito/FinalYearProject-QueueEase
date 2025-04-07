@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
-import { 
+import {
   Box, Typography, CircularProgress, Alert, Fade, Snackbar, Button, Dialog,
-  DialogTitle, DialogContent, DialogContentText, DialogActions 
+  DialogTitle, DialogContent, DialogContentText, DialogActions
 } from '@mui/material';
 import ServiceMap from '../components/map/ServiceMap';
 import ServiceCard from '../components/serviceList/ServiceCard';
@@ -39,18 +39,19 @@ const MapProximity: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [searchRadius, setSearchRadius] = useState(2); // Default 2km radius
   const debounceTimerRef = useRef<number | null>(null);
-  
+
   // Add new state variables for transfer functionality
   const [activeQueue, setActiveQueue] = useState<UserMainPageQueue | null>(null);
   const [transferDialogOpen, setTransferDialogOpen] = useState<boolean>(false);
   const [targetService, setTargetService] = useState<Service | null>(null);
   const [transferring, setTransferring] = useState<boolean>(false);
+  const [ignoreActiveQueueFilter, setIgnoreActiveQueueFilter] = useState<boolean>(false);
 
   // Calculate distance between two points (haversine formula)
   const calculateDistance = useCallback((
-    lat1: number, 
-    lon1: number, 
-    lat2: number, 
+    lat1: number,
+    lon1: number,
+    lat2: number,
     lon2: number
   ): number => {
     const R = 6371e3; // Earth's radius in meters
@@ -60,8 +61,8 @@ const MapProximity: React.FC = () => {
     const Δλ = (lon2 - lon1) * Math.PI / 180;
 
     const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c;
@@ -74,20 +75,20 @@ const MapProximity: React.FC = () => {
     const fetchActiveQueue = async () => {
       try {
         const res = await API.queues.getActive(user.id);
-        
+
         if (!res.ok) {
           setActiveQueue(null);
           return;
         }
 
         const data = await res.json();
-        
+
         if (data && data.queue_id) {
           // Get detailed queue information
           const detailRes = await API.queues.getDetails(data.queue_id);
           if (detailRes.ok) {
             const detailData = await detailRes.json();
-            
+
             if (detailData.status === 'pending') {
               setActiveQueue({
                 id: data.queue_id,
@@ -112,7 +113,7 @@ const MapProximity: React.FC = () => {
     };
 
     fetchActiveQueue();
-    
+
     // Refresh active queue every 15 seconds
     const intervalId = setInterval(fetchActiveQueue, 15000);
     return () => clearInterval(intervalId);
@@ -120,21 +121,21 @@ const MapProximity: React.FC = () => {
 
   const isEligibleForTransfer = useCallback((service: Service) => {
     if (!activeQueue || !activeQueue.service_name || !activeQueue.id) return false;
-    
+
     const creationTime = new Date(activeQueue.time_created || '').getTime();
     const now = new Date().getTime();
     const twoMinutesInMs = 2 * 60 * 1000;
     const isWithin2Minutes = now - creationTime < twoMinutesInMs;
-    
-    return isWithin2Minutes && 
-           service.name === activeQueue.service_name && 
-           service.id !== activeQueue.service_id &&
-           service.service_type === 'immediate';
+
+    return isWithin2Minutes &&
+      service.name === activeQueue.service_name &&
+      service.id !== activeQueue.service_id &&
+      service.service_type === 'immediate';
   }, [activeQueue]);
-  
+
   const handleTransferClick = useCallback((service: Service) => {
     if (!activeQueue || !user) return;
-    
+
     setTargetService(service);
     setTransferDialogOpen(true);
   }, [activeQueue, user]);
@@ -147,29 +148,29 @@ const MapProximity: React.FC = () => {
       if (window.innerWidth < 960) setSheetHeight('partial');
     }
   }, [isEligibleForTransfer, handleTransferClick]);
-  
+
   // Handle transfer confirmation
   const handleConfirmTransfer = async () => {
     if (!activeQueue || !targetService || !user) return;
-    
+
     setTransferring(true);
-    
+
     try {
       const response = await API.queues.transferQueue(
         activeQueue.id!,
         targetService.id,
         user.id
       );
-      
+
       if (response.ok) {
         const data = await response.json();
-        
+
         setSnackbarState({
           open: true,
           message: 'Queue transferred successfully!',
           severity: 'success'
         });
-        
+
         // Update the active queue with the new queue information
         setActiveQueue({
           id: data.queue_id,
@@ -179,7 +180,7 @@ const MapProximity: React.FC = () => {
           expected_ready_time: data.expected_ready_time,
           status: 'pending',
         });
-        
+
         // Navigate to the success page for the new queue
         navigate(`/success/${data.queue_id}`);
       } else {
@@ -213,13 +214,13 @@ const MapProximity: React.FC = () => {
 
   // Check if there are any active filters
   const hasActiveFilters = useMemo(() => {
-    return debouncedFilterText !== "" || selectedCategory !== "All" || searchRadius !== 2;
-  }, [debouncedFilterText, selectedCategory, searchRadius]);
+    return debouncedFilterText !== "" || selectedCategory !== "All" || searchRadius !== 2 || ignoreActiveQueueFilter;
+  }, [debouncedFilterText, selectedCategory, searchRadius, ignoreActiveQueueFilter]);
 
-  // Filter services based on search, category, and distance
+  // Filter services based on search, category, distance, and transferability
   const filteredServices = useMemo(() => {
     if (!services.length) return [];
-    
+
     return services.filter(service => {
       // Text filter
       if (debouncedFilterText) {
@@ -243,14 +244,14 @@ const MapProximity: React.FC = () => {
         const serviceName = service.name?.toLowerCase() || '';
 
         if (selectedCategory.toLowerCase() === 'healthcare') {
-            return ["healthcare", "hospital", "doctors", "clinic", "dentist", "medical"].some(term =>
-              serviceCategory.includes(term) || serviceName.includes(term)
-            );
+          return ["healthcare", "hospital", "doctors", "clinic", "dentist", "medical"].some(term =>
+            serviceCategory.includes(term) || serviceName.includes(term)
+          );
         }
 
         return serviceCategory === selectedCategory.toLowerCase();
       }
-      
+
       // Distance filter
       if (userLocation && searchRadius > 0) {
         const distanceInMeters = calculateDistance(
@@ -259,16 +260,22 @@ const MapProximity: React.FC = () => {
           service.latitude,
           service.longitude
         );
-        
+
         // Convert distance to kilometers and compare with searchRadius
         if (distanceInMeters / 1000 > searchRadius) {
           return false;
         }
       }
-      
+
+      // Filter for transferable services if there's an active queue and not ignoring the filter
+      if (activeQueue && activeQueue.service_name && !ignoreActiveQueueFilter) {
+        // If we have an active queue, only show eligible services for transfer
+        return isEligibleForTransfer(service);
+      }
+
       return true;
     });
-  }, [services, debouncedFilterText, selectedCategory, userLocation, searchRadius, calculateDistance]);
+  }, [services, debouncedFilterText, selectedCategory, userLocation, searchRadius, calculateDistance, activeQueue, isEligibleForTransfer, ignoreActiveQueueFilter]);
 
   // Get visible services for the list
   const visibleServices = useMemo(() => {
@@ -286,21 +293,21 @@ const MapProximity: React.FC = () => {
         if (!response.ok) {
           throw new Error(`Failed to fetch services: ${response.status}`);
         }
-  
+
         let data = await response.json();
-  
+
         data = data.map((service: Service) => {
-          const newService = { 
+          const newService = {
             ...service,
             subcategory: ''
           };
-  
+
           if (!newService.latitude || !newService.longitude) {
             const { latitude, longitude } = generateRandomDublinCoordinates();
             newService.latitude = latitude;
             newService.longitude = longitude;
           }
-  
+
           const nameLower = newService.name?.toLowerCase() || '';
           if (
             nameLower.includes('mcdonald') ||
@@ -317,21 +324,21 @@ const MapProximity: React.FC = () => {
             newService.category = 'fast_food';
             newService.subcategory = 'fast_food';
           }
-  
+
           if ((newService.category && newService.category.toLowerCase().includes('health')) ||
             (newService.category && newService.category.toLowerCase().includes('clinic')) ||
             (newService.category && newService.category.toLowerCase().includes('doctor')) ||
             (newService.category && newService.category.toLowerCase().includes('hospital'))) {
             newService.category = 'healthcare';
           }
-  
+
           if (!newService.category) {
             newService.category = 'other';
           }
-  
+
           return newService;
         });
-  
+
         setServices(data);
         setLoading(false);
       } catch (err) {
@@ -340,7 +347,7 @@ const MapProximity: React.FC = () => {
         setLoading(false);
       }
     };
-  
+
     fetchServices();
   }, []);
 
@@ -419,7 +426,11 @@ const MapProximity: React.FC = () => {
     setFilterText("");
     setSelectedCategory("All");
     setSearchRadius(2);
-  }, []);
+    // If user wants to see all services, temporarily disable active queue filtering
+    if (activeQueue) {
+      setIgnoreActiveQueueFilter(true);
+    }
+  }, [activeQueue]);
 
   // Handle join queue - only for appointment services
   const handleJoinQueue = useCallback(async (serviceId: number) => {
@@ -427,13 +438,13 @@ const MapProximity: React.FC = () => {
       navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
       return;
     }
-  
+
     try {
       const serviceToJoin = services.find(s => s.id === serviceId);
       if (!serviceToJoin) {
         throw new Error('Service not found');
       }
-  
+
       // Only for appointment services
       if (serviceToJoin.service_type === 'appointment') {
         navigate(`/book-appointment/${serviceId}`);
@@ -451,7 +462,7 @@ const MapProximity: React.FC = () => {
   const renderServiceRow = useCallback((service: Service) => {
     const isSelected = selectedService?.id === service.id;
     const canTransfer = isEligibleForTransfer(service);
-    
+
     return (
       <ServiceCard
         key={service.id}
@@ -475,7 +486,9 @@ const MapProximity: React.FC = () => {
       return (
         <Box sx={{ textAlign: 'center', my: 4, px: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            No services match your criteria
+            {activeQueue && !ignoreActiveQueueFilter
+              ? "No transferable services found within your radius"
+              : "No services match your criteria"}
           </Typography>
           <Button
             variant="outlined"
@@ -483,15 +496,17 @@ const MapProximity: React.FC = () => {
             onClick={handleResetFilters}
             size="small"
           >
-            Clear filters
+            {activeQueue && !ignoreActiveQueueFilter
+              ? "Show all services"
+              : "Clear filters"}
           </Button>
         </Box>
       );
     }
 
     return visibleServices.map(renderServiceRow);
-  }, [filteredServices.length, handleResetFilters, loading, renderServiceRow, visibleServices]);
-  
+  }, [filteredServices.length, handleResetFilters, loading, renderServiceRow, visibleServices, activeQueue, ignoreActiveQueueFilter]);
+
   // Render transfer dialog
   const renderTransferDialog = () => (
     <Dialog
@@ -504,7 +519,7 @@ const MapProximity: React.FC = () => {
           Are you sure you want to transfer your queue from {activeQueue?.service_name} to {targetService?.name}?
           This action cannot be undone.
         </DialogContentText>
-        <Box sx={{ 
+        <Box sx={{
           mt: 2,
           p: 2,
           bgcolor: 'rgba(25, 118, 210, 0.1)',
@@ -519,16 +534,16 @@ const MapProximity: React.FC = () => {
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button 
-          onClick={() => setTransferDialogOpen(false)} 
+        <Button
+          onClick={() => setTransferDialogOpen(false)}
           color="primary"
           disabled={transferring}
         >
           Cancel
         </Button>
-        <Button 
-          onClick={handleConfirmTransfer} 
-          color="primary" 
+        <Button
+          onClick={handleConfirmTransfer}
+          color="primary"
           variant="contained"
           disabled={transferring}
           startIcon={transferring ? <CircularProgress size={16} color="inherit" /> : <SwapHorizIcon />}
@@ -587,120 +602,120 @@ const MapProximity: React.FC = () => {
         {/* Distance Filter (only shown when user location is available) */}
         {userLocation && (
           <DistanceFilter
-          value={searchRadius}
-          onChange={setSearchRadius}
-          min={0.5}
-          max={10}
-          step={0.5}
+            value={searchRadius}
+            onChange={setSearchRadius}
+            min={0.5}
+            max={10}
+            step={0.5}
+          />
+        )}
+
+        {/* Category Filter */}
+        <CategoryFilter
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
         />
-      )}
-      
-      {/* Category Filter */}
-      <CategoryFilter
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
-    </SearchBar>
+      </SearchBar>
 
-    {/* Bottom sheet UI */}
-    <BottomSheet
-      height={sheetHeight}
-      toggleHeight={toggleSheetHeight}
-      collapseSheet={collapseSheet}
-      title="Nearby Services"
-      filteredCount={filteredServices.length}
-      showResetButton={hasActiveFilters}
-      onReset={handleResetFilters}
-    >
-      {renderServiceList()}
-    </BottomSheet>
-
-    {/* Selected service detail panel */}
-    <ServiceDetailPanel
-      service={selectedService}
-      onClose={() => setSelectedService(null)}
-      onTransferClick={(serviceId) => handleTransferClick(
-        services.find(s => s.id === serviceId) || selectedService!
-      )}
-      userLocation={userLocation}
-      canTransfer={selectedService ? isEligibleForTransfer(selectedService) : false}
-      activeQueue={activeQueue}
-    />
-
-    {/* Loading State */}
-    {loading && (
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          display: 'flex',
-          alignItems: 'center',
-          bgcolor: 'rgba(255, 255, 255, 0.9)',
-          padding: 2,
-          borderRadius: 2,
-          zIndex: 30,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-        }}
+      {/* Bottom sheet UI */}
+      <BottomSheet
+        height={sheetHeight}
+        toggleHeight={toggleSheetHeight}
+        collapseSheet={collapseSheet}
+        title={activeQueue && !ignoreActiveQueueFilter ? "Transferable Services" : "Nearby Services"}
+        filteredCount={filteredServices.length}
+        showResetButton={hasActiveFilters}
+        onReset={handleResetFilters}
       >
-        <CircularProgress size={24} color="primary" sx={{ mr: 1.5 }} />
-        <Typography variant="body2" fontWeight={500}>
-          Loading services...
-        </Typography>
-      </Box>
-    )}
+        {renderServiceList()}
+      </BottomSheet>
 
-    {/* Error Display */}
-    {error && (
-      <Fade in={!!error}>
-        <Alert
-          severity="error"
+      {/* Selected service detail panel */}
+      <ServiceDetailPanel
+        service={selectedService}
+        onClose={() => setSelectedService(null)}
+        onTransferClick={(serviceId) => handleTransferClick(
+          services.find(s => s.id === serviceId) || selectedService!
+        )}
+        userLocation={userLocation}
+        canTransfer={selectedService ? isEligibleForTransfer(selectedService) : false}
+        activeQueue={activeQueue}
+      />
+
+      {/* Loading State */}
+      {loading && (
+        <Box
           sx={{
             position: 'absolute',
-            top: 70,
+            top: '50%',
             left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 25,
-            maxWidth: '90%',
-            boxShadow: 2,
-            borderRadius: 1
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
+            padding: 2,
+            borderRadius: 2,
+            zIndex: 30,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
           }}
-          action={
-            <Button color="inherit" size="small" onClick={() => setError(null)}>
-              Dismiss
-            </Button>
-          }
         >
-          {error}
-        </Alert>
-      </Fade>
-    )}
+          <CircularProgress size={24} color="primary" sx={{ mr: 1.5 }} />
+          <Typography variant="body2" fontWeight={500}>
+            Loading services...
+          </Typography>
+        </Box>
+      )}
 
-    {/* Snackbar for notifications */}
-    <Snackbar
-      open={snackbarState.open}
-      autoHideDuration={4000}
-      onClose={handleSnackbarClose}
-      anchorOrigin={{
-        vertical: 'bottom',
-        horizontal: 'center'
-      }}
-    >
-      <Alert
+      {/* Error Display */}
+      {error && (
+        <Fade in={!!error}>
+          <Alert
+            severity="error"
+            sx={{
+              position: 'absolute',
+              top: 70,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 25,
+              maxWidth: '90%',
+              boxShadow: 2,
+              borderRadius: 1
+            }}
+            action={
+              <Button color="inherit" size="small" onClick={() => setError(null)}>
+                Dismiss
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        </Fade>
+      )}
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarState.open}
+        autoHideDuration={4000}
         onClose={handleSnackbarClose}
-        severity={snackbarState.severity}
-        variant="filled"
-        sx={{ width: '100%', borderRadius: 1 }}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center'
+        }}
       >
-        {snackbarState.message}
-      </Alert>
-    </Snackbar>
-    
-    {/* Transfer confirmation dialog */}
-    {renderTransferDialog()}
-  </Box>
-);
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarState.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 1 }}
+        >
+          {snackbarState.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Transfer confirmation dialog */}
+      {renderTransferDialog()}
+    </Box>
+  );
 };
 
 export default React.memo(MapProximity);
