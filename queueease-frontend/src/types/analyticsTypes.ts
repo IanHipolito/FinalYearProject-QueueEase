@@ -50,6 +50,8 @@ export interface ServiceData {
 
 export interface SatisfactionDonutChartProps {
   satisfactionRate: number;
+  neutralRate?: number;
+  dissatisfiedRate?: number;
 }
 
 export interface StatisticCardProps {

@@ -23,7 +23,6 @@ const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleQueueS
                 <TableCell sx={{ fontWeight: 'bold' }}>Department</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Customers</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -43,17 +42,6 @@ const QueueTable: React.FC<QueueTableProps> = ({ queues, loading, onToggleQueueS
                         />
                       </TableCell>
                       <TableCell>{queue.customers}</TableCell>
-                      <TableCell>
-                        <Tooltip title={isActive ? "Deactivate Queue" : "Activate Queue"}>
-                          <IconButton 
-                            size="small" 
-                            color={isActive ? "primary" : "default"}
-                            onClick={() => onToggleQueueStatus(queue.id, !isActive)}
-                          >
-                            {isActive ? <ToggleOnIcon /> : <ToggleOffIcon />}
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
                     </TableRow>
                   );
                 })

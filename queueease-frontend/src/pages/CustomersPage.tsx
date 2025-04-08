@@ -13,8 +13,7 @@ import CustomerStatsCard from '../components/customers/CustomerStatsCard';
 import CustomerFilters from '../components/customers/CustomerFilters';
 import CustomerTable from '../components/customers/CustomerTable';
 import CustomerDetailsDialog from '../components/customers/CustomerDetailsDialog';
-import CreateCustomerDialog from '../components/customers/CreateCustomerDialog';
-import { Customer, CustomerStats, CustomerFormData } from '../types/customerTypes';
+import { Customer, CustomerStats } from '../types/customerTypes';
 
 const CustomersPage: React.FC = () => {
   const { currentService } = useAuth();
@@ -31,16 +30,6 @@ const CustomersPage: React.FC = () => {
   // Dialog states
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
-  
-  // Form states
-  const [newCustomerForm, setNewCustomerForm] = useState<CustomerFormData>({
-    name: '',
-    email: '',
-    phone: ''
-  });
-  const [formError, setFormError] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
   
   // Notification state
   const [snackbar, setSnackbar] = useState({
@@ -132,79 +121,6 @@ const CustomersPage: React.FC = () => {
   const handleShowDetails = (customer: Customer) => {
     setSelectedCustomer(customer);
     setDetailsOpen(true);
-  };
-
-  // Open the create customer dialog
-  const handleCreateCustomer = () => {
-    setNewCustomerForm({
-      name: '',
-      email: '',
-      phone: ''
-    });
-    setFormError('');
-    setCreateCustomerOpen(true);
-  };
-
-  // Submit new customer form
-  const handleSubmitNewCustomer = async () => {
-    // Form validation
-    if (!newCustomerForm.name || !newCustomerForm.email) {
-      setFormError('Name and email are required');
-      return;
-    }
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newCustomerForm.email)) {
-      setFormError('Please enter a valid email address');
-      return;
-    }
-    
-    setFormLoading(true);
-    setFormError('');
-    
-    try {
-      const response = await API.admin.createCustomer(
-        currentService?.id as number, 
-        newCustomerForm
-      );
-      
-      if (response.ok) {
-        const newCustomer = await response.json();
-        
-        // Add the new customer to our list
-        setCustomers([...customers, {
-          id: newCustomer.id,
-          name: newCustomer.name,
-          email: newCustomer.email,
-          phone: newCustomer.phone || '',
-          status: 'Active',
-          orders: 0,
-          is_active: true
-        }]);
-        
-        // Update stats
-        setCustomerStats({
-          ...customerStats,
-          totalCustomers: customerStats.totalCustomers + 1,
-          activeCustomers: customerStats.activeCustomers + 1
-        });
-        
-        setCreateCustomerOpen(false);
-        setSnackbar({
-          open: true,
-          message: 'Customer created successfully',
-          severity: 'success'
-        });
-      } else {
-        const errorData = await response.json();
-        setFormError(errorData.error || 'Failed to create customer');
-      }
-    } catch (error: any) {
-      setFormError(error.message || 'An error occurred');
-    } finally {
-      setFormLoading(false);
-    }
   };
 
   // Close the snackbar
@@ -338,7 +254,6 @@ const CustomersPage: React.FC = () => {
             setSearchTerm={setSearchTerm}
             filterStatus={filterStatus}
             setFilterStatus={setFilterStatus}
-            onCreateCustomer={handleCreateCustomer}
           />
 
           {/* Customers Table */}
@@ -358,17 +273,6 @@ const CustomersPage: React.FC = () => {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         customer={selectedCustomer}
-      />
-      
-      {/* Create Customer Dialog */}
-      <CreateCustomerDialog
-        open={createCustomerOpen}
-        onClose={() => setCreateCustomerOpen(false)}
-        onSubmit={handleSubmitNewCustomer}
-        formData={newCustomerForm}
-        setFormData={setNewCustomerForm}
-        formError={formError}
-        formLoading={formLoading}
       />
       
       {/* Success/Error Snackbar */}

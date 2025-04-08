@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, ThemeProvider, createTheme, Card, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
+import { 
+  Box, Button, CircularProgress, Container, Typography, LinearProgress, Paper, CssBaseline, 
+  ThemeProvider, createTheme, Card, Grid, Dialog, DialogTitle, DialogContent, DialogContentText, 
+  DialogActions, Snackbar, Alert, useMediaQuery 
+} from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
@@ -93,7 +97,7 @@ const spin = keyframes`
 const SuccessPage: React.FC = () => {
   const { queueId } = useParams<{ queueId: string }>();
   const navigate = useNavigate();
-
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [queueData, setQueueData] = useState<QueueData | null>(null);
   const [remainingTime, setRemainingTime] = useState<number>(0);
   const [initialTime, setInitialTime] = useState<number>(0);
@@ -271,9 +275,13 @@ const SuccessPage: React.FC = () => {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Container maxWidth="sm" sx={{ mt: 6, mb: 6 }}>
+        <Container maxWidth="sm" sx={{ 
+          mt: { xs: 3, sm: 6 }, 
+          mb: { xs: 3, sm: 6 },
+          px: { xs: 2, sm: 3 }
+        }}>
           <Paper elevation={3} sx={{ 
-            p: 5, 
+            p: { xs: 3, sm: 5 }, 
             borderRadius: 3, 
             textAlign: 'center',
             background: 'linear-gradient(145deg, #ffffff, #f8f9fa)'
@@ -293,13 +301,13 @@ const SuccessPage: React.FC = () => {
               }}>
                 <CheckCircleIcon 
                   color="secondary" 
-                  sx={{ fontSize: 72 }} 
+                  sx={{ fontSize: { xs: 56, sm: 72 } }} 
                 />
               </Box>
-              <Typography variant="h4" gutterBottom fontWeight="bold">
+              <Typography variant={isMobile ? "h5" : "h4"} gutterBottom fontWeight="bold">
                 Order Complete!
               </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 1, maxWidth: '80%', mx: 'auto' }}>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 1, maxWidth: '90%', mx: 'auto' }}>
                 Your order has been successfully processed and is now ready.
               </Typography>
               <Typography variant="body1" color="primary" fontWeight="medium" sx={{ mb: 4 }}>
@@ -333,11 +341,12 @@ const SuccessPage: React.FC = () => {
                 color="primary" 
                 onClick={() => navigate('/usermainpage')}
                 sx={{ 
-                  px: 4, 
+                  px: { xs: 3, sm: 4 }, 
                   py: 1.5,
                   borderRadius: 2,
                   boxShadow: '0 4px 14px rgba(111, 66, 193, 0.3)',
                   transition: 'all 0.3s',
+                  width: { xs: '100%', sm: 'auto' },
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 6px 20px rgba(111, 66, 193, 0.4)',
@@ -356,9 +365,13 @@ const SuccessPage: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="sm" sx={{ mt: 6, mb: 6 }}>
+      <Container maxWidth="sm" sx={{ 
+        mt: { xs: 3, sm: 6 }, 
+        mb: { xs: 3, sm: 6 },
+        px: { xs: 2, sm: 3 }
+      }}>
         <Paper elevation={3} sx={{ 
-          p: { xs: 3, sm: 4 }, 
+          p: { xs: 2, sm: 4 }, 
           borderRadius: 3,
           background: 'linear-gradient(145deg, #ffffff, #f8f9fa)'
         }}>
@@ -368,7 +381,7 @@ const SuccessPage: React.FC = () => {
                 display: 'flex', 
                 flexDirection: 'column', 
                 alignItems: 'center',
-                mb: 4
+                mb: 3
               }}>
                 <Box sx={{ 
                   backgroundColor: 'rgba(111, 66, 193, 0.1)', 
@@ -379,15 +392,15 @@ const SuccessPage: React.FC = () => {
                   <HourglassBottomIcon 
                     color="primary" 
                     sx={{ 
-                      fontSize: 60, 
+                      fontSize: { xs: 48, sm: 60 }, 
                       animation: `${spin} 3s linear infinite` 
                     }} 
                   />
                 </Box>
-                <Typography variant="h4" gutterBottom fontWeight="bold">
+                <Typography variant={isMobile ? "h5" : "h4"} gutterBottom fontWeight="bold">
                   Order In Progress
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 4, maxWidth: '90%', mx: 'auto' }}>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: '95%', mx: 'auto' }}>
                   We're preparing your order. Please check the details below for real-time updates.
                 </Typography>
               </Box>
@@ -399,21 +412,21 @@ const SuccessPage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   mb: 3,
-                  p: 2,
+                  p: { xs: 1.5, sm: 2 },
                   bgcolor: 'rgba(25, 118, 210, 0.1)',
                   borderRadius: 2
                 }}>
                   <SwapHorizIcon sx={{ mr: 1, color: '#1976d2' }} />
-                  <Typography variant="body2" sx={{ color: '#1976d2' }}>
+                  <Typography variant="body2" sx={{ color: '#1976d2', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
                     Queue transferred from another location
                   </Typography>
                 </Box>
               )}
               
-              <Grid container spacing={2.5} sx={{ mb: 4 }}>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={12}>
                   <Card sx={{ 
-                    p: 2, 
+                    p: { xs: 1.5, sm: 2 }, 
                     borderRadius: 2, 
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                     border: '1px solid rgba(0,0,0,0.05)'
@@ -422,20 +435,22 @@ const SuccessPage: React.FC = () => {
                       <Box sx={{ 
                         bgcolor: 'primary.light',  
                         color: 'white', 
-                        p: 1.5, 
+                        p: { xs: 1, sm: 1.5 }, 
                         borderRadius: 2,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        mr: 2
+                        mr: 2,
+                        minWidth: { xs: '40px', sm: '48px' },
+                        minHeight: { xs: '40px', sm: '48px' }
                       }}>
-                        <QueueIcon fontSize="medium" />
+                        <QueueIcon fontSize={isMobile ? "small" : "medium"} />
                       </Box>
                       <Box sx={{ textAlign: 'left', flexGrow: 1 }}>
                         <Typography variant="body2" color="text.secondary">
                           Current Position
                         </Typography>
-                        <Typography variant="h6" fontWeight="bold">
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold">
                           {queueData.current_position ?? 'Processing'}
                         </Typography>
                       </Box>
@@ -445,7 +460,7 @@ const SuccessPage: React.FC = () => {
                 
                 <Grid item xs={12}>
                   <Card sx={{ 
-                    p: 2, 
+                    p: { xs: 1.5, sm: 2 }, 
                     borderRadius: 2, 
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                     border: '1px solid rgba(0,0,0,0.05)'
@@ -454,20 +469,22 @@ const SuccessPage: React.FC = () => {
                       <Box sx={{ 
                         bgcolor: 'primary.light', 
                         color: 'white', 
-                        p: 1.5, 
+                        p: { xs: 1, sm: 1.5 }, 
                         borderRadius: 2,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        mr: 2
+                        mr: 2,
+                        minWidth: { xs: '40px', sm: '48px' },
+                        minHeight: { xs: '40px', sm: '48px' }
                       }}>
-                        <StorefrontIcon fontSize="medium" />
+                        <StorefrontIcon fontSize={isMobile ? "small" : "medium"} />
                       </Box>
                       <Box sx={{ textAlign: 'left', flexGrow: 1 }}>
                         <Typography variant="body2" color="text.secondary">
                           Service
                         </Typography>
-                        <Typography variant="h6" fontWeight="bold">
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold">
                           {queueData.service_name}
                         </Typography>
                       </Box>
@@ -477,7 +494,7 @@ const SuccessPage: React.FC = () => {
                 
                 <Grid item xs={12}>
                   <Card sx={{ 
-                    p: 2, 
+                    p: { xs: 1.5, sm: 2 }, 
                     borderRadius: 2, 
                     boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                     border: '1px solid rgba(0,0,0,0.05)'
@@ -486,20 +503,22 @@ const SuccessPage: React.FC = () => {
                       <Box sx={{ 
                         bgcolor: 'primary.light', 
                         color: 'white', 
-                        p: 1.5, 
+                        p: { xs: 1, sm: 1.5 }, 
                         borderRadius: 2,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        mr: 2
+                        mr: 2,
+                        minWidth: { xs: '40px', sm: '48px' },
+                        minHeight: { xs: '40px', sm: '48px' }
                       }}>
-                        <AccessTimeIcon fontSize="medium" />
+                        <AccessTimeIcon fontSize={isMobile ? "small" : "medium"} />
                       </Box>
                       <Box sx={{ textAlign: 'left', flexGrow: 1 }}>
                         <Typography variant="body2" color="text.secondary">
                           Estimated Time Remaining
                         </Typography>
-                        <Typography variant="h6" fontWeight="bold">
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight="bold">
                           {formatTime(remainingTime)}
                         </Typography>
                       </Box>
@@ -508,7 +527,7 @@ const SuccessPage: React.FC = () => {
                 </Grid>
               </Grid>
               
-              <Box sx={{ mb: 4, px: 1 }}>
+              <Box sx={{ mb: 3, px: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Typography variant="body2" fontWeight="medium">Progress</Typography>
                   <Typography variant="body2" fontWeight="medium">{Math.min(Math.round(progressPercentage), 100)}%</Typography>
@@ -517,7 +536,7 @@ const SuccessPage: React.FC = () => {
                   variant="determinate"
                   value={Math.min(progressPercentage, 100)}
                   sx={{ 
-                    height: 10, 
+                    height: 8, 
                     borderRadius: 2,
                     backgroundColor: 'rgba(111, 66, 193, 0.1)',
                     '.MuiLinearProgress-bar': {
@@ -527,17 +546,24 @@ const SuccessPage: React.FC = () => {
                 />
               </Box>
               
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+              {/* Action Buttons - Responsive Layout */}
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', md: 'row' }, 
+                justifyContent: 'center', 
+                gap: { xs: 1.5, md: 2 } 
+              }}>
                 <Button 
                   variant="contained" 
                   color="primary" 
                   onClick={() => navigate('/usermainpage')}
                   sx={{ 
-                    px: 4, 
+                    px: { xs: 2, sm: 4 }, 
                     py: 1.5,
                     borderRadius: 2,
                     boxShadow: '0 4px 14px rgba(111, 66, 193, 0.3)',
                     transition: 'all 0.3s',
+                    width: '100%',
                     '&:hover': {
                       transform: 'translateY(-2px)',
                       boxShadow: '0 6px 20px rgba(111, 66, 193, 0.4)',
@@ -562,8 +588,9 @@ const SuccessPage: React.FC = () => {
                         transform: 'translateY(-2px)'
                       },
                       borderRadius: 2,
-                      px: 3,
+                      px: { xs: 2, sm: 3 },
                       py: 1.5,
+                      width: '100%',
                       transition: 'all 0.3s',
                     }}
                   >
@@ -578,9 +605,10 @@ const SuccessPage: React.FC = () => {
                   disabled={isLeavingQueue || !canLeaveQueue}
                   onClick={handleOpenConfirmDialog}
                   sx={{ 
-                    px: 4,
+                    px: { xs: 2, sm: 4 },
                     py: 1.5,
                     borderRadius: 2,
+                    width: '100%',
                     transition: 'all 0.3s',
                     opacity: canLeaveQueue ? 1 : 0.6,
                     '&:hover': canLeaveQueue ? {
@@ -605,9 +633,9 @@ const SuccessPage: React.FC = () => {
               flexDirection: 'column', 
               justifyContent: 'center', 
               alignItems: 'center', 
-              py: 6 
+              py: { xs: 4, sm: 6 } 
             }}>
-              <CircularProgress size={48} sx={{ mb: 3 }} />
+              <CircularProgress size={isMobile ? 40 : 48} sx={{ mb: 3 }} />
               <Typography variant="h6" fontWeight="medium" sx={{ mb: 1 }}>
                 Loading Order Details
               </Typography>
@@ -623,6 +651,8 @@ const SuccessPage: React.FC = () => {
       <Dialog
         open={openConfirmDialog}
         onClose={() => setOpenConfirmDialog(false)}
+        fullWidth
+        maxWidth="xs"
       >
         <DialogTitle>Leave Queue?</DialogTitle>
         <DialogContent>
@@ -630,7 +660,7 @@ const SuccessPage: React.FC = () => {
             Are you sure you want to leave this queue? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button 
             onClick={() => setOpenConfirmDialog(false)} 
             color="primary"
@@ -656,6 +686,12 @@ const SuccessPage: React.FC = () => {
         autoHideDuration={6000} 
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ 
+          bottom: { xs: 16, sm: 24 },
+          width: { xs: '90%', sm: 'auto' },
+          left: { xs: '5%', sm: 24 },
+          right: { xs: '5%', sm: 24 }
+        }}
       >
         <Alert 
           onClose={handleCloseSnackbar} 

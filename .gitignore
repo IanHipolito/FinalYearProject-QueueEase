@@ -59,3 +59,5 @@ queueease_backend/queueease-5945e-firebase-adminsdk-fbsvc-3b7f51bf7a.json
 *-firebase-adminsdk-*.json
 
 queueease-frontend/build/
+
+htmlcov/

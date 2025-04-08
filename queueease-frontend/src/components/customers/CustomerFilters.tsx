@@ -1,19 +1,23 @@
 import React from 'react';
 import {
-  Box, TextField, Button, FormControl, 
+  Box, TextField, FormControl, 
   InputLabel, Select, MenuItem, InputAdornment
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { CustomerFiltersProps } from 'types/customerTypes';
+
+interface CustomerFiltersProps {
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  filterStatus: string;
+  setFilterStatus: (status: string) => void;
+}
 
 const CustomerFilters: React.FC<CustomerFiltersProps> = ({
   searchTerm,
   setSearchTerm,
   filterStatus,
-  setFilterStatus,
-  onCreateCustomer
+  setFilterStatus
 }) => {
   return (
     <Box sx={{ 
@@ -72,20 +76,6 @@ const CustomerFilters: React.FC<CustomerFiltersProps> = ({
           </Select>
         </FormControl>
       </Box>
-      
-      <Button 
-        variant="contained" 
-        startIcon={<AddIcon />}
-        onClick={onCreateCustomer}
-        sx={{ 
-          borderRadius: 2, 
-          bgcolor: '#6f42c1', 
-          '&:hover': { bgcolor: '#8551d9' },
-          alignSelf: { xs: 'stretch', sm: 'auto' }
-        }}
-      >
-        Add New Customer
-      </Button>
     </Box>
   );
 };

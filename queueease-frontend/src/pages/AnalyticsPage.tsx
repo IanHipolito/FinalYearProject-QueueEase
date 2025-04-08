@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import ErrorDisplay from '../components/common/ErrorDisplay';
@@ -22,6 +22,9 @@ const AnalyticsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState('month');
   const [commentFilter, setCommentFilter] = useState('recent');
+  
+  // Separate state for sentiment trend
+  const [sentimentTrendData, setSentimentTrendData] = useState<number[]>([]);
 
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     feedback_distribution: [],
@@ -40,10 +43,27 @@ const AnalyticsPage: React.FC = () => {
     total_reports: totalReports,
     satisfaction_rate: satisfactionRate,
     average_wait_time: averageWaitTime,
-    satisfaction_trend: sentimentTrendData,
     feedback_keywords: keywordData
   } = analyticsData;
 
+  // Separate fetch for sentiment trend
+  const fetchSentimentTrend = useCallback(async () => {
+    if (!currentService?.id) return;
+
+    try {
+      const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
+
+      if (response.ok) {
+        const data = await response.json();
+        setSentimentTrendData(data.satisfaction_trend || []);
+      }
+    } catch (error) {
+      console.error('Error fetching sentiment trend:', error);
+      setSentimentTrendData([]);
+    }
+  }, [currentService?.id, analyticsTimeRange]);
+
+  // Main analytics data fetch
   useEffect(() => {
     const fetchAnalytics = async () => {
       if (!currentService?.id) return;
@@ -55,61 +75,7 @@ const AnalyticsPage: React.FC = () => {
         const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
 
         if (!response.ok) {
-          let errorMessage = 'Failed to load analytics data';
-          let errorData;
-
-          try {
-            errorData = await response.json();
-            console.error('API response error:', errorData);
-
-            // Special handling for known backend errors
-            if (errorData.error && (
-              errorData.error.includes('Resource punkt_tab not found') ||
-              errorData.error.includes('NLTK')
-            )) {
-              console.log("NLTK dependency missing on the server, using fallback approach...");
-
-              setAnalyticsData({
-                feedback_distribution: [],
-                customer_comments: [],
-                total_reports: 0,
-                satisfaction_rate: 0,
-                average_wait_time: 0,
-                wait_time_trend: Array(12).fill(0),
-                satisfaction_trend: Array(12).fill(0),
-                feedback_keywords: []
-              });
-
-              setError("Natural Language Processing features are unavailable. The server is missing required NLTK packages. Please contact the administrator.");
-              setLoading(false);
-              return;
-            }
-
-            if (errorData.error && errorData.error.includes("'Queue' object has no attribute 'total_wait'")) {
-              console.log("Queue total_wait attribute missing, using fallback approach...");
-
-              setAnalyticsData({
-                feedback_distribution: errorData.feedback_distribution || [],
-                customer_comments: errorData.customer_comments || [],
-                total_reports: errorData.total_reports || 0,
-                satisfaction_rate: errorData.satisfaction_rate || 0,
-                average_wait_time: 0,
-                wait_time_trend: Array(12).fill(0),
-                satisfaction_trend: errorData.satisfaction_trend || Array(12).fill(0),
-                feedback_keywords: errorData.feedback_keywords || []
-              });
-
-              setError("Note: Wait time analysis is currently unavailable. Other analytics are still accessible.");
-              setLoading(false);
-              return;
-            }
-
-            errorMessage = errorData.error || errorMessage;
-          } catch (err) {
-            const errorText = await response.text().catch(() => '');
-            console.error('API response error:', errorText);
-          }
-          throw new Error(`Failed to load analytics data: ${response.status}`);
+          throw new Error('Failed to load analytics data');
         }
 
         const data = await response.json();
@@ -120,65 +86,43 @@ const AnalyticsPage: React.FC = () => {
           total_reports: data.total_reports || 0,
           satisfaction_rate: data.satisfaction_rate || 0,
           average_wait_time: data.average_wait_time || 0,
-          wait_time_trend: data.wait_time_trend || Array(12).fill(0),
-          satisfaction_trend: data.satisfaction_trend || Array(12).fill(0),
+          wait_time_trend: data.wait_time_trend || [],
+          satisfaction_trend: data.satisfaction_trend || [],
           feedback_keywords: data.feedback_keywords || []
         });
 
+        // Also fetch sentiment trend separately
+        fetchSentimentTrend();
       } catch (err: any) {
         console.error('Error fetching analytics data:', err);
         setError(err.message || 'Failed to load analytics data');
-        setAnalyticsData({
-          feedback_distribution: [],
-          customer_comments: [],
-          total_reports: 0,
-          satisfaction_rate: 0,
-          average_wait_time: 0,
-          wait_time_trend: Array(12).fill(0),
-          satisfaction_trend: Array(12).fill(0),
-          feedback_keywords: []
-        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchAnalytics();
-  }, [currentService?.id, analyticsTimeRange]);
+  }, [currentService?.id, analyticsTimeRange, fetchSentimentTrend]);
 
+  // Time range change handler
   const handleTimeRangeChange = (event: SelectChangeEvent) => {
     setAnalyticsTimeRange(event.target.value);
   };
 
+  // Comment filter change handler
   const handleCommentFilterChange = (event: SelectChangeEvent) => {
     setCommentFilter(event.target.value);
   };
 
+  // Filter comments based on selected filter
   const filteredComments = customerFeedback.filter(comment => {
     if (commentFilter === 'recent') return true;
     if (commentFilter === 'positive' && comment.rating >= 4) return true;
     if (commentFilter === 'negative' && comment.rating <= 2) return true;
-    return commentFilter === 'recent';
+    return false;
   });
 
-  const lineChart = (
-    <svg width="100%" height="40" viewBox="0 0 200 40">
-      <path d="M0,30 Q40,15 80,25 T160,10 T200,20" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" />
-    </svg>
-  );
-
-  const generateTimeLabels = (timeRange: string): string[] => {
-    if (timeRange === 'week') {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days;
-    } else if (timeRange === 'month') {
-      return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-    } else {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return months;
-    }
-  };
-
+  // Loading state
   if (loading && !feedbackData.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -193,9 +137,7 @@ const AnalyticsPage: React.FC = () => {
         Analytics
       </Typography>
 
-      {error && <ErrorDisplay error={error} onRetry={() => {
-        setAnalyticsTimeRange(analyticsTimeRange);
-      }} />}
+      {error && <ErrorDisplay error={error} onRetry={() => setAnalyticsTimeRange(analyticsTimeRange)} />}
 
       {/* Top Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -204,7 +146,6 @@ const AnalyticsPage: React.FC = () => {
             title="Total Feedback Reports"
             value={totalReports}
             icon={<FeedbackIcon />}
-            trend="+12%"
             bgGradient="linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
           />
         </Grid>
@@ -215,7 +156,6 @@ const AnalyticsPage: React.FC = () => {
             value={`${satisfactionRate}%`}
             icon={<InsightsIcon />}
             bgGradient="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
-            chart={lineChart}
           />
         </Grid>
 
@@ -232,8 +172,8 @@ const AnalyticsPage: React.FC = () => {
       {/* Charts Row */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} md={8}>
-          <FeedbackDistributionChart
-            data={feedbackData}
+          <SentimentTrendChart
+            data={sentimentTrendData}
             timeRange={analyticsTimeRange}
             onTimeRangeChange={handleTimeRangeChange}
           />
@@ -244,9 +184,8 @@ const AnalyticsPage: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={8}>
-          <SentimentTrendChart
-            data={sentimentTrendData}
-            timeLabels={generateTimeLabels(analyticsTimeRange)}
+          <FeedbackDistributionChart
+            data={feedbackData}
             timeRange={analyticsTimeRange}
             onTimeRangeChange={handleTimeRangeChange}
           />

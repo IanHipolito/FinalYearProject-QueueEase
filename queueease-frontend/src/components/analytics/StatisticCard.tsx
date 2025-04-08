@@ -9,17 +9,17 @@ import {
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { StatisticCardProps } from 'types/analyticsTypes';
 
-const StatisticCard: React.FC<StatisticCardProps> = ({ 
-  title, 
-  value, 
-  icon, 
-  trend, 
+const StatisticCard: React.FC<StatisticCardProps> = ({
+  title,
+  value,
+  icon,
+  trend,
   bgGradient,
-  chart 
+  chart
 }) => {
   return (
-    <Card sx={{ 
-      borderRadius: 4, 
+    <Card sx={{
+      borderRadius: 4,
       background: bgGradient,
       color: '#fff',
       height: '100%',
@@ -31,20 +31,17 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
           <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
             {icon}
           </Box>
-          <IconButton sx={{ color: 'white' }}>
-            <MoreVertIcon />
-          </IconButton>
         </Box>
         <Box sx={{ mt: 2 }}>
           <Typography variant="h3" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center' }}>
             {value}
             {trend && (
-              <Box component="span" sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                fontSize: '0.5em', 
-                p: 0.5, 
-                borderRadius: 1, 
-                ml: 1 
+              <Box component="span" sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                fontSize: '0.5em',
+                p: 0.5,
+                borderRadius: 1,
+                ml: 1
               }}>
                 {trend}
               </Box>

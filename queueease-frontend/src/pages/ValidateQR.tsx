@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { API } from "../services/api";
 
 const ValidateQR: React.FC = () => {
   interface QueueDetails {
@@ -12,18 +13,17 @@ const ValidateQR: React.FC = () => {
 
   const validateQRCode = async (qrHash: string) => {
     try {
-      const response = await fetch(`/api/validate-qr`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrHash }),
-      });
+      const response = await API.queues.validateQR(qrHash);
       if (!response.ok) {
-        throw new Error("Invalid QR Code.");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Invalid QR Code");
       }
       const data = await response.json();
       setQueueDetails(data);
+      setError(null);
     } catch (error) {
       setError((error as Error).message);
+      setQueueDetails(null);
     }
   };
 

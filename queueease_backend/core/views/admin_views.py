@@ -533,51 +533,65 @@ def calculate_satisfaction_trend(feedbacks, period):
         return [0] * 12
 
     now = timezone.now()
-    data_points = 12
-    
+    current_month = now.month
+    current_year = now.year
+
+    # Filter feedbacks based on the current period
+    filtered_feedbacks = []
+    for fb in feedbacks:
+        if period == 'week':
+            # Check if feedback is in the current week
+            fb_week = fb.created_at.isocalendar()[1]
+            current_week = now.isocalendar()[1]
+            if fb_week == current_week and fb.created_at.year == now.year:
+                filtered_feedbacks.append(fb)
+        
+        elif period == 'month':
+            # Check if feedback is in the current month and year
+            if fb.created_at.month == current_month and fb.created_at.year == current_year:
+                filtered_feedbacks.append(fb)
+        
+        elif period == 'year':
+            # Check if feedback is in the current year
+            if fb.created_at.year == current_year:
+                filtered_feedbacks.append(fb)
+
+    # Prepare time buckets and labels
     if period == 'week':
         data_points = 7
-        interval_duration = timedelta(days=1)
-        start_date = now - timedelta(days=7)
+        labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        start_date = now - timedelta(days=now.weekday())
+    
     elif period == 'month':
-        interval_duration = timedelta(days=2.5)
-        start_date = now - timedelta(days=30)
-    else:
-        interval_duration = timedelta(days=30.5)
-        start_date = now - timedelta(days=366)
+        data_points = 4
+        labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+        start_date = now.replace(day=1)
     
-    time_buckets = []
-    bucket_labels = []
-    
-    for i in range(data_points):
-        bucket_start = start_date + (i * interval_duration)
-        bucket_end = start_date + ((i + 1) * interval_duration)
-        time_buckets.append((bucket_start, bucket_end))
-        
-        if period == 'week':
-            bucket_labels.append(bucket_start.strftime('%a'))
-        elif period == 'month':
-            day = bucket_start.day
-            if day == 1 or i == 0:
-                bucket_labels.append(bucket_start.strftime('%d %b'))
-            else:
-                bucket_labels.append(str(day))
-        else:
-            bucket_labels.append(bucket_start.strftime('%b'))
-    
+    else:  # year
+        data_points = now.month
+        labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][:data_points]
+        start_date = datetime(current_year, 1, 1)
+
+    # Initialize buckets
     bucket_totals = [0] * data_points
     bucket_positives = [0] * data_points
-    
-    for feedback in feedbacks:
-        feedback_time = feedback.created_at
-        
-        for i, (bucket_start, bucket_end) in enumerate(time_buckets):
-            if bucket_start <= feedback_time < bucket_end:
-                bucket_totals[i] += 1
-                if feedback.sentiment == 'positive':
-                    bucket_positives[i] += 1
-                break
-    
+
+    # Categorize feedbacks
+    for feedback in filtered_feedbacks:
+        if period == 'week':
+            day_index = feedback.created_at.weekday()
+        elif period == 'month':
+            day_index = (feedback.created_at.day - 1) // 7
+        else:  # year
+            day_index = feedback.created_at.month - 1
+
+        if 0 <= day_index < data_points:
+            bucket_totals[day_index] += 1
+            if feedback.sentiment == 'positive':
+                bucket_positives[day_index] += 1
+
+    # Calculate sentiment percentages
     trend = []
     for total, positive in zip(bucket_totals, bucket_positives):
         if total > 0:
@@ -585,7 +599,11 @@ def calculate_satisfaction_trend(feedbacks, period):
             trend.append(satisfaction)
         else:
             trend.append(trend[-1] if trend else 0)
-    
+
+    # Ensure the trend matches the number of labels
+    while len(trend) < len(labels):
+        trend.append(trend[-1] if trend else 0)
+
     return trend
 
 def calculate_wait_time_trend(service, period):

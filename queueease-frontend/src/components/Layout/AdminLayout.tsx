@@ -20,6 +20,7 @@ import QueuesPage from 'pages/QueuesPage';
 import AnalyticsPage from 'pages/AnalyticsPage';
 import NotificationsPage from 'pages/NotificationsPage';
 import SettingsPage from 'pages/SettingsPage';
+import LogoImage from 'assets/images/QueueEaseLogoWhite.png';
 
 const drawerWidth = 260;
 
@@ -57,7 +58,7 @@ const AdminLayout: React.FC = () => {
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box
           component="img"
-          src="/static/images/logo.png"
+          src={LogoImage}
           alt="Logo"
           sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#6f42c1' }}
         />
@@ -298,13 +299,6 @@ const AdminLayout: React.FC = () => {
             borderRadius: 10,
             px: 2
           }}>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar 
-              sx={{ ml: 2, width: 40, height: 40 }} 
-              alt={user?.name || "Admin"} 
-              src="/static/images/avatar/1.jpg" 
-            />
           </Box>
         </Toolbar>
       </AppBar>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box, Card, CardContent, Typography, FormControl,
   Select, MenuItem, SelectChangeEvent, useTheme
@@ -22,39 +22,71 @@ ChartJS.register(
 
 interface SentimentTrendChartProps {
   data: number[];
-  timeLabels: string[];
   timeRange: string;
   onTimeRangeChange: (event: SelectChangeEvent) => void;
 }
 
 const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
   data,
-  timeLabels,
   timeRange,
   onTimeRangeChange
 }) => {
   const theme = useTheme();
   
-  const chartData = {
-    labels: timeLabels,
-    datasets: [
-      {
-        label: 'Sentiment Score',
-        data: data,
-        fill: true,
-        backgroundColor: 'rgba(111, 66, 193, 0.1)',
-        borderColor: '#6f42c1',
-        tension: 0.4,
-        pointBackgroundColor: '#6f42c1',
-        pointBorderColor: '#fff',
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointHoverBackgroundColor: '#6f42c1',
-        pointHoverBorderColor: '#fff',
-        pointHoverBorderWidth: 2,
-      }
-    ]
-  };
+  // Generate labels based on time range and current date
+  const generateTimeLabels = useMemo(() => {
+    const now = new Date();
+    
+    switch (timeRange) {
+      case 'week':
+        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      case 'month':
+        return ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      case 'year':
+        return [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ].slice(0, now.getMonth() + 1);
+      default:
+        return [];
+    }
+  }, [timeRange]);
+
+  // Ensure data matches the number of labels
+  const chartData = useMemo(() => {
+    const labels = generateTimeLabels;
+    
+    // If no data, fill with zeros
+    const processedData = data.length === 0 
+      ? labels.map(() => 0)
+      : data.slice(0, labels.length);
+
+    // Pad with zeros if needed
+    while (processedData.length < labels.length) {
+      processedData.push(processedData[processedData.length - 1] || 0);
+    }
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Sentiment Score',
+          data: processedData,
+          fill: true,
+          backgroundColor: 'rgba(111, 66, 193, 0.1)',
+          borderColor: '#6f42c1',
+          tension: 0.4,
+          pointBackgroundColor: '#6f42c1',
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#6f42c1',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+        }
+      ]
+    };
+  }, [data, generateTimeLabels]);
 
   const chartOptions = {
     responsive: true,
@@ -120,7 +152,10 @@ const SentimentTrendChart: React.FC<SentimentTrendChartProps> = ({
           color: theme.palette.text.secondary,
           font: {
             size: 11,
-          }
+          },
+          maxRotation: 0,
+          autoSkip: true,
+          autoSkipPadding: 10
         }
       }
     },

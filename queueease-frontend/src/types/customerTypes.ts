@@ -85,6 +85,7 @@ export interface CustomerTrendsChartProps {
   onTimeRangeChange: (event: SelectChangeEvent) => void;
   onRefresh: () => void;
   isImmediateService: () => boolean;
+  latestOrders: Array<any>;
 }
 
 export interface CustomerCommentsProps {

@@ -28,6 +28,7 @@ const DashboardPage: React.FC = () => {
   const [error, setError] = useState('');
   const [statsTimeRange, setStatsTimeRange] = useState('daily');
   const [timeLabels, setTimeLabels] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Function to fetch dashboard data with time range parameters
   const fetchDashboardData = async (serviceId?: number, timeRangeParam = statsTimeRange) => {
@@ -108,6 +109,7 @@ const DashboardPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -169,6 +171,14 @@ const DashboardPage: React.FC = () => {
     setStatsTimeRange(newTimeRange);
     if (currentService?.id) {
       fetchDashboardData(currentService.id, newTimeRange);
+    }
+  };
+
+  // Enhanced refresh function
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    if (currentService?.id) {
+      await fetchDashboardData(currentService.id, statsTimeRange);
     }
   };
 
@@ -245,17 +255,6 @@ const DashboardPage: React.FC = () => {
             value={
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 {dashboardData.customerCount}
-                {dashboardData.growth !== undefined && (
-                  <Box component="span" sx={{
-                    bgcolor: dashboardData.growth >= 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,0,0,0.2)',
-                    fontSize: '0.5em',
-                    p: 0.5,
-                    borderRadius: 1,
-                    ml: 1
-                  }}>
-                    {dashboardData.growth >= 0 ? '+' : ''}{dashboardData.growth}%
-                  </Box>
-                )}
               </Box>
             }
             icon={<ShoppingBagIcon />}
@@ -301,7 +300,7 @@ const DashboardPage: React.FC = () => {
                 orders={dashboardData.latestOrders}
                 loading={loading}
                 isImmediateService={isImmediateService}
-                onRefresh={() => currentService?.id && fetchDashboardData(currentService.id, statsTimeRange)}
+                onRefresh={handleRefreshData}
                 onOrderClick={handleOrderClick}
                 onViewAll={handleViewAllOrders}
                 getStatusColor={getStatusColor}
@@ -316,11 +315,12 @@ const DashboardPage: React.FC = () => {
             <CustomerTrendsChart 
               customerStats={dashboardData.customerStats}
               timeLabels={timeLabels}
-              loading={loading}
+              loading={loading || isRefreshing}
               statsTimeRange={statsTimeRange}
               onTimeRangeChange={handleStatsTimeRangeChange}
-              onRefresh={() => currentService?.id && fetchDashboardData(currentService.id, statsTimeRange)}
+              onRefresh={handleRefreshData}
               isImmediateService={isImmediateService}
+              latestOrders={dashboardData.latestOrders}
             />
           </Card>
         </Grid>

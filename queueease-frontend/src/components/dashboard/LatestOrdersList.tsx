@@ -1,12 +1,6 @@
 import React from 'react';
 import {
-  Box,
-  Typography,
-  Divider,
-  Button,
-  Chip,
-  CircularProgress,
-  IconButton
+  Box, Typography, Divider, Chip, CircularProgress, IconButton
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { LatestOrdersListProps } from 'types/dashboardTypes';
@@ -17,7 +11,6 @@ const LatestOrdersList: React.FC<LatestOrdersListProps> = ({
   isImmediateService,
   onRefresh,
   onOrderClick,
-  onViewAll,
   getStatusColor
 }) => {
   return (
@@ -94,20 +87,6 @@ const LatestOrdersList: React.FC<LatestOrdersListProps> = ({
                 : 'No recent appointments found'}
             </Typography>
           </Box>
-        )}
-
-        {orders && orders.length > 0 && (
-          <Button
-            variant="text"
-            onClick={onViewAll}
-            sx={{
-              mt: 2,
-              fontWeight: 'medium',
-              color: '#3d8bfd'
-            }}
-          >
-            {isImmediateService() ? 'View All Orders' : 'View All Appointments'}
-          </Button>
         )}
       </Box>
     </Box>
