@@ -29,11 +29,13 @@ export interface AnalyticsData {
   feedback_distribution: FeedbackCategory[];
   customer_comments: CustomerComment[];
   total_reports: number;
-  satisfaction_rate: number;
   average_wait_time: number;
   wait_time_trend: number[];
   satisfaction_trend: number[];
   feedback_keywords: KeywordData[];
+  satisfied_pct: number;
+  neutral_pct: number;
+  dissatisfied_pct: number; 
 }
 
 export interface AnalyticsSummaryCardProps {

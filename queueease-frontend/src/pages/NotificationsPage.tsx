@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Grid, Typography, TextField, Button, Card, CardContent, Switch,
-  FormControlLabel, Divider, IconButton, Chip, CircularProgress, Alert, Snackbar
+  FormControlLabel, Divider, Chip, CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -129,9 +129,6 @@ const NotificationsPage: React.FC = () => {
                 <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
                   <NotificationsIcon />
                 </Box>
-                <IconButton sx={{ color: 'white' }}>
-                  <MoreVertIcon />
-                </IconButton>
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h3" fontWeight="bold">
@@ -159,9 +156,6 @@ const NotificationsPage: React.FC = () => {
                 <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
                   <TimerIcon />
                 </Box>
-                <IconButton sx={{ color: 'white' }}>
-                  <MoreVertIcon />
-                </IconButton>
               </Box>
               <Box sx={{ mt: 2 }}>
                 <Typography variant="h3" fontWeight="bold">

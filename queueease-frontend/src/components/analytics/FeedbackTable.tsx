@@ -21,7 +21,6 @@ const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
                 <TableCell sx={{ fontWeight: 'bold' }}>Satisfied %</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Neutral %</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Dissatisfied %</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Total Responses</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -73,7 +72,6 @@ const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
                       {item.dissatisfied}%
                     </Box>
                   </TableCell>
-                  <TableCell>{item.satisfied + item.neutral + item.dissatisfied}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -242,30 +242,21 @@ def admin_customers(request):
             
         # Get unique user IDs who have used this service
         user_ids = Queue.objects.filter(service=service).values_list('user', flat=True).distinct()
-        
-        # Log the count of users found
-        print(f"Found {len(user_ids)} unique users for service {service_id}")
-        
         users = User.objects.filter(id__in=user_ids)
         
         customers_data = []
         for user in users:
-            # Count completed orders for this user with this service
+            # Count orders placed by this customer for this service
             order_count = Queue.objects.filter(user=user, service=service).count()
             
-            # Get the user's most recent activity
-            last_visit = Queue.objects.filter(
-                user=user, 
-                service=service
-            ).order_by('-date_created').first()
+            # Get the user's last visit date for this service
+            last_visit = Queue.objects.filter(user=user, service=service).order_by('-date_created').first()
             
-            # Determine if the user is "active" (used service in last 30 days)
             is_active = False
             if last_visit and last_visit.date_created:
                 thirty_days_ago = timezone.now() - timedelta(days=30)
                 is_active = last_visit.date_created > thirty_days_ago
             
-            # Add user data to response 
             customers_data.append({
                 'id': user.id,
                 'name': user.name or f"User #{user.id}",
@@ -273,12 +264,11 @@ def admin_customers(request):
                 'phone': user.mobile_number or "No phone",
                 'status': 'Active' if is_active else 'Inactive',
                 'is_active': is_active,
-                'orders': order_count,
+                'order_count': order_count,
                 'last_visit': last_visit.date_created.isoformat() if last_visit and last_visit.date_created else None
             })
             
         return Response(customers_data)
-        
     except Exception as e:
         print(f"Error in admin_customers: {str(e)}")
         print(traceback.format_exc())
@@ -402,18 +392,19 @@ def admin_get_analytics(request):
         period = request.GET.get('period', 'month')
         
         if not service_id:
-            return Response({'error': 'service_id is required'}, status=400)
+            return Response({'error': 'service_id is required'}, status=status.HTTP_400_BAD_REQUEST)
             
         service = get_object_or_404(Service, id=service_id)
         
         today = timezone.now()
         if period == 'week':
-            start_date = today - timezone.timedelta(days=7)
+            start_date = today - timedelta(days=7)
         elif period == 'month':
-            start_date = today - timezone.timedelta(days=30)
+            start_date = today - timedelta(days=30)
         else:
-            start_date = today - timezone.timedelta(days=365)
+            start_date = today - timedelta(days=365)
             
+        # Retrieve feedbacks from the start date
         feedbacks = Feedback.objects.filter(
             service=service,
             created_at__gte=start_date
@@ -421,11 +412,19 @@ def admin_get_analytics(request):
         
         total_feedbacks = feedbacks.count()
         if total_feedbacks > 0:
-            positive_feedbacks = feedbacks.filter(sentiment='positive').count()
-            satisfaction_rate = int((positive_feedbacks / total_feedbacks) * 100)
-        else:
-            satisfaction_rate = 0
+            # Calculate counts using explicit rating thresholds
+            satisfied_count = feedbacks.filter(rating__gte=4).count()
+            neutral_count   = feedbacks.filter(rating=3).count()
+            dissatisfied_count = feedbacks.filter(rating__lte=2).count()
             
+            satisfied_pct = int((satisfied_count / total_feedbacks) * 100)
+            neutral_pct   = int((neutral_count / total_feedbacks) * 100)
+            # Ensure total percentage sums to 100
+            dissatisfied_pct = 100 - satisfied_pct - neutral_pct
+        else:
+            satisfied_pct = neutral_pct = dissatisfied_pct = 0
+        
+        # Compute per-category distribution for additional charting
         category_distribution = {}
         for feedback in feedbacks:
             for category in feedback.categories:
@@ -436,14 +435,12 @@ def admin_get_analytics(request):
                         'dissatisfied': 0,
                         'total': 0
                     }
-                
                 if feedback.rating >= 4:
                     category_distribution[category]['satisfied'] += 1
                 elif feedback.rating <= 2:
                     category_distribution[category]['dissatisfied'] += 1
                 else:
                     category_distribution[category]['neutral'] += 1
-                    
                 category_distribution[category]['total'] += 1
                 
         feedback_distribution = []
@@ -458,15 +455,14 @@ def admin_get_analytics(request):
                     'dissatisfied': int((counts['dissatisfied'] / total) * 100),
                     'total': total
                 })
-                
+        
+        # Prepare customer comments and extract keywords
         comments = []
         comment_texts = []
         comment_sentiments = {}
-        
         for feedback in feedbacks[:10]:
             user = feedback.user
             queue_name = f"Queue #{feedback.queue.id}" if feedback.queue else "General"
-            
             comment_data = {
                 'id': feedback.id,
                 'name': user.name,
@@ -477,20 +473,19 @@ def admin_get_analytics(request):
                 'sentiment': feedback.sentiment
             }
             comments.append(comment_data)
-            
             if feedback.comment:
                 comment_texts.append(feedback.comment)
                 comment_sentiments[feedback.comment] = feedback.sentiment
-            
+        
         keyword_extractor = KeywordExtractor()
         keywords = keyword_extractor.extract_keywords(comment_texts, comment_sentiments)
-            
+        
+        # Compute average wait time
         avg_wait_time = 0
         historical_data = ServiceWaitTime.objects.filter(
             service=service,
             date_recorded__gte=start_date
         )
-        
         if historical_data.exists():
             avg_wait_time = int(historical_data.aggregate(
                 avg_time=models.Avg('wait_time')
@@ -509,24 +504,30 @@ def admin_get_analytics(request):
                         wait_minutes = (queue.expected_ready_time - queue.date_created).total_seconds() / 60
                         total_wait_time += wait_minutes
                         count += 1
-                
                 if count > 0:
                     avg_wait_time = int(total_wait_time / count)
-                
+        
+        # Calculate trends
+        satisfaction_trend = calculate_satisfaction_trend(feedbacks, period)
+        wait_time_trend = calculate_wait_time_trend(service, period)
+        
         return Response({
             'feedback_distribution': feedback_distribution,
             'customer_comments': comments,
             'total_reports': total_feedbacks,
-            'satisfaction_rate': satisfaction_rate,
+            'satisfied_pct': satisfied_pct,
+            'neutral_pct': neutral_pct,
+            'dissatisfied_pct': dissatisfied_pct,
             'average_wait_time': avg_wait_time,
-            'satisfaction_trend': calculate_satisfaction_trend(feedbacks, period),
-            'wait_time_trend': calculate_wait_time_trend(service, period),
+            'satisfaction_trend': satisfaction_trend,
+            'wait_time_trend': wait_time_trend,
             'feedback_keywords': keywords
         })
         
     except Exception as e:
         print(f"Error in admin_get_analytics: {str(e)}")
-        return Response({'error': str(e)}, status=500)
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 def calculate_satisfaction_trend(feedbacks, period):
     if not feedbacks:

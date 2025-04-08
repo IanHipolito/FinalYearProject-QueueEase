@@ -13,14 +13,19 @@ import ServiceDetailPanel from '../components/serviceList/ServiceDetailPanel';
 import DistanceFilter from '../components/map/DistanceFilter';
 import SearchBar from '../components/map/SearchBar';
 import CategoryFilter from '../components/map/CategoryFilter';
-import { generateRandomDublinCoordinates } from '../utils/mapUtils';
+import { generateRandomDublinCoordinates, DUBLIN_CENTER, DUBLIN_BOUNDS } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { UserMainPageQueue } from '../types/queueTypes';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import debounce from 'lodash/debounce';
+import throttle from 'lodash/throttle';
 
 const MapProximity: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  // Services and UI states
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +43,19 @@ const MapProximity: React.FC = () => {
   }>({ open: false, message: "", severity: "success" });
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [searchRadius, setSearchRadius] = useState(2); // Default 2km radius
-  const debounceTimerRef = useRef<number | null>(null);
-
+  const [locationLoading, setLocationLoading] = useState<boolean>(false);
+  
   // Add new state variables for transfer functionality
   const [activeQueue, setActiveQueue] = useState<UserMainPageQueue | null>(null);
   const [transferDialogOpen, setTransferDialogOpen] = useState<boolean>(false);
   const [targetService, setTargetService] = useState<Service | null>(null);
   const [transferring, setTransferring] = useState<boolean>(false);
   const [ignoreActiveQueueFilter, setIgnoreActiveQueueFilter] = useState<boolean>(false);
+
+  // Refs for stable references
+  const serviceListRef = useRef<HTMLDivElement>(null);
+  const debounceFilterRef = useRef<ReturnType<typeof debounce>>();
+  const activeQueueInterval = useRef<number | null>(null);
 
   // Calculate distance between two points (haversine formula)
   const calculateDistance = useCallback((
@@ -115,8 +125,13 @@ const MapProximity: React.FC = () => {
     fetchActiveQueue();
 
     // Refresh active queue every 15 seconds
-    const intervalId = setInterval(fetchActiveQueue, 15000);
-    return () => clearInterval(intervalId);
+    activeQueueInterval.current = window.setInterval(fetchActiveQueue, 15000);
+    return () => {
+      if (activeQueueInterval.current) {
+        clearInterval(activeQueueInterval.current);
+        activeQueueInterval.current = null;
+      }
+    };
   }, [user]);
 
   const isEligibleForTransfer = useCallback((service: Service) => {
@@ -179,6 +194,7 @@ const MapProximity: React.FC = () => {
           position: data.position,
           expected_ready_time: data.expected_ready_time,
           status: 'pending',
+          time_created: activeQueue.time_created,
         });
 
         // Navigate to the success page for the new queue
@@ -204,20 +220,97 @@ const MapProximity: React.FC = () => {
     }
   };
 
-  // User location change
+  // Convert coordinates to numbers and store in state
   const handleUserLocationChange = useCallback((location: { latitude: number; longitude: number } | null) => {
-    setUserLocation(location);
     if (location) {
-      localStorage.setItem('userLocation', JSON.stringify(location));
+      const parsedLoc = {
+        latitude: Number(location.latitude),
+        longitude: Number(location.longitude)
+      };
+      setUserLocation(parsedLoc);
+    } else {
+      setUserLocation(null);
     }
   }, []);
+
+  // Geolocation get user's current location
+  const getUserLocation = useCallback(() => {
+    setLocationLoading(true);
+    
+    if (!navigator.geolocation) {
+      console.error('Geolocation is not supported by your browser');
+      fallbackToDublinCenter();
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Update state without saving to localStorage
+          setUserLocation({ latitude, longitude });
+          setLocationLoading(false);
+        } catch (error) {
+          console.error('Error processing user location:', error);
+          fallbackToDublinCenter();
+        }
+      },
+      (error) => {
+        let errorMsg = 'Unknown error getting location';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = 'User denied the request for geolocation';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = 'Location information is unavailable';
+            break;
+          case error.TIMEOUT:
+            errorMsg = 'The request to get user location timed out';
+            break;
+        }
+        console.error('Geolocation error:', errorMsg);
+        setSnackbarState({
+          open: true,
+          message: `Using Dublin center as fallback location. ${errorMsg}`,
+          severity: 'info'
+        });
+        fallbackToDublinCenter();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+    
+    // Helper function to use Dublin center as fallback
+    function fallbackToDublinCenter() {
+      console.log('Using Dublin center as fallback');
+      // Using DUBLIN_CENTER from imported constants
+      const dublinCenter = { 
+        latitude: DUBLIN_CENTER[1], 
+        longitude: DUBLIN_CENTER[0] 
+      };
+      
+      setUserLocation(dublinCenter);
+      setLocationLoading(false);
+    }
+  }, []);
+
+  // Get the user's current location on mount if not already set
+  useEffect(() => {
+    if (!userLocation) {
+      getUserLocation();
+    }
+  }, [userLocation, getUserLocation]);
 
   // Check if there are any active filters
   const hasActiveFilters = useMemo(() => {
     return debouncedFilterText !== "" || selectedCategory !== "All" || searchRadius !== 2 || ignoreActiveQueueFilter;
   }, [debouncedFilterText, selectedCategory, searchRadius, ignoreActiveQueueFilter]);
 
-  // Filter services based on search, category, distance, and transferability
+  // Filter services based on search, category, distance, and transferability with memoization
   const filteredServices = useMemo(() => {
     if (!services.length) return [];
 
@@ -275,7 +368,17 @@ const MapProximity: React.FC = () => {
 
       return true;
     });
-  }, [services, debouncedFilterText, selectedCategory, userLocation, searchRadius, calculateDistance, activeQueue, isEligibleForTransfer, ignoreActiveQueueFilter]);
+  }, [
+    services, 
+    debouncedFilterText, 
+    selectedCategory, 
+    userLocation, 
+    searchRadius, 
+    calculateDistance, 
+    activeQueue, 
+    isEligibleForTransfer, 
+    ignoreActiveQueueFilter
+  ]);
 
   // Get visible services for the list
   const visibleServices = useMemo(() => {
@@ -296,35 +399,27 @@ const MapProximity: React.FC = () => {
 
         let data = await response.json();
 
+        // Data processing with a single-pass transformation
         data = data.map((service: Service) => {
           const newService = {
             ...service,
             subcategory: ''
           };
 
+          // Add coordinates if missing
           if (!newService.latitude || !newService.longitude) {
             const { latitude, longitude } = generateRandomDublinCoordinates();
             newService.latitude = latitude;
             newService.longitude = longitude;
           }
 
-          const nameLower = newService.name?.toLowerCase() || '';
-          if (
-            nameLower.includes('mcdonald') ||
-            nameLower.includes('burger king') ||
-            nameLower.includes('kfc') ||
-            nameLower.includes('subway') ||
-            nameLower.includes('wendy') ||
-            nameLower.includes('taco bell') ||
-            nameLower.includes('domino') ||
-            nameLower.includes('pizza hut') ||
-            nameLower.includes('chipotle') ||
-            (newService.category && newService.category.toLowerCase() === 'fast_food')
-          ) {
+          // Categorize fast food places
+          if ( newService.category && newService.category.toLowerCase() === 'fast_food') {
             newService.category = 'fast_food';
             newService.subcategory = 'fast_food';
           }
 
+          // Categorize healthcare places
           if ((newService.category && newService.category.toLowerCase().includes('health')) ||
             (newService.category && newService.category.toLowerCase().includes('clinic')) ||
             (newService.category && newService.category.toLowerCase().includes('doctor')) ||
@@ -332,6 +427,7 @@ const MapProximity: React.FC = () => {
             newService.category = 'healthcare';
           }
 
+          // Default category
           if (!newService.category) {
             newService.category = 'other';
           }
@@ -351,34 +447,25 @@ const MapProximity: React.FC = () => {
     fetchServices();
   }, []);
 
-  // Debounce search text
+  // Debounce search text with proper cleanup
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedFilterText(filterText);
-    }, 300);
+    // Create debounced function only once
+    if (!debounceFilterRef.current) {
+      debounceFilterRef.current = debounce((value: string) => {
+        setDebouncedFilterText(value);
+      }, 300);
+    }
 
+    // Call the debounced function with current value
+    debounceFilterRef.current(filterText);
+
+    // Cleanup
     return () => {
-      clearTimeout(timer);
-      if (debounceTimerRef.current) {
-        window.clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
+      debounceFilterRef.current?.cancel();
     };
   }, [filterText]);
 
-  // Load saved user location
-  useEffect(() => {
-    const savedLocation = localStorage.getItem('userLocation');
-    if (savedLocation) {
-      try {
-        setUserLocation(JSON.parse(savedLocation));
-      } catch (e) {
-        console.error('Error parsing saved location', e);
-      }
-    }
-  }, []);
-
-  // Setup scroll listener
+  // Setup scroll listener with passive flag for better performance
   useEffect(() => {
     // Reset visible count when filters change
     setVisibleCount(10);
@@ -386,19 +473,19 @@ const MapProximity: React.FC = () => {
     // Setup scroll listener for the service list container
     const container = document.querySelector('.service-list-container');
     if (container) {
-      const handleScroll = (e: Event) => {
+      const handleScroll = throttle((e: Event) => {
         const target = e.target as HTMLElement;
         if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
           setVisibleCount(prev => Math.min(prev + 5, filteredServices.length));
         }
-      };
+      }, 100);
 
-      container.addEventListener('scroll', handleScroll);
+      container.addEventListener('scroll', handleScroll, { passive: true });
       return () => container.removeEventListener('scroll', handleScroll);
     }
   }, [filteredServices.length]);
 
-  // Bottom sheet control
+  // Bottom sheet control with memoized callbacks
   const toggleSheetHeight = useCallback(() => {
     setSheetHeight(prev => {
       if (prev === 'collapsed') return 'partial';
@@ -505,10 +592,18 @@ const MapProximity: React.FC = () => {
     }
 
     return visibleServices.map(renderServiceRow);
-  }, [filteredServices.length, handleResetFilters, loading, renderServiceRow, visibleServices, activeQueue, ignoreActiveQueueFilter]);
+  }, [
+    filteredServices, 
+    handleResetFilters, 
+    loading, 
+    renderServiceRow, 
+    visibleServices, 
+    activeQueue, 
+    ignoreActiveQueueFilter
+  ]);
 
   // Render transfer dialog
-  const renderTransferDialog = () => (
+  const renderTransferDialog = useCallback(() => (
     <Dialog
       open={transferDialogOpen}
       onClose={() => !transferring && setTransferDialogOpen(false)}
@@ -552,7 +647,7 @@ const MapProximity: React.FC = () => {
         </Button>
       </DialogActions>
     </Dialog>
-  );
+  ), [transferDialogOpen, transferring, activeQueue?.service_name, targetService?.name]);
 
   return (
     <Box
@@ -577,8 +672,11 @@ const MapProximity: React.FC = () => {
           width: '100%',
           height: '100%',
           zIndex: 1,
+          pointerEvents: 'auto',
+          willChange: 'transform',
         }}
       >
+        {/* Service Map */}
         <ServiceMap
           services={filteredServices}
           selectedService={selectedService}
@@ -590,7 +688,7 @@ const MapProximity: React.FC = () => {
           onUserLocationChange={handleUserLocationChange}
         />
       </Box>
-
+      
       {/* Search and filter components */}
       <SearchBar
         filterText={filterText}
@@ -599,7 +697,7 @@ const MapProximity: React.FC = () => {
         toggleFilters={toggleFilters}
         hasActiveFilters={hasActiveFilters}
       >
-        {/* Distance Filter (only shown when user location is available) */}
+        {/* Distance Filter */}
         {userLocation && (
           <DistanceFilter
             value={searchRadius}
@@ -629,6 +727,47 @@ const MapProximity: React.FC = () => {
       >
         {renderServiceList()}
       </BottomSheet>
+
+      {/* User Location Button */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 100,
+          right: 16,
+          zIndex: 10
+        }}
+      >
+        <Button
+          variant="contained"
+          size="small"
+          onClick={getUserLocation}
+          disabled={locationLoading}
+          title="Find my location"
+          sx={{
+            minWidth: '44px',
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            backgroundColor: locationLoading ? '#f0f0f0' : 'white',
+            color: '#FF0000',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            '&:hover': {
+              backgroundColor: '#f5f5f5'
+            },
+            transition: 'transform 0.2s ease',
+            '&:active': {
+              transform: 'scale(0.95)'
+            },
+            willChange: 'transform'
+          }}
+        >
+          {locationLoading ? (
+            <CircularProgress size={24} color="error" /> 
+          ) : (
+            <MyLocationIcon fontSize="medium" />
+          )}
+        </Button>
+      </Box>
 
       {/* Selected service detail panel */}
       <ServiceDetailPanel

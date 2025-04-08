@@ -7,7 +7,7 @@ import { Box, Grid, Typography, SelectChangeEvent } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';
-import { AnalyticsData } from '../types/analyticsTypes';
+import { AnalyticsData } from 'types/analyticsTypes';
 import StatisticCard from '../components/analytics/StatisticCard';
 import FeedbackDistributionChart from '../components/analytics/FeedbackDistributionChart';
 import SatisfactionDonutChart from '../components/analytics/SatisfactionDonutChart';
@@ -26,33 +26,36 @@ const AnalyticsPage: React.FC = () => {
   // Separate state for sentiment trend
   const [sentimentTrendData, setSentimentTrendData] = useState<number[]>([]);
 
+  // Updated analyticsData initial state to include our new keys
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     feedback_distribution: [],
     customer_comments: [],
     total_reports: 0,
-    satisfaction_rate: 0,
+    satisfied_pct: 0,
+    neutral_pct: 0,
+    dissatisfied_pct: 0,
     average_wait_time: 0,
     wait_time_trend: [],
     satisfaction_trend: [],
     feedback_keywords: []
   });
 
+  // Destructure with our new fields
   const {
     feedback_distribution: feedbackData,
     customer_comments: customerFeedback,
     total_reports: totalReports,
-    satisfaction_rate: satisfactionRate,
+    satisfied_pct, // our customer satisfaction percentage
     average_wait_time: averageWaitTime,
     feedback_keywords: keywordData
   } = analyticsData;
 
-  // Separate fetch for sentiment trend
+  // Separate fetch for sentiment trend remains unchanged
   const fetchSentimentTrend = useCallback(async () => {
     if (!currentService?.id) return;
 
     try {
       const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
-
       if (response.ok) {
         const data = await response.json();
         setSentimentTrendData(data.satisfaction_trend || []);
@@ -73,18 +76,18 @@ const AnalyticsPage: React.FC = () => {
 
       try {
         const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
-
         if (!response.ok) {
           throw new Error('Failed to load analytics data');
         }
-
         const data = await response.json();
 
         setAnalyticsData({
           feedback_distribution: data.feedback_distribution || [],
           customer_comments: data.customer_comments || [],
           total_reports: data.total_reports || 0,
-          satisfaction_rate: data.satisfaction_rate || 0,
+          satisfied_pct: data.satisfied_pct || 0,
+          neutral_pct: data.neutral_pct || 0,
+          dissatisfied_pct: data.dissatisfied_pct || 0,
           average_wait_time: data.average_wait_time || 0,
           wait_time_trend: data.wait_time_trend || [],
           satisfaction_trend: data.satisfaction_trend || [],
@@ -153,7 +156,7 @@ const AnalyticsPage: React.FC = () => {
         <Grid item xs={12} md={4}>
           <StatisticCard
             title="Customer Satisfaction"
-            value={`${satisfactionRate}%`}
+            value={`${satisfied_pct}%`}
             icon={<InsightsIcon />}
             bgGradient="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
           />
@@ -180,7 +183,8 @@ const AnalyticsPage: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <SatisfactionDonutChart satisfactionRate={satisfactionRate} />
+          {/* Pass satisfied_pct into the donut chart */}
+          <SatisfactionDonutChart satisfactionRate={satisfied_pct} />
         </Grid>
 
         <Grid item xs={12} md={8}>
