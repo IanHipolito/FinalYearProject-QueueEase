@@ -7,13 +7,13 @@ import {
   DialogTitle, DialogContent, DialogContentText, DialogActions
 } from '@mui/material';
 import ServiceMap from '../components/map/ServiceMap';
-import ServiceCard from '../components/serviceList/ServiceCard';
+import MapServiceCard from '../components/serviceList/MapServiceCard';
 import BottomSheet from '../components/serviceList/BottomSheet';
 import ServiceDetailPanel from '../components/serviceList/ServiceDetailPanel';
 import DistanceFilter from '../components/map/DistanceFilter';
 import SearchBar from '../components/map/SearchBar';
 import CategoryFilter from '../components/map/CategoryFilter';
-import { generateRandomDublinCoordinates, DUBLIN_CENTER, DUBLIN_BOUNDS } from '../utils/mapUtils';
+import { generateRandomDublinCoordinates, DUBLIN_CENTER } from '../utils/mapUtils';
 import { Service } from '../types/serviceTypes';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { UserMainPageQueue } from '../types/queueTypes';
@@ -53,7 +53,6 @@ const MapProximity: React.FC = () => {
   const [ignoreActiveQueueFilter, setIgnoreActiveQueueFilter] = useState<boolean>(false);
 
   // Refs for stable references
-  const serviceListRef = useRef<HTMLDivElement>(null);
   const debounceFilterRef = useRef<ReturnType<typeof debounce>>();
   const activeQueueInterval = useRef<number | null>(null);
 
@@ -551,7 +550,7 @@ const MapProximity: React.FC = () => {
     const canTransfer = isEligibleForTransfer(service);
 
     return (
-      <ServiceCard
+      <MapServiceCard
         key={service.id}
         service={service}
         isSelected={isSelected}

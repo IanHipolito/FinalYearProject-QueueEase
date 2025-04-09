@@ -10,8 +10,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import { ServiceDetailProps } from 'types/serviceTypes';
-import { getCategoryIcon } from '../map/mapUtils';
-import { getCategoryColor } from 'utils/mapUtils';
+import { getCategoryIcon, getCategoryColor } from 'utils/mapUtils';
 import { RouteInfo } from 'types/mapTypes';
 
 const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
@@ -157,7 +156,7 @@ const ServiceDetailPanel: React.FC<ServiceDetailProps> = ({
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
           <Chip
-            icon={getCategoryIcon(service.category || 'default')}
+            icon={getCategoryIcon(service.category || 'default') as React.ReactElement || undefined}
             label={service.category}
             size="small"
             sx={{ borderRadius: 1.5, height: 24 }}

@@ -4,8 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Box, Button, CircularProgress } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { Service, ServiceMapProps } from 'types/serviceTypes';
-import { prepareGeoJSON, getServicePointLayer, getServiceSymbolLayer, addMapStyles } from './mapUtils';
-import { DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN } from 'utils/mapUtils';
+import { geoJSONGenerator, getServicePointLayer, getServiceSymbolLayer, addMapStyles, DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN, removeMapStyles } from 'utils/mapUtils';
 import * as turf from '@turf/turf';
 import throttle from 'lodash/throttle';
 import debounce from 'lodash/debounce';
@@ -71,7 +70,6 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   const serviceData = useMemo(() => {
     let filteredServices = services;
     
-    // Filter services by distance if user location is available
     if (userLocation && maxDistance > 0) {
       filteredServices = services.filter(service => {
         const distance = calculateDistance(
@@ -80,12 +78,11 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           service.latitude,
           service.longitude
         );
-        // Convert distance to kilometers and compare with maxDistance
         return distance / 1000 <= maxDistance;
       });
     }
     
-    return prepareGeoJSON(filteredServices, selectedService?.id);
+    return geoJSONGenerator.prepareGeoJSON(filteredServices, selectedService?.id);
   }, [services, selectedService?.id, userLocation, maxDistance, calculateDistance]);
   
   // Helper function to ensure map is ready for operations
@@ -715,6 +712,14 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       }
     });
   }, [selectedService, updateMapData, ensureMapIsReady]);
+
+  useEffect(() => {
+    return () => {
+      // Perform cleanup on unmount
+      removeMapStyles();
+      geoJSONGenerator.clearCaches();
+    };
+  }, []);
 
   return (
     <Box

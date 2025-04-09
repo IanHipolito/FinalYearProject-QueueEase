@@ -1,4 +1,5 @@
 import { SelectChangeEvent } from '@mui/material/Select';
+import { KeywordData } from './feedbackTypes';
 
 export interface FeedbackCategory {
   id: number;
@@ -17,12 +18,6 @@ export interface CustomerComment {
   rating: number;
   comment: string;
   avatar?: string;
-}
-
-export interface KeywordData {
-  text: string;
-  value: number;
-  sentiment: string;
 }
 
 export interface AnalyticsData {

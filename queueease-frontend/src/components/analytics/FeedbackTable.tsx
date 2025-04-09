@@ -6,6 +6,11 @@ import {
 import { FeedbackTableProps } from 'types/analyticsTypes';
 
 const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
+  // Ensure that data is an array; if not, wrap it into an array if possible.
+  const safeData = Array.isArray(data)
+    ? data
+    : (data && typeof data === 'object' ? [data] : []);
+
   return (
     <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', mb: 3 }}>
       <CardContent>
@@ -24,7 +29,7 @@ const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.map((item) => (
+              {safeData.map((item) => (
                 <TableRow key={item.id} hover>
                   <TableCell>{item.category}</TableCell>
                   <TableCell>
@@ -37,7 +42,7 @@ const FeedbackTable: React.FC<FeedbackTableProps> = ({ data }) => {
                           bgcolor: '#81c784', 
                           borderRadius: 1,
                           mr: 1 
-                        }} 
+                        }}
                       />
                       {item.satisfied}%
                     </Box>

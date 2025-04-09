@@ -1,8 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { ServiceMarkerProps } from '../../types/serviceTypes';
-import { getCategoryColor } from '../../utils/mapUtils';
-import { getCategoryIcon } from './mapUtils';
+import { getCategoryColor, getCategoryIcon } from '../../utils/mapUtils';
 
 const ServiceMarker: React.FC<ServiceMarkerProps> = ({ 
   service, 
@@ -24,7 +23,7 @@ const ServiceMarker: React.FC<ServiceMarkerProps> = ({
         cursor: 'pointer',
       }}
     >
-      {getCategoryIcon(service.category || 'default', 'small')}
+      {getCategoryIcon(service.category || 'default', 'small') as React.ReactElement || undefined}
       
       {(service.queue_length && service.queue_length > 0) && (
         <Box

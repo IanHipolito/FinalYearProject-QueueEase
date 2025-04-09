@@ -51,7 +51,11 @@ export interface UserFeedback {
 export interface KeywordData {
   text: string;
   value: number;
-  sentiment: string;
+  sentiment_breakdown: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
 }
 
 export interface FeedbackAnalyticsSectionProps {

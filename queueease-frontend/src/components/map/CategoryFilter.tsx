@@ -1,7 +1,6 @@
 import React from 'react';
 import {  Box,  Chip,  useTheme, Paper } from '@mui/material';
-import { CATEGORIES } from '../../utils/mapUtils';
-import { getCategoryIcon } from './mapUtils';
+import { CATEGORIES, getCategoryIcon } from '../../utils/mapUtils';
 import { CategoryFilterProps } from 'types/mapTypes';
 
 const CategoryFilter: React.FC<CategoryFilterProps> = ({
@@ -41,7 +40,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
         {CATEGORIES.map((category) => (
           <Chip
             key={category.id}
-            icon={category.id !== "All" ? getCategoryIcon(category.id) : undefined}
+            icon={category.id !== "All" ? getCategoryIcon(category.id) as React.ReactElement || undefined : undefined}
             label={category.label}
             clickable
             color={selectedCategory === category.id ? "primary" : "default"}

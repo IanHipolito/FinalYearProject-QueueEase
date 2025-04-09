@@ -9,48 +9,15 @@ from rest_framework import status
 from datetime import datetime, timedelta
 import logging
 import traceback
-import numpy as np
 from django.contrib.auth.hashers import check_password, make_password
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-import os
-import uuid
 import json
 
 from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence, NotificationSettings
-from ..utils.keyword_extractor import KeywordExtractor
+from ..utils.nlp_sentiment import KeywordExtractor, SentimentAnalyzer
 from ..services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
 
 logger = logging.getLogger(__name__)
 
-# @api_view(['GET'])
-# def admin_services(request, user_id):
-#     try:
-#         user = User.objects.get(id=user_id, user_type='admin')
-#         service_admins = ServiceAdmin.objects.filter(user=user)
-        
-#         services = []
-#         for sa in service_admins:
-#             service_data = {
-#                 'id': sa.service.id,
-#                 'name': sa.service.name,
-#                 'description': sa.service.description,
-#                 'category': sa.service.category,
-#                 'is_owner': sa.is_owner,
-#                 'queue_length': Queue.objects.filter(
-#                     service=sa.service, 
-#                     status='pending',
-#                     is_active=True
-#                 ).count()
-#             }
-#             services.append(service_data)
-            
-#         return Response(services)
-#     except User.DoesNotExist:
-#         return Response({'error': 'Admin not found'}, status=404)
-#     except Exception as e:
-#         return Response({'error': str(e)}, status=500)
-    
 @api_view(['GET'])
 def admin_dashboard_data(request):
     try:
@@ -325,7 +292,6 @@ def admin_create_customer(request):
 @csrf_exempt
 @api_view(['POST'])
 def test_notification(request):
-    """Test sending a notification to a user"""
     try:
         user_id = request.data.get('user_id')
         title = request.data.get('title', 'QueueEase Notification')
@@ -348,8 +314,8 @@ def test_notification(request):
         # Send different types of notifications based on the type
         if notification_type == 'queue_update':
             queue_id = data.get('queue_id', '1')
-            position = 3  # Example position
-            wait_time = 15  # Example wait time in minutes
+            position = 3 
+            wait_time = 15
             service_name = "Test Service"
             
             result = send_queue_update_notification(
@@ -390,12 +356,10 @@ def admin_get_analytics(request):
     try:
         service_id = request.GET.get('service_id')
         period = request.GET.get('period', 'month')
-        
         if not service_id:
             return Response({'error': 'service_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        service = get_object_or_404(Service, id=service_id)
         
+        service = get_object_or_404(Service, id=service_id)
         today = timezone.now()
         if period == 'week':
             start_date = today - timedelta(days=7)
@@ -403,265 +367,217 @@ def admin_get_analytics(request):
             start_date = today - timedelta(days=30)
         else:
             start_date = today - timedelta(days=365)
-            
-        # Retrieve feedbacks from the start date
+        
+        # Retrieve feedback for this service from start_date
         feedbacks = Feedback.objects.filter(
             service=service,
             created_at__gte=start_date
-        ).order_by('-created_at')
+        ).select_related('user', 'queue').order_by('-created_at')
         
         total_feedbacks = feedbacks.count()
-        if total_feedbacks > 0:
-            # Calculate counts using explicit rating thresholds
-            satisfied_count = feedbacks.filter(rating__gte=4).count()
-            neutral_count   = feedbacks.filter(rating=3).count()
-            dissatisfied_count = feedbacks.filter(rating__lte=2).count()
-            
-            satisfied_pct = int((satisfied_count / total_feedbacks) * 100)
-            neutral_pct   = int((neutral_count / total_feedbacks) * 100)
-            # Ensure total percentage sums to 100
-            dissatisfied_pct = 100 - satisfied_pct - neutral_pct
-        else:
-            satisfied_pct = neutral_pct = dissatisfied_pct = 0
         
-        # Compute per-category distribution for additional charting
+        # Build the Feedback Distribution Array
+        # Instead of returning an object, we now aggregate feedback by category (or "Overall" if no category provided)
         category_distribution = {}
-        for feedback in feedbacks:
-            for category in feedback.categories:
-                if category not in category_distribution:
-                    category_distribution[category] = {
-                        'satisfied': 0,
-                        'neutral': 0,
-                        'dissatisfied': 0,
-                        'total': 0
-                    }
-                if feedback.rating >= 4:
-                    category_distribution[category]['satisfied'] += 1
-                elif feedback.rating <= 2:
-                    category_distribution[category]['dissatisfied'] += 1
+        for fb in feedbacks:
+            categories = fb.categories if fb.categories else ["Overall"]
+            for cat in categories:
+                if cat not in category_distribution:
+                    category_distribution[cat] = {'satisfied': 0, 'neutral': 0, 'dissatisfied': 0, 'total': 0}
+                if fb.rating >= 4:
+                    category_distribution[cat]['satisfied'] += 1
+                elif fb.rating <= 2:
+                    category_distribution[cat]['dissatisfied'] += 1
                 else:
-                    category_distribution[category]['neutral'] += 1
-                category_distribution[category]['total'] += 1
-                
-        feedback_distribution = []
-        for category, counts in category_distribution.items():
-            total = counts['total']
-            if total > 0:
-                feedback_distribution.append({
-                    'id': len(feedback_distribution) + 1,
-                    'category': category,
-                    'satisfied': int((counts['satisfied'] / total) * 100),
-                    'neutral': int((counts['neutral'] / total) * 100),
-                    'dissatisfied': int((counts['dissatisfied'] / total) * 100),
-                    'total': total
-                })
+                    category_distribution[cat]['neutral'] += 1
+                category_distribution[cat]['total'] += 1
         
-        # Prepare customer comments and extract keywords
+        distribution_array = []
+        idx = 1
+        for cat, counts in category_distribution.items():
+            total = counts['total'] if counts['total'] > 0 else 1  # Avoid division by zero
+            distribution_array.append({
+                'id': idx,
+                'category': cat,
+                'satisfied': int((counts['satisfied'] / total) * 100),
+                'neutral': int((counts['neutral'] / total) * 100),
+                'dissatisfied': int((counts['dissatisfied'] / total) * 100)
+            })
+            idx += 1
+
+        # Calculate Overall Rating Percentages as Fallback
+        if total_feedbacks > 0:
+            satisfied_count = feedbacks.filter(rating__gte=4).count()
+            neutral_count = feedbacks.filter(rating=3).count()
+            dissatisfied_count = feedbacks.filter(rating__lte=2).count()
+            overall_satisfied_pct = int((satisfied_count / total_feedbacks) * 100)
+            overall_neutral_pct = int((neutral_count / total_feedbacks) * 100)
+            overall_dissatisfied_pct = 100 - overall_satisfied_pct - overall_neutral_pct
+        else:
+            overall_satisfied_pct = overall_neutral_pct = overall_dissatisfied_pct = 0
+
+        # Build Customer Comments
         comments = []
         comment_texts = []
         comment_sentiments = {}
-        for feedback in feedbacks[:10]:
-            user = feedback.user
-            queue_name = f"Queue #{feedback.queue.id}" if feedback.queue else "General"
+        sentiment_analyzer = SentimentAnalyzer()
+        for fb in feedbacks[:10]:
+            user = fb.user
+            queue_name = f"Queue #{fb.queue.id}" if fb.queue else "General"
             comment_data = {
-                'id': feedback.id,
-                'name': user.name,
-                'date': feedback.created_at.strftime("%b %d, %Y"),
+                'id': fb.id,
+                'name': user.name if user else 'Anonymous',
+                'date': fb.created_at.strftime("%b %d, %Y"),
                 'queue': queue_name,
-                'rating': feedback.rating,
-                'comment': feedback.comment,
-                'sentiment': feedback.sentiment
+                'rating': fb.rating,
+                'comment': fb.comment,
+                'sentiment': fb.sentiment  # stored sentiment
             }
             comments.append(comment_data)
-            if feedback.comment:
-                comment_texts.append(feedback.comment)
-                comment_sentiments[feedback.comment] = feedback.sentiment
+            if fb.comment:
+                comment_texts.append(fb.comment)
+                norm_comment = fb.comment.strip().lower()
+                # Re-run analysis using the new SentimentAnalyzer (ensemble method)
+                comment_sentiments[norm_comment] = sentiment_analyzer.analyze(fb.comment, method="ensemble")["sentiment"]
         
+        # Extract Feedback Keywords Using KeywordExtractor
         keyword_extractor = KeywordExtractor()
-        keywords = keyword_extractor.extract_keywords(comment_texts, comment_sentiments)
+        keywords = keyword_extractor.extract_keywords(comment_texts, sentiment_mapping=comment_sentiments)
         
-        # Compute average wait time
+        # Compute Average Wait Time
         avg_wait_time = 0
         historical_data = ServiceWaitTime.objects.filter(
             service=service,
             date_recorded__gte=start_date
         )
         if historical_data.exists():
-            avg_wait_time = int(historical_data.aggregate(
-                avg_time=models.Avg('wait_time')
-            )['avg_time'] or 0)
+            avg = historical_data.aggregate(avg_time=models.Avg('wait_time'))['avg_time']
+            if avg:
+                avg_wait_time = int(avg)
         else:
             queues = Queue.objects.filter(service=service, status='completed')
             if queues.exists():
-                total_wait_time = 0
+                total_wait = 0
                 count = 0
                 for queue in queues:
                     if hasattr(queue, 'total_wait') and queue.total_wait:
                         wait_minutes = queue.total_wait / 60 if queue.total_wait > 1000 else queue.total_wait
-                        total_wait_time += wait_minutes
+                        total_wait += wait_minutes
                         count += 1
-                    elif hasattr(queue, 'expected_ready_time') and queue.expected_ready_time and hasattr(queue, 'date_created'):
-                        wait_minutes = (queue.expected_ready_time - queue.date_created).total_seconds() / 60
-                        total_wait_time += wait_minutes
-                        count += 1
-                if count > 0:
-                    avg_wait_time = int(total_wait_time / count)
+                if count:
+                    avg_wait_time = int(total_wait / count)
         
-        # Calculate trends
+        # Calculate Trends Using Existing Functions
         satisfaction_trend = calculate_satisfaction_trend(feedbacks, period)
         wait_time_trend = calculate_wait_time_trend(service, period)
         
-        return Response({
-            'feedback_distribution': feedback_distribution,
+        # Assemble the Real Response Data
+        response_data = {
+            'feedback_distribution': distribution_array,
             'customer_comments': comments,
             'total_reports': total_feedbacks,
-            'satisfied_pct': satisfied_pct,
-            'neutral_pct': neutral_pct,
-            'dissatisfied_pct': dissatisfied_pct,
+            'satisfied_pct': overall_satisfied_pct,
+            'neutral_pct': overall_neutral_pct,
+            'dissatisfied_pct': overall_dissatisfied_pct,
             'average_wait_time': avg_wait_time,
             'satisfaction_trend': satisfaction_trend,
             'wait_time_trend': wait_time_trend,
             'feedback_keywords': keywords
-        })
+        }
         
+        return Response(response_data)
+    
     except Exception as e:
-        print(f"Error in admin_get_analytics: {str(e)}")
-        print(traceback.format_exc())
+        logger.error("Error in admin_get_analytics: " + str(e))
+        logger.error(traceback.format_exc())
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 def calculate_satisfaction_trend(feedbacks, period):
     if not feedbacks:
-        return [0] * 12
-
+        return []
     now = timezone.now()
-    current_month = now.month
-    current_year = now.year
-
-    # Filter feedbacks based on the current period
-    filtered_feedbacks = []
-    for fb in feedbacks:
-        if period == 'week':
-            # Check if feedback is in the current week
-            fb_week = fb.created_at.isocalendar()[1]
-            current_week = now.isocalendar()[1]
-            if fb_week == current_week and fb.created_at.year == now.year:
-                filtered_feedbacks.append(fb)
-        
-        elif period == 'month':
-            # Check if feedback is in the current month and year
-            if fb.created_at.month == current_month and fb.created_at.year == current_year:
-                filtered_feedbacks.append(fb)
-        
-        elif period == 'year':
-            # Check if feedback is in the current year
-            if fb.created_at.year == current_year:
-                filtered_feedbacks.append(fb)
-
-    # Prepare time buckets and labels
     if period == 'week':
-        data_points = 7
-        labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        start_date = now - timedelta(days=now.weekday())
-    
+        # 7-day buckets (Monday=0)
+        buckets = [0] * 7
+        totals = [0] * 7
+        for fb in feedbacks:
+            weekday = fb.created_at.weekday()
+            totals[weekday] += 1
+            if fb.rating >= 4:
+                buckets[weekday] += 1
+        trend = [int((pos / tot) * 100) if tot else 0 for pos, tot in zip(buckets, totals)]
+        return trend
     elif period == 'month':
-        data_points = 4
-        labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
-        start_date = now.replace(day=1)
-    
-    else:  # year
-        data_points = now.month
-        labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][:data_points]
-        start_date = datetime(current_year, 1, 1)
-
-    # Initialize buckets
-    bucket_totals = [0] * data_points
-    bucket_positives = [0] * data_points
-
-    # Categorize feedbacks
-    for feedback in filtered_feedbacks:
-        if period == 'week':
-            day_index = feedback.created_at.weekday()
-        elif period == 'month':
-            day_index = (feedback.created_at.day - 1) // 7
-        else:  # year
-            day_index = feedback.created_at.month - 1
-
-        if 0 <= day_index < data_points:
-            bucket_totals[day_index] += 1
-            if feedback.sentiment == 'positive':
-                bucket_positives[day_index] += 1
-
-    # Calculate sentiment percentages
-    trend = []
-    for total, positive in zip(bucket_totals, bucket_positives):
-        if total > 0:
-            satisfaction = int((positive / total) * 100)
-            trend.append(satisfaction)
-        else:
-            trend.append(trend[-1] if trend else 0)
-
-    # Ensure the trend matches the number of labels
-    while len(trend) < len(labels):
-        trend.append(trend[-1] if trend else 0)
-
-    return trend
+        # 4-week buckets
+        buckets = [0] * 4
+        totals = [0] * 4
+        for fb in feedbacks:
+            week_index = (fb.created_at.day - 1) // 7
+            if week_index < 4:
+                totals[week_index] += 1
+                if fb.rating >= 4:
+                    buckets[week_index] += 1
+        trend = [int((pos / tot) * 100) if tot else 0 for pos, tot in zip(buckets, totals)]
+        return trend
+    else:
+        # For year: group by month
+        buckets = [0] * 12
+        totals = [0] * 12
+        for fb in feedbacks:
+            month = fb.created_at.month
+            index = month - 1
+            totals[index] += 1
+            if fb.rating >= 4:
+                buckets[index] += 1
+        trend = [int((pos / tot) * 100) if tot else 0 for pos, tot in zip(buckets, totals)]
+        return trend[:now.month]
 
 def calculate_wait_time_trend(service, period):
     now = timezone.now()
-    data_points = 12
-    
     if period == 'week':
-        data_points = 7
-        interval_duration = timedelta(days=1)
-        start_date = now - timedelta(days=7)
-    elif period == 'month':
-        interval_duration = timedelta(days=2.5)
-        start_date = now - timedelta(days=30)
-    else:
-        interval_duration = timedelta(days=30.5)
-        start_date = now - timedelta(days=366)
-    
-    time_buckets = []
-    
-    for i in range(data_points):
-        bucket_start = start_date + (i * interval_duration)
-        bucket_end = start_date + ((i + 1) * interval_duration)
-        time_buckets.append((bucket_start, bucket_end))
-    
-    bucket_wait_times = [[] for _ in range(data_points)]
-    
-    historical_data = ServiceWaitTime.objects.filter(
-        service=service,
-        date_recorded__gte=start_date
-    )
-    
-    for record in historical_data:
-        if not record.date_recorded:
-            continue
-        
-        for i, (bucket_start, bucket_end) in enumerate(time_buckets):
-            if bucket_start <= record.date_recorded < bucket_end:
-                bucket_wait_times[i].append(record.wait_time)
-                break
-    
-    trend = []
-    for wait_times in bucket_wait_times:
-        if wait_times:
-            if len(wait_times) >= 3:
-                wait_times_array = np.array(wait_times)
-                lower_bound = np.percentile(wait_times_array, 5)
-                upper_bound = np.percentile(wait_times_array, 95)
-                filtered_times = wait_times_array[(wait_times_array >= lower_bound) & (wait_times_array <= upper_bound)]
-                avg_wait = int(np.mean(filtered_times))
+        trend = []
+        for i in range(7):
+            day = now - timedelta(days=i)
+            day_data = ServiceWaitTime.objects.filter(
+                service=service,
+                date_recorded__date=day.date()
+            )
+            if day_data.exists():
+                avg = day_data.aggregate(avg_time=models.Avg('wait_time'))['avg_time']
+                trend.append(int(avg) if avg else 0)
             else:
-                avg_wait = int(np.mean(wait_times))
-            
-            trend.append(avg_wait)
-        else:
-            trend.append(trend[-1] if trend else 0)
-    
-    return trend
+                trend.append(0)
+        return list(reversed(trend))
+    elif period == 'month':
+        trend = []
+        for week in range(4):
+            week_start = now - timedelta(days=(week + 1) * 7)
+            week_end = now - timedelta(days=week * 7)
+            week_data = ServiceWaitTime.objects.filter(
+                service=service,
+                date_recorded__gte=week_start,
+                date_recorded__lt=week_end
+            )
+            if week_data.exists():
+                avg = week_data.aggregate(avg_time=models.Avg('wait_time'))['avg_time']
+                trend.append(int(avg) if avg else 0)
+            else:
+                trend.append(0)
+        return list(reversed(trend))
+    else:
+        trend = []
+        for month in range(1, now.month + 1):
+            month_data = ServiceWaitTime.objects.filter(
+                service=service,
+                date_recorded__month=month,
+                date_recorded__year=now.year
+            )
+            if month_data.exists():
+                avg = month_data.aggregate(avg_time=models.Avg('wait_time'))['avg_time']
+                trend.append(int(avg) if avg else 0)
+            else:
+                trend.append(0)
+        return trend
 
 @api_view(['GET', 'POST'])
 def notification_settings(request):
@@ -735,7 +651,7 @@ def admin_company_info(request, user_id):
             "address": service.details.get("address", ""),
             "latitude": float(service.latitude) if service.latitude else 0.0,
             "longitude": float(service.longitude) if service.longitude else 0.0,
-            "logo_base64": service.details.get("logo_base64", "")  # Use logo_base64 instead of logo_url
+            "logo_base64": service.details.get("logo_base64", "") 
         }
         
         logger.info(f"Returning company data for user {user_id} (without logo content for brevity)")
@@ -749,7 +665,6 @@ def admin_company_info(request, user_id):
 
 @api_view(['POST'])
 def admin_update_company_info(request):
-    """Update company information for an admin user"""
     try:
         # Get data from request body instead of POST
         data = request.data
@@ -786,7 +701,6 @@ def admin_update_company_info(request):
         if not service.details:
             service.details = {}
         elif isinstance(service.details, str):
-            # Sometimes JSONField might be stored as a string
             try:
                 service.details = json.loads(service.details)
             except json.JSONDecodeError:
@@ -832,7 +746,6 @@ def admin_update_company_info(request):
 
 @api_view(['POST'])
 def admin_change_password(request):
-    """Change password for an admin user"""
     try:
         data = request.data
         user_id = data.get('user_id')

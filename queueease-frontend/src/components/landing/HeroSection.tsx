@@ -54,21 +54,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ displayText, fadeIn }) => {
               >
                 Login to Get Started
               </Button>
-              <Button 
-                variant="outlined"
-                size="large"
-                endIcon={<ArrowForwardIcon />}
-                onClick={() => navigate('/learn-more')}
-                sx={{ 
-                  borderColor: '#fff',
-                  color: '#fff',
-                  '&:hover': { borderColor: '#f0f0f0', bgcolor: 'rgba(255,255,255,0.1)' },
-                  borderRadius: 2,
-                  px: 3
-                }}
-              >
-                Learn More
-              </Button>
             </Box>
             <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
               * Login required to access QR scanning and appointment features

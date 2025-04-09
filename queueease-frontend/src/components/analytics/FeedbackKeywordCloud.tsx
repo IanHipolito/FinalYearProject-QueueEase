@@ -1,24 +1,52 @@
 import React, { useMemo } from 'react';
-import {  Box, Card, CardContent, Typography, Tooltip, Skeleton, useTheme } from '@mui/material';
+import { Box, Card, CardContent, Typography, Tooltip, Skeleton, useTheme } from '@mui/material';
 import { FeedbackKeywordCloudProps } from 'types/feedbackTypes';
 
 const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = [] }) => {
   const theme = useTheme();
-  const sortedKeywords = useMemo(() => 
-    [...(keywords || [])].sort((a, b) => b.value - a.value), 
+
+  // Sort keywords in descending order by frequency.
+  const sortedKeywords = useMemo(() =>
+    [...(keywords || [])].sort((a, b) => b.value - a.value),
     [keywords]
   );
+
+  // Determine the dominant sentiment from the sentiment breakdown.
+  const getDominantSentiment = (
+    breakdown: { positive: number; neutral: number; negative: number }
+  ) => {
+    const { positive, neutral, negative } = breakdown;
   
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment?.toLowerCase()) {
+    // If all are zero, explicitly default to 'neutral'
+    if (positive === 0 && neutral === 0 && negative === 0) {
+      return 'neutral';
+    }
+  
+    // Otherwise, pick the largest
+    if (positive > negative && positive > neutral) {
+      return 'positive';
+    }
+    if (negative > positive && negative > neutral) {
+      return 'negative';
+    }
+  
+    // If there's a tie, or neutral is highest, default to 'neutral'
+    return 'neutral';
+  };
+
+  // Assign a color based on the dominant sentiment.
+  const getSentimentColor = (breakdown: { positive: number; neutral: number; negative: number }) => {
+    const dominant = getDominantSentiment(breakdown);
+    switch (dominant.toLowerCase()) {
       case 'positive': return '#4caf50';
       case 'negative': return '#f44336';
-      case 'neutral': default: return '#ff9800';
+      case 'neutral':
+      default: return '#ff9800';
     }
   };
 
+  // Normalise word size for visualisation.
   const getWordSize = (value: number) => {
-    // Normalize word sizes between 14px and 38px
     const minSize = 14;
     const maxSize = 38;
     const maxValue = Math.max(...keywords.map(k => k.value || 0), 1);
@@ -26,8 +54,8 @@ const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = 
   };
 
   return (
-    <Card sx={{ 
-      borderRadius: 4, 
+    <Card sx={{
+      borderRadius: 4,
       boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
       height: '100%',
       transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
@@ -47,11 +75,11 @@ const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = 
             </Typography>
           </Box>
         </Box>
-        
-        <Box sx={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          justifyContent: 'center', 
+
+        <Box sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
           p: 2,
           height: '260px',
           overflow: 'hidden',
@@ -62,9 +90,9 @@ const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = 
         }}>
           {keywords && keywords.length > 0 ? (
             sortedKeywords.map((word, idx) => (
-              <Tooltip 
+              <Tooltip
                 key={idx}
-                title={`${word.text}: Mentioned ${word.value} times (${word.sentiment})`}
+                title={`${word.text}: Mentioned ${word.value} times (Positive: ${word.sentiment_breakdown.positive}, Neutral: ${word.sentiment_breakdown.neutral}, Negative: ${word.sentiment_breakdown.negative})`}
                 arrow
                 placement="top"
               >
@@ -73,7 +101,7 @@ const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = 
                     m: 1.5,
                     p: 0.5,
                     fontSize: `${getWordSize(word.value)}px`,
-                    color: getSentimentColor(word.sentiment),
+                    color: getSentimentColor(word.sentiment_breakdown),
                     fontWeight: (word.value || 0) > 5 ? 'bold' : 'medium',
                     opacity: Math.max(0.6, Math.min(1, 0.6 + (word.value || 0) * 0.04)),
                     textAlign: 'center',
@@ -106,44 +134,26 @@ const FeedbackKeywordCloud: React.FC<FeedbackKeywordCloudProps> = ({ keywords = 
             </Box>
           )}
         </Box>
-        
+
         {keywords && keywords.length > 0 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box 
-                sx={{ 
-                  width: 10, 
-                  height: 10, 
-                  borderRadius: '50%', 
-                  bgcolor: '#4caf50', 
-                  mr: 1 
-                }} 
+              <Box
+                sx={{ width: 15, height: 15, borderRadius: '50%', bgcolor: '#4caf50', mr: 1 }}
               />
-              <Typography variant="caption">Positive</Typography>
+              <Typography variant="body2">Positive</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box 
-                sx={{ 
-                  width: 10, 
-                  height: 10, 
-                  borderRadius: '50%', 
-                  bgcolor: '#ff9800', 
-                  mr: 1 
-                }} 
+              <Box
+                sx={{ width: 15, height: 15, borderRadius: '50%', bgcolor: '#ff9800', mr: 1 }}
               />
-              <Typography variant="caption">Neutral</Typography>
+              <Typography variant="body2">Neutral</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box 
-                sx={{ 
-                  width: 10, 
-                  height: 10, 
-                  borderRadius: '50%', 
-                  bgcolor: '#f44336', 
-                  mr: 1 
-                }} 
+              <Box
+                sx={{ width: 15, height: 15, borderRadius: '50%', bgcolor: '#f44336', mr: 1 }}
               />
-              <Typography variant="caption">Negative</Typography>
+              <Typography variant="body2">Negative</Typography>
             </Box>
           </Box>
         )}

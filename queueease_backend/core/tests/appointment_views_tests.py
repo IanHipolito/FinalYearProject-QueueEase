@@ -147,50 +147,40 @@ class GetOrCreateAppointmentTests(AppointmentBaseTest):
     
     @patch('core.views.appointment_views.Service.objects.get')
     @patch('core.views.appointment_views.generate_order_id')
-    @patch('core.views.appointment_views.AppointmentDetails.objects.create')
-    @patch('core.views.appointment_views.AppointmentDetailsSerializer')
     @patch('core.views.appointment_views.User.objects.get')
-    def test_create_new_appointment(self, mock_user_get, mock_serializer_class, mock_create, 
-                                   mock_generate_order_id, mock_service_get):
-        # Setup basic mocks
+    def test_create_new_appointment(self, mock_user_get, mock_generate_order_id, mock_service_get):
+        # Setup mocks
         mock_service_get.return_value = self.service
         mock_user_get.return_value = self.user
-        mock_generate_order_id.return_value = "NEW-ORDER-ID"
+        mock_generate_order_id.return_value = "NEW-APPT-12345"
         
-        # Create test appointment object
-        mock_appointment = MagicMock()
-        mock_appointment.order_id = "NEW-ORDER-ID"
-        mock_create.return_value = mock_appointment
+        tomorrow = (timezone.now().date() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
         
-        # Mock the serializer
-        mock_serializer = MagicMock()
-        mock_serializer.data = {'order_id': 'NEW-ORDER-ID'}
-        mock_serializer_class.return_value = mock_serializer
-        
-        # Create request data
         data = {
             'user_id': self.user.id,
             'service_id': self.service.id,
-            'appointment_date': '2025-05-01',
-            'appointment_time': '10:30'
+            'appointment_date': tomorrow,
+            'appointment_time': '16:30'
         }
         
-        # Create request with proper content type
-        request = self.factory.post(
-            '/', 
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        request.data = data  # Django REST framework sets this
+        # Create a request factory
+        request = self.factory.post('/', json.dumps(data), content_type='application/json')
+        request.data = data
         
-        # Instead of trying to patch datetime.strptime, we mock AppointmentDetails.objects.create
-        # since we're already patching it and controlling its return value
-        response = get_or_create_appointment(request)
+        try:
+            response = create_appointment(request)
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            raise
         
-        # Assert expected results
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # Ensure the response status is 201 (CREATED)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, 
+                        f"Unexpected response: {response.data}")
+        
+        # Check that an order ID was returned
         self.assertIn('order_id', response.data)
-    
+        self.assertEqual(response.data['order_id'], "NEW-APPT-12345")
+        
     def test_get_or_create_missing_parameters(self):
         # Test GET without order_id
         request = self.factory.get('/', {'user_id': self.user.id})

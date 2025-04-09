@@ -1,5 +1,4 @@
 import { FeatureCollection, Feature, Point } from 'geojson';
-import mapboxgl from 'mapbox-gl';
 import { Service } from 'types/serviceTypes';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import FastfoodIcon from '@mui/icons-material/Fastfood';
@@ -63,49 +62,32 @@ export const getCategoryColor = (category: string): string => {
 
   switch (lowerCategory) {
     case 'restaurant':
-      return '#FF5722';
+      return MARKER_COLORS.restaurant;
     case 'fast_food':
-      return '#E91E63';
+      return MARKER_COLORS.fast_food;
     case 'cafe':
-      return '#FF9800';
+      return MARKER_COLORS.cafe;
     case 'bar':
-      return '#9C27B0';
+      return MARKER_COLORS.bar;
     case 'hotel':
-      return '#2196F3';
+      return MARKER_COLORS.hotel;
     case 'bank':
-      return '#FFC107';
+      return MARKER_COLORS.bank;
     case 'shop':
-      return '#795548';
+      return MARKER_COLORS.shop;
     case 'storefront':
-      return '#8D6E63';
+      return MARKER_COLORS.shop;
     case 'attraction':
-      return '#4CAF50';
+      return MARKER_COLORS.attraction;
     case 'healthcare':
-      return '#F44336';
+      return MARKER_COLORS.healthcare;
     default:
-      return '#00BCD4';
+      return MARKER_COLORS.default;
   }
-};
-
-// Memoization cache for service GeoJSON
-const geoJsonCache = new Map<string, FeatureCollection<Point>>();
-
-// Create a unique cache key based on services and selected ID
-const createCacheKey = (services: Service[], selectedId?: number): string => {
-  return `${services.length}-${selectedId || 0}-${services.reduce((hash, service) => hash + service.id, 0)}`;
 };
 
 export const prepareGeoJSON = (services: Service[], selectedServiceId?: number): FeatureCollection<Point> => {
-  // Generate cache key
-  const cacheKey = createCacheKey(services, selectedServiceId);
-  
-  // Check if we have a cached version
-  if (geoJsonCache.has(cacheKey)) {
-    return geoJsonCache.get(cacheKey)!;
-  }
-  
-  // Create new GeoJSON
-  const geoJson: FeatureCollection<Point> = {
+  return {
     type: 'FeatureCollection',
     features: services.map((service): Feature<Point> => ({
       type: 'Feature',
@@ -124,45 +106,91 @@ export const prepareGeoJSON = (services: Service[], selectedServiceId?: number):
       }
     }))
   };
-  
-  // Cache the result
-  geoJsonCache.set(cacheKey, geoJson);
-  
-  // Limit cache size to prevent memory leaks
-if (geoJsonCache.size > 100) {
-  // Get the keys iterator
-  const keysIterator = geoJsonCache.keys();
-  const firstEntry = keysIterator.next();
-  
-  // Make sure there is a value before deleting
-  if (!firstEntry.done && firstEntry.value) {
-    geoJsonCache.delete(firstEntry.value);
-  }
-}
-  
-  return geoJson;
 };
 
-// Define layer styles once and reuse
-const SERVICE_POINT_BASE_STYLE = {
-  'circle-color': [
-    'match',
-    ['get', 'category'],
-    'restaurant', MARKER_COLORS.restaurant,
-    'fast_food', MARKER_COLORS.fast_food,
-    'cafe', MARKER_COLORS.cafe,
-    'bar', MARKER_COLORS.bar,
-    'shop', MARKER_COLORS.shop,
-    'bank', MARKER_COLORS.bank,
-    'attraction', MARKER_COLORS.attraction,
-    'hotel', MARKER_COLORS.hotel,
-    'healthcare', MARKER_COLORS.healthcare,
-    MARKER_COLORS.default
-  ],
-  'circle-stroke-width': 1.5,
-  'circle-stroke-color': 'white',
-  'circle-opacity': 0.9
-};
+// GeoJSON Generator class for optimized GeoJSON creation
+export class GeoJSONGenerator {
+  private serviceIdToFeatureCache: Map<string, Feature<Point>> = new Map();
+  private geoJSONCache: Map<string, FeatureCollection<Point>> = new Map();
+  
+  prepareGeoJSON(services: Service[], selectedServiceId?: number): FeatureCollection<Point> {
+    // Create a unique cache key based on services array and selected ID
+    const serviceHashCode = services.length > 0 ? 
+      services.reduce((hash, service) => hash + service.id, 0) : 0;
+    const cacheKey = `${services.length}-${selectedServiceId || 0}-${serviceHashCode}`;
+    
+    // Return cached version if available
+    if (this.geoJSONCache.has(cacheKey)) {
+      return this.geoJSONCache.get(cacheKey)!;
+    }
+    
+    // Reuse features when possible for better performance
+    const features = services.map(service => {
+      const featureCacheKey = `${service.id}-${selectedServiceId === service.id ? 1 : 0}`;
+      
+      if (this.serviceIdToFeatureCache.has(featureCacheKey)) {
+        return this.serviceIdToFeatureCache.get(featureCacheKey)!;
+      }
+      
+      // Create new feature if not cached
+      const feature: Feature<Point> = {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [service.longitude, service.latitude]
+        },
+        properties: {
+          id: service.id,
+          name: service.name,
+          category: service.category,
+          initial: service.name.charAt(0),
+          wait_time: service.wait_time || 0,
+          queue_length: service.queue_length || 0,
+          selected: selectedServiceId === service.id
+        }
+      };
+      
+      // Cache the feature
+      this.serviceIdToFeatureCache.set(featureCacheKey, feature);
+      return feature;
+    });
+    
+    // Create full GeoJSON
+    const geoJSON: FeatureCollection<Point> = {
+      type: 'FeatureCollection',
+      features
+    };
+    
+    // Cache the GeoJSON result
+    this.geoJSONCache.set(cacheKey, geoJSON);
+    
+    // Limit cache size to prevent memory leaks
+    if (this.geoJSONCache.size > 20) {
+      const firstKey = this.geoJSONCache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.geoJSONCache.delete(firstKey);
+      }
+    }
+    
+    // Limit feature cache size as well
+    if (this.serviceIdToFeatureCache.size > 1000) {
+      // Get first 200 keys to delete
+      const keysToDelete = Array.from(this.serviceIdToFeatureCache.keys()).slice(0, 200);
+      keysToDelete.forEach(key => this.serviceIdToFeatureCache.delete(key));
+    }
+    
+    return geoJSON;
+  }
+  
+  // Clear caches when no longer needed
+  clearCaches(): void {
+    this.serviceIdToFeatureCache.clear();
+    this.geoJSONCache.clear();
+  }
+}
+
+// Export a singleton instance
+export const geoJSONGenerator = new GeoJSONGenerator();
 
 export const getServicePointLayer = (selectedService: Service | null): mapboxgl.CircleLayer => {
   return {
@@ -233,19 +261,19 @@ export const getServiceSymbolLayer = (): mapboxgl.SymbolLayer => ({
 // Cached map of category icons for re-use
 const categoryIconCache = new Map<string, React.ReactNode>();
 
-export const getCategoryIcon = (category: string, size: 'small' | 'medium' | 'large' = 'small') => {
+export const getCategoryIcon = (category: string, size: 'small' | 'medium' | 'large' = 'small'): React.ReactElement | undefined => {
   // Create cache key
   const cacheKey = `${category}-${size}`;
   
   // Check cache first
   if (categoryIconCache.has(cacheKey)) {
-    return categoryIconCache.get(cacheKey);
+    return categoryIconCache.get(cacheKey) as React.ReactElement || undefined;
   }
   
   const iconProps = { fontSize: size };
   const lowerCategory = category?.toLowerCase() || '';
   
-  let icon: React.ReactNode;
+  let icon: React.ReactElement | undefined;
   
   // Regular function approach instead of JSX
   switch (lowerCategory) {

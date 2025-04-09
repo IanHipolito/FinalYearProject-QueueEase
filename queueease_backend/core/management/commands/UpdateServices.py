@@ -45,7 +45,7 @@ class Command(BaseCommand):
         for keyword in appointment_keywords:
             keyword_services = Service.objects.filter(
                 name__icontains=keyword,
-                service_type='immediate'  # Only update those not already set
+                service_type='immediate'
             )
             count_keyword = keyword_services.update(service_type='appointment')
             if count_keyword > 0:

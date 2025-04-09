@@ -2,11 +2,10 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework import status
 import logging
 
 from ..models import Feedback, User, Service, Queue
-from ..utils.sentiment_analyzer import SentimentAnalyzer
+from ..utils.nlp_sentiment import SentimentAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,6 @@ def submit_feedback(request):
     try:
         data = request.data
         required_fields = ['service_id', 'rating', 'user_id', 'categories']
-        
         for field in required_fields:
             if field not in data:
                 return Response({'error': f'Missing required field: {field}'}, status=400)
@@ -27,18 +25,16 @@ def submit_feedback(request):
         if order_id:
             queue = Queue.objects.filter(id=order_id).first()
         
-        existing_feedback = Feedback.objects.filter(
-            user=user,
-            service=service,
-            queue=queue
-        ).exists()
-        
-        if existing_feedback:
+        # Prevent duplicate feedback submissions
+        if Feedback.objects.filter(user=user, service=service, queue=queue).exists():
             return Response({'error': 'You have already submitted feedback for this service'}, status=400)
         
         comment = data.get('comment', '')
-        sentiment_result = SentimentAnalyzer.analyze(comment)
+        # Instantiate and use the new SentimentAnalyzer (ensemble method)
+        analyzer = SentimentAnalyzer()
+        sentiment_result = analyzer.analyze(comment, method="ensemble")
         
+        # Create the feedback (preserving all previous fields)
         feedback = Feedback.objects.create(
             user=user,
             service=service,

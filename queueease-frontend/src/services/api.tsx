@@ -101,7 +101,6 @@ export const API = {
     services: {
         list: () => fetch(`${API_BASE}/list_services/`),
         listWithStatus: () => fetch(`${API_BASE}/list_services_with_status/`),
-        // getAdminServices: (userId: number) => fetch(`${API_BASE}/admin_services/${userId}/`),
         getServiceDetails: (serviceId: number) => fetch(`${API_BASE}/service/${serviceId}/`),
         getAvailableTimes: (serviceId: number, date: string) =>
             fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`),

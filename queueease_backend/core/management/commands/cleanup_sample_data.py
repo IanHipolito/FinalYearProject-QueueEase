@@ -10,7 +10,6 @@ class Command(BaseCommand):
         parser.add_argument('--keep-users', type=int, default=0, help='Number of sample users to keep (starting from lowest ID)')
 
     def handle(self, *args, **options):
-        # Find sample users by their naming pattern
         sample_users = User.objects.filter(name__startswith='Sample User')
         total_users = sample_users.count()
         

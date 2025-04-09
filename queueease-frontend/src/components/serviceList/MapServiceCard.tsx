@@ -4,15 +4,14 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
 import AddIcon from '@mui/icons-material/Add';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
-import { getCategoryIcon } from '../map/mapUtils';
-import { getCategoryColor } from 'utils/mapUtils';
+import { getCategoryColor, getCategoryIcon } from 'utils/mapUtils';
 import { ServiceCardProps } from 'types/mapTypes';
 
 const getSafeCategory = (category?: string): string => {
   return category || 'default';
 };
 
-const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
+const MapServiceCard: React.FC<ServiceCardProps> = React.memo(({
   service,
   isSelected = false,
   onCardClick,
@@ -54,7 +53,9 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
                 {service.name}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.25 }}>
-                {getCategoryIcon(getSafeCategory(service.category))}
+                <Box sx={{ mr: 2, color: theme.palette.grey[600] }}>
+                  {getCategoryIcon(getSafeCategory(service.category), 'medium') as React.ReactElement || undefined}
+                </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
                   {service.category}
                 </Typography>
@@ -183,4 +184,4 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
   );
 });
 
-export default ServiceCard;
+export default MapServiceCard;
