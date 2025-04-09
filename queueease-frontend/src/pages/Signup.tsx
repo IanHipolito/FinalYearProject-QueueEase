@@ -76,7 +76,7 @@ const Signup: React.FC = () => {
     severity: 'info'
   });
 
-  // Wrap validateForm in useCallback to memoize it
+  // Validation function
   const validateForm = useCallback(() => {
     const newErrors = {
       email: "",
@@ -147,32 +147,23 @@ const Signup: React.FC = () => {
     };
 
     try {
-      const response = await API.auth.signup(dataToSend);
-
-      if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: 'Signup successful!',
-          severity: 'success'
-        });
-        
-        // Navigate after a short delay to allow the user to see the success message
-        setTimeout(() => {
-          navigate("/usermainpage");
-        }, 1000);
-      } else {
-        const errorData = await response.json();
-        setSnackbar({
-          open: true,
-          message: `Signup failed: ${errorData.error || "Unknown error"}`,
-          severity: 'error'
-        });
-      }
+      await API.auth.signup(dataToSend);
+      
+      setSnackbar({
+        open: true,
+        message: 'Signup successful!',
+        severity: 'success'
+      });
+      
+      // Navigate after a short delay to allow the user to see the success message
+      setTimeout(() => {
+        navigate("/usermainpage");
+      }, 1000);
     } catch (error) {
       console.error("Error during signup:", error);
       setSnackbar({
         open: true,
-        message: "An error occurred. Please try again.",
+        message: error instanceof Error ? error.message : "An unknown error occurred during signup.",
         severity: 'error'
       });
     } finally {

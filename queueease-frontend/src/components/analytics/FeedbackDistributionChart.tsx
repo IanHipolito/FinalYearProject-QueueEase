@@ -1,17 +1,19 @@
 import React from 'react';
 import {
   Box, Card, CardContent, Typography, FormControl,
-  Select, MenuItem, Paper, Tooltip
+  Select, MenuItem, Paper, Tooltip, SelectChangeEvent
 } from '@mui/material';
 import { FeedbackDistributionChartProps } from 'types/analyticsTypes';
 
 const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({ 
-  data
+  data,
+  timeRange,
+  onTimeRangeChange
 }) => {
   // Helper function to capitalize and clean category names
   const formatCategoryName = (category: string) => {
     return category
-      .replace('_', ' ')
+      .replace(/_/g, ' ')
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
@@ -27,6 +29,13 @@ const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({
     }
   };
 
+  // Handle time range change
+  const handleTimeRangeChange = (event: SelectChangeEvent) => {
+    if (onTimeRangeChange) {
+      onTimeRangeChange(event);
+    }
+  };
+
   // If data is not an array, try to wrap it in an array
   const safeData = Array.isArray(data) ? data : (data && typeof data === 'object' ? [data] : []);
 
@@ -37,6 +46,23 @@ const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({
           <Typography variant="h6" fontWeight="500">
             Feedback Distribution
           </Typography>
+          
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={timeRange || 'month'}
+              onChange={handleTimeRangeChange}
+              displayEmpty
+              variant="outlined"
+              sx={{ 
+                fontSize: '0.875rem',
+                '& .MuiSelect-select': { py: 0.75 }
+              }}
+            >
+              <MenuItem value="week">Weekly</MenuItem>
+              <MenuItem value="month">Monthly</MenuItem>
+              <MenuItem value="year">Yearly</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
         
         <Box sx={{ 
@@ -58,63 +84,77 @@ const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({
               backgroundColor: '#f5f5f5'
             }}
           >
-            {safeData.map((item, index) => (
-              <Tooltip 
-                key={index} 
-                title={`${formatCategoryName(item.category)}: Dissatisfied: ${item.dissatisfied}%, Neutral: ${item.neutral}%, Satisfied: ${item.satisfied}%`}
-                arrow
-              >
-                <Box 
-                  sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '20%', height: '100%' }}
+            {safeData.length > 0 ? (
+              safeData.map((item, index) => (
+                <Tooltip 
+                  key={index} 
+                  title={`${formatCategoryName(item.category)}: Dissatisfied: ${item.dissatisfied}%, Neutral: ${item.neutral}%, Satisfied: ${item.satisfied}%`}
+                  arrow
                 >
                   <Box 
-                    sx={{ width: '70%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '20%', height: '100%' }}
                   >
-                    {item.dissatisfied > 0 && (
-                      <Box 
-                        sx={{ 
-                          width: '100%', 
-                          height: `${item.dissatisfied}%`, 
-                          minHeight: 5,
-                          bgcolor: getBarColor('dissatisfied'),
-                          borderRadius: '4px 4px 0 0',
-                          mb: 0.5
-                        }} 
-                      />
-                    )}
-                    {item.neutral > 0 && (
-                      <Box 
-                        sx={{ 
-                          width: '100%', 
-                          height: `${item.neutral}%`, 
-                          minHeight: 5,
-                          bgcolor: getBarColor('neutral'),
-                          borderRadius: '4px 4px 0 0',
-                          mb: 0.5
-                        }} 
-                      />
-                    )}
-                    {item.satisfied > 0 && (
-                      <Box 
-                        sx={{ 
-                          width: '100%', 
-                          height: `${item.satisfied}%`, 
-                          minHeight: 5,
-                          bgcolor: getBarColor('satisfied'),
-                          borderRadius: '4px 4px 0 0'
-                        }} 
-                      />
-                    )}
+                    <Box 
+                      sx={{ width: '70%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+                    >
+                      {item.dissatisfied > 0 && (
+                        <Box 
+                          sx={{ 
+                            width: '100%', 
+                            height: `${item.dissatisfied}%`, 
+                            minHeight: 5,
+                            bgcolor: getBarColor('dissatisfied'),
+                            borderRadius: '4px 4px 0 0',
+                            mb: 0.5
+                          }} 
+                        />
+                      )}
+                      {item.neutral > 0 && (
+                        <Box 
+                          sx={{ 
+                            width: '100%', 
+                            height: `${item.neutral}%`, 
+                            minHeight: 5,
+                            bgcolor: getBarColor('neutral'),
+                            borderRadius: '4px 4px 0 0',
+                            mb: 0.5
+                          }} 
+                        />
+                      )}
+                      {item.satisfied > 0 && (
+                        <Box 
+                          sx={{ 
+                            width: '100%', 
+                            height: `${item.satisfied}%`, 
+                            minHeight: 5,
+                            bgcolor: getBarColor('satisfied'),
+                            borderRadius: '4px 4px 0 0'
+                          }} 
+                        />
+                      )}
+                    </Box>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ mt: 2, fontSize: '0.75rem', color: 'text.secondary', textAlign: 'center', width: '120%', wordWrap: 'break-word', lineHeight: 1.2 }}
+                    >
+                      {formatCategoryName(item.category)}
+                    </Typography>
                   </Box>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ mt: 2, fontSize: '0.75rem', color: 'text.secondary', textAlign: 'center', width: '120%', wordWrap: 'break-word', lineHeight: 1.2 }}
-                  >
-                    {formatCategoryName(item.category)}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            ))}
+                </Tooltip>
+              ))
+            ) : (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                width: '100%', 
+                height: '100%'
+              }}>
+                <Typography variant="body1" color="text.secondary">
+                  No feedback data available
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </Box>
         

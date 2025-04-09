@@ -6,6 +6,11 @@ import { keyframes } from '@emotion/react';
 import { API } from '../services/api';
 import { QRCodeScreenProps } from "types/queueTypes";
 
+const API_BASE =
+    window.location.hostname === "localhost"
+        ? "http://127.0.0.1:8000/api"
+        : "https://c21436494.pythonanywhere.com/api";
+
 const theme = createTheme({
   palette: {
     primary: {
@@ -72,10 +77,26 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({ queueId }) => {
     
     const fetchQRCode = async () => {
       try {
-        const response = await API.queues.getQRCode(queueId);
+        // For QR code we need to handle differently since it returns a blob not JSON
+        const response = await fetch(`${API_BASE}/get-qr-code/${queueId}/`);
         
         if (!response.ok) {
-          throw new Error("Failed to generate QR code");
+          let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+          
+          try {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorData.detail || errorMessage;
+            } else {
+              const textError = await response.text();
+              if (textError) errorMessage = textError;
+            }
+          } catch (parseError) {
+            console.error("Error parsing API error response:", parseError);
+          }
+          
+          throw new Error(errorMessage);
         }
         
         // Create a blob URL from the response
@@ -84,7 +105,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({ queueId }) => {
         setQrCodeUrl(url);
       } catch (err) {
         console.error("Error fetching QR code:", err);
-        setError("Failed to generate QR code");
+        setError(err instanceof Error ? err.message : "Failed to generate QR code");
       } finally {
         setLoading(false);
       }

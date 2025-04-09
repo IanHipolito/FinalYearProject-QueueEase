@@ -72,13 +72,7 @@ const AppointmentDetail: React.FC = () => {
     if (!orderId) return;
     
     try {
-      const response = await API.appointments.cancelAppointment(orderId);
-      
-      if (!response.ok) {
-        const data = await response.json();
-        setCancelError(data.error || 'Failed to cancel appointment');
-        return;
-      }
+      await API.appointments.cancelAppointment(orderId);
       
       setCancelSuccess(true);
       setOpenCancelDialog(false);
@@ -99,22 +93,14 @@ const AppointmentDetail: React.FC = () => {
       
     } catch (error) {
       console.error('Error cancelling appointment:', error);
-      setCancelError('An unexpected error occurred');
+      setCancelError(error instanceof Error ? error.message : 'An unexpected error occurred');
     }
   };
 
   const fetchAppointment = async () => {
     setLoading(true);
     try {
-      const response = await API.appointments.getAppointmentDetails(orderId || '');
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`API error (${response.status}):`, errorText);
-        throw new Error(`Failed to fetch appointment: ${response.status} error`);
-      }
-      
-      const data = await response.json();
+      const data = await API.appointments.getAppointmentDetails(orderId || '');
       
       // Defensive data handling
       if (data && data.appointment_date) {

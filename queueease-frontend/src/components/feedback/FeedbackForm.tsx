@@ -85,24 +85,23 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setError('');
 
     try {
-      const response = await API.feedback.submitFeedback(feedbackData);
-
-      if (response.ok) {
-        setSuccess(true);
-        setComment('');
-        setRating(null);
-        setSelectedCategories([]);
+      await API.feedback.submitFeedback(feedbackData);
+      
+      setSuccess(true);
+      setComment('');
+      setRating(null);
+      setSelectedCategories([]);
+      
+      if (onSubmitSuccess) {
         onSubmitSuccess();
-        
-        setTimeout(() => {
-          setSuccess(false);
-        }, 3000);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to submit feedback');
       }
+      
+      setTimeout(() => {
+        setSuccess(false);
+      }, 3000);
     } catch (err) {
-      setError('Network error. Please try again.');
+      console.error('Error submitting feedback:', err);
+      setError(err instanceof Error ? err.message : 'Failed to submit feedback');
     } finally {
       setSubmitting(false);
     }

@@ -62,35 +62,25 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await API.auth.login(formData.email, formData.password);
-
-      if (response.ok) {
-        const data = await response.json();
-        await login(data.email, formData.password);
-        
-        setSnackbar({
-          open: true,
-          message: 'Login successful!',
-          severity: 'success'
-        });
-        
-        // Navigate after a short delay to allow the user to see the success message
-        setTimeout(() => {
-          navigate("/usermainpage");
-        }, 1000);
-      } else {
-        const errorData = await response.json();
-        setSnackbar({
-          open: true,
-          message: `Login failed: ${errorData.error}`,
-          severity: 'error'
-        });
-      }
+      const data = await API.auth.login(formData.email, formData.password);
+      
+      await login(data.email, formData.password);
+      
+      setSnackbar({
+        open: true,
+        message: 'Login successful!',
+        severity: 'success'
+      });
+      
+      // Navigate after a short delay to allow the user to see the success message
+      setTimeout(() => {
+        navigate("/usermainpage");
+      }, 1000);
     } catch (error) {
       console.error("Error during login:", error);
       setSnackbar({
         open: true,
-        message: "An error occurred. Please try again.",
+        message: error instanceof Error ? error.message : "An error occurred. Please try again.",
         severity: 'error'
       });
     } finally {

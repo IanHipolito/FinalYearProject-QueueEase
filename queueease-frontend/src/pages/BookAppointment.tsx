@@ -28,16 +28,19 @@ const BookAppointment: React.FC = () => {
   
   useEffect(() => {
     const fetchService = async () => {
+      if (!serviceId) {
+        setError('Service ID is missing');
+        setLoading(false);
+        return;
+      }
+      
       try {
-        const response = await API.services.getServiceDetails(Number(serviceId));
-        if (!response.ok) {
-          throw new Error('Service not found');
-        }
-        const data = await response.json();
+        const data = await API.services.getServiceDetails(Number(serviceId));
         setService(data);
         setLoading(false);
       } catch (err) {
-        setError('Failed to load service details');
+        console.error('Error fetching service details:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load service details');
         setLoading(false);
       }
     };
@@ -46,18 +49,16 @@ const BookAppointment: React.FC = () => {
   }, [serviceId]);
   
   const fetchAvailableTimes = async (date: Date) => {
+    if (!serviceId) return;
+    
     try {
       const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      const response = await API.services.getAvailableTimes(Number(serviceId), formattedDate);
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch available times');
-      }
-      
-      const data = await response.json();
+      const data = await API.services.getAvailableTimes(Number(serviceId), formattedDate);
       setAvailableTimes(data.available_times);
     } catch (err) {
-      setError('Failed to load available appointment times');
+      console.error('Error fetching available times:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load available appointment times');
     }
   };
   
@@ -78,6 +79,7 @@ const BookAppointment: React.FC = () => {
     }
     
     setSubmitting(true);
+    setError('');
     
     try {
       const year = selectedDate.getFullYear();
@@ -92,22 +94,13 @@ const BookAppointment: React.FC = () => {
         appointment_time: selectedTime,
       };
       
-      const response = await API.appointments.createAppointment(appointmentData);
+      const data = await API.appointments.createAppointment(appointmentData);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error:', response.status, errorData);
-        throw new Error(
-          errorData.error || 
-          `Failed to book appointment (Status: ${response.status})`
-        );
-      }
-      
-      const data = await response.json();
+      // Navigate to the appointment details page
       navigate(`/appointment/${data.order_id}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Booking error:', err);
-      setError(err.message || 'Failed to book appointment. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to book appointment. Please try again.');
     } finally {
       setSubmitting(false);
     }

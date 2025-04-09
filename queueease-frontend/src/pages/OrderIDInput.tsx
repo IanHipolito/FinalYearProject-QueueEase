@@ -27,18 +27,14 @@ const OrderIDInput: React.FC = () => {
 
     try {
       setLoading(true);
-      const response = await API.appointments.addAppointment(orderID, user.id);
       
-      if (response.ok) {
-        const data = await response.json();
-        navigate(`/appointment/${data.order_id}`);
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.error || 'Failed to fetch appointment details.');
-      }
+      const data = await API.appointments.addAppointment(orderID, user.id);
+      
+      navigate(`/appointment/${data.order_id}`);
+      
     } catch (err) {
       console.error('Error:', err);
-      setError('An error occurred. Please try again.');
+      setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

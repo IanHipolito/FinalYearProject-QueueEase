@@ -83,20 +83,12 @@ const MapProximity: React.FC = () => {
 
     const fetchActiveQueue = async () => {
       try {
-        const res = await API.queues.getActive(user.id);
-
-        if (!res.ok) {
-          setActiveQueue(null);
-          return;
-        }
-
-        const data = await res.json();
+        const data = await API.queues.getActive(user.id);
 
         if (data && data.queue_id) {
-          // Get detailed queue information
-          const detailRes = await API.queues.getDetails(data.queue_id);
-          if (detailRes.ok) {
-            const detailData = await detailRes.json();
+          try {
+            // Get detailed queue information
+            const detailData = await API.queues.getDetails(data.queue_id);
 
             if (detailData.status === 'pending') {
               setActiveQueue({
@@ -111,6 +103,9 @@ const MapProximity: React.FC = () => {
             } else {
               setActiveQueue(null);
             }
+          } catch (detailError) {
+            console.error("Error fetching queue details:", detailError);
+            setActiveQueue(null);
           }
         } else {
           setActiveQueue(null);
@@ -170,47 +165,36 @@ const MapProximity: React.FC = () => {
     setTransferring(true);
 
     try {
-      const response = await API.queues.transferQueue(
+      const data = await API.queues.transferQueue(
         activeQueue.id!,
         targetService.id,
         user.id
       );
 
-      if (response.ok) {
-        const data = await response.json();
+      setSnackbarState({
+        open: true,
+        message: 'Queue transferred successfully!',
+        severity: 'success'
+      });
 
-        setSnackbarState({
-          open: true,
-          message: 'Queue transferred successfully!',
-          severity: 'success'
-        });
+      // Update the active queue with the new queue information
+      setActiveQueue({
+        id: data.queue_id,
+        service_id: targetService.id,
+        service_name: targetService.name,
+        position: data.position,
+        expected_ready_time: data.expected_ready_time,
+        status: 'pending',
+        time_created: activeQueue.time_created,
+      });
 
-        // Update the active queue with the new queue information
-        setActiveQueue({
-          id: data.queue_id,
-          service_id: targetService.id,
-          service_name: targetService.name,
-          position: data.position,
-          expected_ready_time: data.expected_ready_time,
-          status: 'pending',
-          time_created: activeQueue.time_created,
-        });
-
-        // Navigate to the success page for the new queue
-        navigate(`/success/${data.queue_id}`);
-      } else {
-        const errorData = await response.json();
-        setSnackbarState({
-          open: true,
-          message: errorData.error || 'Failed to transfer queue',
-          severity: 'error'
-        });
-      }
+      // Navigate to the success page for the new queue
+      navigate(`/success/${data.queue_id}`);
     } catch (error) {
       console.error("Error transferring queue:", error);
       setSnackbarState({
         open: true,
-        message: 'An error occurred while transferring the queue',
+        message: error instanceof Error ? error.message : 'An error occurred while transferring the queue',
         severity: 'error'
       });
     } finally {
@@ -391,15 +375,11 @@ const MapProximity: React.FC = () => {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await API.services.list();
-        if (!response.ok) {
-          throw new Error(`Failed to fetch services: ${response.status}`);
-        }
-
-        let data = await response.json();
+        
+        const data = await API.services.list();
 
         // Data processing with a single-pass transformation
-        data = data.map((service: Service) => {
+        const processedData = data.map((service: Service) => {
           const newService = {
             ...service,
             subcategory: ''
@@ -413,7 +393,7 @@ const MapProximity: React.FC = () => {
           }
 
           // Categorize fast food places
-          if ( newService.category && newService.category.toLowerCase() === 'fast_food') {
+          if (newService.category && newService.category.toLowerCase() === 'fast_food') {
             newService.category = 'fast_food';
             newService.subcategory = 'fast_food';
           }
@@ -434,7 +414,7 @@ const MapProximity: React.FC = () => {
           return newService;
         });
 
-        setServices(data);
+        setServices(processedData);
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');

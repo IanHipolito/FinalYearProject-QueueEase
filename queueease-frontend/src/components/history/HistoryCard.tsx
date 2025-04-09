@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, CardContent, Grid, Box, Typography, Chip, Button, useTheme, useMediaQuery } from '@mui/material';
+import React, { useState } from 'react';
+import { Card, CardContent, Grid, Box, Typography, Chip, Button, useTheme, useMediaQuery, Alert } from '@mui/material';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CategoryIcon from '@mui/icons-material/Category';
@@ -21,6 +21,8 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
 }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState('');
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -56,16 +58,20 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
         e.stopPropagation();
         if (!entry.order_id) return;
 
-        try {
-            const response = await API.appointments.checkStatus(entry.order_id);
+        setRefreshing(true);
+        setError('');
 
-            if (response.ok) {
-                if (onRefresh) {
-                    onRefresh();
-                }
+        try {
+            await API.appointments.checkStatus(entry.order_id);
+            
+            if (onRefresh) {
+                onRefresh();
             }
-        } catch (error) {
-            console.error('Error refreshing appointment status:', error);
+        } catch (err) {
+            console.error('Error refreshing appointment status:', err);
+            setError(err instanceof Error ? err.message : 'Failed to refresh status');
+        } finally {
+            setRefreshing(false);
         }
     };
 
@@ -86,6 +92,16 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                 <Grid container spacing={2}>
                     <Grid item xs={12}>
+                        {error && (
+                            <Alert 
+                                severity="error" 
+                                sx={{ mb: 2, borderRadius: 2 }}
+                                onClose={() => setError('')}
+                            >
+                                {error}
+                            </Alert>
+                        )}
+                        
                         <Box sx={{
                             display: 'flex',
                             alignItems: 'flex-start',
@@ -306,8 +322,9 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                         }}>
                             <Button
                                 variant="outlined"
-                                startIcon={<RefreshIcon />}
+                                startIcon={refreshing ? null : <RefreshIcon />}
                                 onClick={handleRefreshStatus}
+                                disabled={refreshing}
                                 sx={{
                                     borderRadius: 2,
                                     borderColor: theme.palette.info.main,
@@ -319,7 +336,7 @@ const HistoryCard: React.FC<HistoryCardProps> = ({
                                     fontSize: { xs: '0.75rem', sm: '0.875rem' }
                                 }}
                             >
-                                Refresh
+                                {refreshing ? "Refreshing..." : "Refresh"}
                             </Button>
                         </Grid>
                     )}

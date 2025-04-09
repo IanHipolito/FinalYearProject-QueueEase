@@ -23,11 +23,6 @@ interface Service {
   requires_sequence?: boolean;
 }
 
-// interface QueueSequenceItem {
-//   serviceId: number;
-//   position: number;
-// }
-
 const ServiceSelection: React.FC = () => {
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
@@ -40,8 +35,6 @@ const ServiceSelection: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const servicesPerPage = 6;
-  // const [sequenceMode, setSequenceMode] = useState<boolean>(false);
-  // const [queueSequence, setQueueSequence] = useState<QueueSequenceItem[]>([]);
   const { user } = useAuth();
   const loggedInUserId = user?.id;
 
@@ -51,18 +44,9 @@ const ServiceSelection: React.FC = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
   
-        const response = await API.services.list();
-  
+        const data = await API.services.list();
+        
         clearTimeout(timeoutId);
-  
-        if (!response.ok) {
-          if (response.status === 500) {
-            throw new Error("Server error: The backend API encountered an issue. Please check the Django server logs.");
-          }
-          throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
-        }
-  
-        const data = await response.json();
         console.log("Services loaded:", data.length);
   
         setServices(data);
@@ -75,7 +59,7 @@ const ServiceSelection: React.FC = () => {
         if (error.name === 'AbortError') {
           setError("Request timed out. Server might be unavailable or processing too many requests. Please try again.");
         } else {
-          setError(error.message || "Failed to fetch services. Please check your connection and try again.");
+          setError(error instanceof Error ? error.message : "Failed to fetch services. Please check your connection and try again.");
         }
         
         setLoading(false);
@@ -135,40 +119,31 @@ const ServiceSelection: React.FC = () => {
       setError("User not logged in.");
       return;
     }
+    
     try {
-      const response = await API.queues.createQueue(loggedInUserId, serviceId);
-
-      if (!response.ok) {
-        throw new Error(`Failed to create queue: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await API.queues.createQueue(loggedInUserId, serviceId);
       navigate(`/qrcodescreen/${data.queue_id}`);
     } catch (error: any) {
       console.error("Error creating queue", error);
-      setError(error.message || "Failed to create queue.");
+      setError(error instanceof Error ? error.message : "Failed to create queue.");
     }
   };
 
   const handleRetry = () => {
     setLoading(true);
     setError(null);
+    
     const fetchServices = async () => {
       try {
-        const response = await API.services.list();
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch services: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await API.services.list();
+        
         setServices(data);
         setFilteredServices(data);
         setTotalPages(Math.ceil(data.length / servicesPerPage));
         setLoading(false);
       } catch (error: any) {
         console.error("Error fetching services", error);
-        setError(error.message || "Failed to fetch services. Please try again.");
+        setError(error instanceof Error ? error.message : "Failed to fetch services. Please try again.");
         setLoading(false);
       }
     };

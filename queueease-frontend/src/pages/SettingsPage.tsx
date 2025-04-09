@@ -64,27 +64,23 @@ const SettingsPage: React.FC = () => {
         return;
       }
       
-      const response = await API.admin.getCompanyInfo(user.id);
+      const data = await API.admin.getCompanyInfo(user.id);
+      console.log("Fetched company data:", data);
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Fetched company data:", data);
-        
-        setCompanyData({
-          name: data.name || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          logo: null,
-          logoPreview: data.logo_base64 || '',
-          logoBase64: '',
-          latitude: data.latitude?.toString() || '',
-          longitude: data.longitude?.toString() || ''
-        });
-      }
+      setCompanyData({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        logo: null,
+        logoPreview: data.logo_base64 || '',
+        logoBase64: '',
+        latitude: data.latitude?.toString() || '',
+        longitude: data.longitude?.toString() || ''
+      });
     } catch (error) {
       console.error('Error fetching company data:', error);
-      showAlert('Error fetching company information', 'error');
+      showAlert(error instanceof Error ? error.message : 'Error fetching company information', 'error');
     } finally {
       setLoading(prev => ({...prev, company: false}));
     }
@@ -142,33 +138,26 @@ const SettingsPage: React.FC = () => {
         formData.append('logoBase64', companyData.logoBase64);
       }
       
-      const response = await API.admin.updateCompanyInfo(formData);
+      const responseData = await API.admin.updateCompanyInfo(formData);
+      console.log("Save response:", responseData);
       
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log("Save response:", responseData);
-        
-        // Update the local state with the returned data to confirm changes
-        if (responseData.data) {
-          setCompanyData(prev => ({
-            ...prev,
-            name: responseData.data.name || prev.name,
-            email: responseData.data.email || prev.email,
-            phone: responseData.data.phone || prev.phone,
-            address: responseData.data.address || prev.address,
-            latitude: responseData.data.latitude?.toString() || prev.latitude,
-            longitude: responseData.data.longitude?.toString() || prev.longitude,
-            logoPreview: responseData.data.logo_base64 || prev.logoPreview
-          }));
-        }
-        
-        // Refresh data completely
-        await fetchCompanyData();
-        showAlert('Company information updated successfully', 'success');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update company information');
+      // Update the local state with the returned data to confirm changes
+      if (responseData.data) {
+        setCompanyData(prev => ({
+          ...prev,
+          name: responseData.data.name || prev.name,
+          email: responseData.data.email || prev.email,
+          phone: responseData.data.phone || prev.phone,
+          address: responseData.data.address || prev.address,
+          latitude: responseData.data.latitude?.toString() || prev.latitude,
+          longitude: responseData.data.longitude?.toString() || prev.longitude,
+          logoPreview: responseData.data.logo_base64 || prev.logoPreview
+        }));
       }
+      
+      // Refresh data completely
+      await fetchCompanyData();
+      showAlert('Company information updated successfully', 'success');
     } catch (error) {
       console.error('Error saving company information:', error);
       showAlert(error instanceof Error ? error.message : 'Failed to update company information', 'error');
@@ -192,24 +181,19 @@ const SettingsPage: React.FC = () => {
     try {
       setLoading(prev => ({...prev, password: true}));
       
-      const response = await API.admin.changePassword({
+      await API.admin.changePassword({
         user_id: user?.id,
         current_password: credentials.currentPassword,
         new_password: credentials.newPassword
       });
       
-      if (response.ok) {
-        // Clear password fields
-        setCredentials({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        showAlert('Password updated successfully', 'success');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update password');
-      }
+      // Clear password fields
+      setCredentials({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      showAlert('Password updated successfully', 'success');
     } catch (error) {
       console.error('Error updating password:', error);
       showAlert(error instanceof Error ? error.message : 'Failed to update password', 'error');

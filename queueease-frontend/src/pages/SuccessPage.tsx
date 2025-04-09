@@ -120,12 +120,9 @@ const SuccessPage: React.FC = () => {
 
   const fetchQueueDetails = useCallback(async () => {
     if (!queueId) return;
+    
     try {
-      const response = await API.queues.getDetails(parseInt(queueId));
-      if (!response.ok) {
-        throw new Error('Failed to fetch queue detail');
-      }
-      const data: QueueData = await response.json();
+      const data = await API.queues.getDetails(parseInt(queueId));
       setQueueData(data);
 
       // Check if this is a transferred queue
@@ -143,11 +140,11 @@ const SuccessPage: React.FC = () => {
 
       // Check if user can leave the queue (within 1 minutes of joining)
       if (queueJoinTime) {
-        const threeMinutesInMs = 1 * 60 * 1000;
+        const oneMinuteInMs = 1 * 60 * 1000;
         const currentTime = new Date();
         const joinedTime = new Date(queueJoinTime);
         const timeElapsed = currentTime.getTime() - joinedTime.getTime();
-        setCanLeaveQueue(timeElapsed <= threeMinutesInMs);
+        setCanLeaveQueue(timeElapsed <= oneMinuteInMs);
       }
 
       if (data.expected_ready_time && data.total_wait !== undefined) {
@@ -162,7 +159,12 @@ const SuccessPage: React.FC = () => {
         setRemainingTime(0);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching queue details:", err);
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : "Failed to load queue details",
+        severity: 'error'
+      });
     }
   }, [queueId, queueJoinTime, initialTime]);
 
@@ -183,17 +185,22 @@ const SuccessPage: React.FC = () => {
   useEffect(() => {
     if (remainingTime <= 0 && queueData && queueData.status === 'pending' && !completionTriggered) {
       // When timer reaches zero, call the check_and_complete_queue endpoint
+      setCompletionTriggered(true);
+      
       API.queues.completeQueue(queueData.queue_id)
-        .then(response => response.json())
         .then(data => {
           console.log("Queue completion check:", data);
           if (data.status === 'completed') {
             setQueueData(prev => prev ? { ...prev, status: 'completed' } : prev);
           }
-          setCompletionTriggered(true);
         })
         .catch(error => {
           console.error("Error in auto-completion check:", error);
+          setSnackbar({
+            open: true,
+            message: error instanceof Error ? error.message : "Failed to complete queue",
+            severity: 'error'
+          });
         });
     }
   }, [remainingTime, queueData, completionTriggered]);
@@ -213,40 +220,20 @@ const SuccessPage: React.FC = () => {
     
     setIsLeavingQueue(true);
     try {
-      const response = await API.queues.leaveQueue(parseInt(queueId));
+      await API.queues.leaveQueue(parseInt(queueId));
       
-      if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: 'You have successfully left the queue',
-          severity: 'success'
-        });
-        // Navigate back to main page after a short delay
-        setTimeout(() => navigate('/usermainpage'), 1500);
-      } else {
-        let errorMessage = 'Failed to leave the queue';
-        
-        // Try to get a more specific error message
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error("Error parsing response:", parseError);
-          // If we can't parse the JSON, use the status text
-          errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
-        }
-        
-        setSnackbar({
-          open: true,
-          message: errorMessage,
-          severity: 'error'
-        });
-      }
+      setSnackbar({
+        open: true,
+        message: 'You have successfully left the queue',
+        severity: 'success'
+      });
+      // Navigate back to main page after a short delay
+      setTimeout(() => navigate('/usermainpage'), 1500);
     } catch (error) {
       console.error("Error leaving queue:", error);
       setSnackbar({
         open: true,
-        message: 'Network error occurred while trying to leave the queue',
+        message: error instanceof Error ? error.message : "Failed to leave the queue. Please try again.",
         severity: 'error'
       });
     } finally {

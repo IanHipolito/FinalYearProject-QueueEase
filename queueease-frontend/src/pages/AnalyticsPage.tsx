@@ -85,18 +85,15 @@ const AnalyticsPage: React.FC = () => {
     setActiveTab(newValue);
   };
 
-  // Separate fetch for sentiment trend remains unchanged
+  // Separate fetch for sentiment trend
   const fetchSentimentTrend = useCallback(async () => {
     if (!currentService?.id) return;
 
     try {
-      const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
-      if (response.ok) {
-        const data = await response.json();
-        setSentimentTrendData(data.satisfaction_trend || []);
-      }
-    } catch (error) {
-      console.error('Error fetching sentiment trend:', error);
+      const data = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
+      setSentimentTrendData(data.satisfaction_trend || []);
+    } catch (err) {
+      console.error('Error fetching sentiment trend:', err);
       setSentimentTrendData([]);
     }
   }, [currentService?.id, analyticsTimeRange]);
@@ -110,11 +107,7 @@ const AnalyticsPage: React.FC = () => {
       setError('');
 
       try {
-        const response = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
-        if (!response.ok) {
-          throw new Error('Failed to load analytics data');
-        }
-        const data = await response.json();
+        const data = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
 
         setAnalyticsData({
           feedback_distribution: data.feedback_distribution || [],
@@ -131,9 +124,9 @@ const AnalyticsPage: React.FC = () => {
 
         // Also fetch sentiment trend separately
         fetchSentimentTrend();
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching analytics data:', err);
-        setError(err.message || 'Failed to load analytics data');
+        setError(err instanceof Error ? err.message : 'Failed to load analytics data');
       } finally {
         setLoading(false);
       }
@@ -160,6 +153,46 @@ const AnalyticsPage: React.FC = () => {
     return false;
   });
 
+  // Retry function for the error display component
+  const handleRetry = () => {
+    if (!currentService?.id) return;
+    setLoading(true);
+    setError('');
+    
+    // Using the same time range to retry
+    fetchAnalytics();
+  };
+  
+  // Fetch analytics helper function (extracted for reuse)
+  const fetchAnalytics = async () => {
+    if (!currentService?.id) return;
+    
+    try {
+      const data = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
+      
+      setAnalyticsData({
+        feedback_distribution: data.feedback_distribution || [],
+        customer_comments: data.customer_comments || [],
+        total_reports: data.total_reports || 0,
+        satisfied_pct: data.satisfied_pct || 0,
+        neutral_pct: data.neutral_pct || 0,
+        dissatisfied_pct: data.dissatisfied_pct || 0,
+        average_wait_time: data.average_wait_time || 0,
+        wait_time_trend: data.wait_time_trend || [],
+        satisfaction_trend: data.satisfaction_trend || [],
+        feedback_keywords: data.feedback_keywords || []
+      });
+      
+      // Also update sentiment trend
+      setSentimentTrendData(data.satisfaction_trend || []);
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Loading state
   if (loading && !feedbackData.length) {
     return (
@@ -177,7 +210,7 @@ const AnalyticsPage: React.FC = () => {
         </Typography>
       </Box>
 
-      {error && <ErrorDisplay error={error} onRetry={() => setAnalyticsTimeRange(analyticsTimeRange)} />}
+      {error && <ErrorDisplay error={error} onRetry={handleRetry} />}
 
       <Paper sx={{ mb: 3, borderRadius: 2 }}>
         <Tabs 

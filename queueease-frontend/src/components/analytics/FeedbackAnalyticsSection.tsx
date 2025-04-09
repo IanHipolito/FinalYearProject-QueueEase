@@ -30,25 +30,21 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
       
       try {
         setLoading(true);
-        const response = await API.feedback.getUserFeedbackHistory(userId);
+        setError('');
         
-        if (response.ok) {
-          const data = await response.json();
-          setUserFeedback(data);
-          
-          // Calculate average rating
-          if (Array.isArray(data) && data.length > 0) {
-            const totalRating = data.reduce((sum, item) => sum + item.rating, 0);
-            const avgRating = Math.round((totalRating / data.length) * 10) / 10;
-            setAverageRating(avgRating);
-          }
-        } else {
-          console.error('Failed to fetch feedback data:', response.statusText);
-          setError('Failed to load feedback data');
+        const data = await API.feedback.getUserFeedbackHistory(userId);
+        
+        setUserFeedback(data);
+        
+        // Calculate average rating
+        if (Array.isArray(data) && data.length > 0) {
+          const totalRating = data.reduce((sum, item) => sum + item.rating, 0);
+          const avgRating = Math.round((totalRating / data.length) * 10) / 10;
+          setAverageRating(avgRating);
         }
       } catch (err) {
         console.error('Error fetching feedback data:', err);
-        setError('An error occurred while loading feedback data');
+        setError(err instanceof Error ? err.message : 'An error occurred while loading feedback data');
       } finally {
         setLoading(false);
       }

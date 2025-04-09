@@ -41,6 +41,7 @@ export interface AppointmentDetailHeaderProps {
 
 export interface AppointmentFormProps {
     onSubmit: (orderID: string) => Promise<void>;
+    isSubmitting: boolean;
     initialValue?: string;
     buttonText?: string;
 }

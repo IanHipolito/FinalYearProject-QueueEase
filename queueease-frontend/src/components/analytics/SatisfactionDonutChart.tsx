@@ -18,6 +18,7 @@ const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({
   );
   const [hoveredArc, setHoveredArc] = useState<'satisfied' | 'neutral' | 'dissatisfied' | null>(null);
   const [animation, setAnimation] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Local state for the three percentages
   const [satisfied, setSatisfied] = useState(propSatisfactionRate ?? 0);
@@ -37,32 +38,33 @@ const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({
 
       try {
         setLoading(true);
+        setError(null);
+        
         if (currentService?.id) {
-          const response = await API.admin.getAnalytics(currentService.id);
-          if (response.ok) {
-            const data = await response.json();
-            if (data) {
-              let s = data.satisfied_pct ?? 0;
-              let n = data.neutral_pct ?? 0;
-              let d = data.dissatisfied_pct ?? 0;
+          const data = await API.admin.getAnalytics(currentService.id);
+          
+          if (data) {
+            let s = data.satisfied_pct ?? 0;
+            let n = data.neutral_pct ?? 0;
+            let d = data.dissatisfied_pct ?? 0;
 
-              // Round total to 100 if needed
-              const total = s + n + d;
-              if (total !== 100) {
-                const diff = 100 - total;
-                if (s >= n && s >= d) s += diff;
-                else if (n >= s && n >= d) n += diff;
-                else d += diff;
-              }
-
-              setSatisfied(s);
-              setNeutral(n);
-              setDissatisfied(d);
+            // Round total to 100 if needed
+            const total = s + n + d;
+            if (total !== 100) {
+              const diff = 100 - total;
+              if (s >= n && s >= d) s += diff;
+              else if (n >= s && n >= d) n += diff;
+              else d += diff;
             }
+
+            setSatisfied(s);
+            setNeutral(n);
+            setDissatisfied(d);
           }
         }
       } catch (err) {
         console.error('Error fetching satisfaction data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load satisfaction data');
       } finally {
         setLoading(false);
       }
@@ -121,6 +123,10 @@ const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({
         >
           {loading ? (
             <CircularProgress size={60} />
+          ) : error ? (
+            <Typography color="error" align="center">
+              {error}
+            </Typography>
           ) : (
             <>
               <svg width="200" height="200" viewBox="0 0 200 200">
@@ -245,7 +251,7 @@ const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({
         </Box>
 
         {/* Simple legend at the bottom */}
-        {!loading && (
+        {!loading && !error && (
           <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 'auto', mb: 1 }}>
             <Box
               sx={{

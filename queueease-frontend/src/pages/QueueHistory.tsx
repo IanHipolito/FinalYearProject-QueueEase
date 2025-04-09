@@ -57,31 +57,18 @@ const QueueHistory: React.FC = () => {
                 }
 
                 try {
-                    const queueResponse = await API.queues.getUserQueues(user.id);
-                    if (queueResponse.ok) {
-                        queueData = await queueResponse.json();
-                        console.log("Successfully fetched queue history:", queueData);
-                    } else {
-                        queueError = `Queue history API returned ${queueResponse.status}`;
-                        console.warn(queueError);
-                    }
+                    queueData = await API.queues.getUserQueues(user.id);
+                    console.log("Successfully fetched queue history:", queueData);
                 } catch (error) {
-                    queueError = "Error connecting to queue history API";
+                    queueError = "Error fetching queue history";
                     console.error(queueError, error);
                 }
 
-                // Try to fetch appointments
                 try {
-                    const appointmentResponse = await API.appointments.getAll(user.id);
-                    if (appointmentResponse.ok) {
-                        appointmentData = await appointmentResponse.json();
-                        console.log("Successfully fetched appointments:", appointmentData);
-                    } else {
-                        appointmentError = `Appointments API returned ${appointmentResponse.status}`;
-                        console.warn(appointmentError);
-                    }
+                    appointmentData = await API.appointments.getAll(user.id);
+                    console.log("Successfully fetched appointments:", appointmentData);
                 } catch (error) {
-                    appointmentError = "Error connecting to appointments API";
+                    appointmentError = "Error fetching appointments";
                     console.error(appointmentError, error);
                 }
 
@@ -132,7 +119,7 @@ const QueueHistory: React.FC = () => {
                 }
             } catch (error) {
                 console.error("Error in fetchHistory:", error);
-                setError("An unexpected error occurred. Please try again later.");
+                setError(error instanceof Error ? error.message : "An unexpected error occurred. Please try again later.");
             } finally {
                 setLoading(false);
             }
@@ -280,36 +267,34 @@ const QueueHistory: React.FC = () => {
         try {
             await API.appointments.checkAndUpdateAppointments();
             
-            const appointmentResponse = await API.appointments.getAll(user.id);
-            if (appointmentResponse.ok) {
-                const appointmentData = await appointmentResponse.json();
-                
-                const appointmentHistory: HistoryEntry[] = Array.isArray(appointmentData) ? appointmentData.map((appointment: any) => ({
-                    id: parseInt(appointment.order_id?.replace(/\D/g, '')) || Math.floor(Math.random() * 10000),
-                    order_id: appointment.order_id || `APT-${Math.floor(Math.random() * 10000)}`,
-                    service_name: appointment.service_name || 'Unknown Service',
-                    service_type: 'appointment',
-                    category: appointment.category || 'other',
-                    date_created: new Date(appointment.appointment_date || new Date()).toISOString(),
-                    status: appointment.status || 'pending',
-                    appointment_date: appointment.appointment_date || new Date().toISOString().split('T')[0],
-                    appointment_time: appointment.appointment_time || '12:00'
-                })) : [];
-                
-                const updatedHistory = history.map(entry => {
-                    if (entry.service_type === 'appointment') {
-                        const updatedEntry = appointmentHistory.find(a => a.order_id === entry.order_id);
-                        if (updatedEntry) {
-                            return { ...entry, status: updatedEntry.status };
-                        }
+            const appointmentData = await API.appointments.getAll(user.id);
+            
+            const appointmentHistory: HistoryEntry[] = Array.isArray(appointmentData) ? appointmentData.map((appointment: any) => ({
+                id: parseInt(appointment.order_id?.replace(/\D/g, '')) || Math.floor(Math.random() * 10000),
+                order_id: appointment.order_id || `APT-${Math.floor(Math.random() * 10000)}`,
+                service_name: appointment.service_name || 'Unknown Service',
+                service_type: 'appointment',
+                category: appointment.category || 'other',
+                date_created: new Date(appointment.appointment_date || new Date()).toISOString(),
+                status: appointment.status || 'pending',
+                appointment_date: appointment.appointment_date || new Date().toISOString().split('T')[0],
+                appointment_time: appointment.appointment_time || '12:00'
+            })) : [];
+            
+            const updatedHistory = history.map(entry => {
+                if (entry.service_type === 'appointment') {
+                    const updatedEntry = appointmentHistory.find(a => a.order_id === entry.order_id);
+                    if (updatedEntry) {
+                        return { ...entry, status: updatedEntry.status };
                     }
-                    return entry;
-                });
-                
-                setHistory(updatedHistory);
-            }
+                }
+                return entry;
+            });
+            
+            setHistory(updatedHistory);
         } catch (error) {
             console.error("Error refreshing data:", error);
+            setError(error instanceof Error ? error.message : "Failed to refresh data. Please try again.");
         }
     }, [user?.id, history]);
 

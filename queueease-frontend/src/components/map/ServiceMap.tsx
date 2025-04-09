@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Box, Button, CircularProgress } from '@mui/material';
+import { Box, Button, CircularProgress, Alert, Snackbar } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { Service, ServiceMapProps } from 'types/serviceTypes';
 import { geoJSONGenerator, getServicePointLayer, getServiceSymbolLayer, addMapStyles, DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN, removeMapStyles } from 'utils/mapUtils';
@@ -35,14 +35,20 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   const pendingUpdatesRef = useRef<(() => void)[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Recreate service map when services change
   useEffect(() => {
-    const serviceMap = new Map<number, Service>();
-    services.forEach(service => {
-      serviceMap.set(service.id, service);
-    });
-    serviceMapRef.current = serviceMap;
+    try {
+      const serviceMap = new Map<number, Service>();
+      services.forEach(service => {
+        serviceMap.set(service.id, service);
+      });
+      serviceMapRef.current = serviceMap;
+    } catch (err) {
+      console.error('Error creating service map:', err);
+      setError(err instanceof Error ? err.message : 'Failed to process service data');
+    }
   }, [services]);
   
   // Calculate distance between two points (haversine formula)
@@ -52,37 +58,53 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     lat2: number, 
     lon2: number
   ): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    try {
+      const R = 6371e3; // Earth's radius in meters
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // in meters
+      return R * c; // in meters
+    } catch (err) {
+      console.error('Error calculating distance:', err);
+      return Infinity; // Return Infinity to ensure the service is filtered out
+    }
   }, []);
   
   // Memoized data transform with distance filtering
   const serviceData = useMemo(() => {
-    let filteredServices = services;
-    
-    if (userLocation && maxDistance > 0) {
-      filteredServices = services.filter(service => {
-        const distance = calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          service.latitude,
-          service.longitude
-        );
-        return distance / 1000 <= maxDistance;
-      });
+    try {
+      let filteredServices = services;
+      
+      if (userLocation && maxDistance > 0) {
+        filteredServices = services.filter(service => {
+          try {
+            const distance = calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              service.latitude,
+              service.longitude
+            );
+            return distance / 1000 <= maxDistance;
+          } catch (err) {
+            console.error('Error filtering service by distance:', err);
+            return false;
+          }
+        });
+      }
+      
+      return geoJSONGenerator.prepareGeoJSON(filteredServices, selectedService?.id);
+    } catch (err) {
+      console.error('Error preparing service data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to prepare map data');
+      return geoJSONGenerator.prepareGeoJSON([], undefined);
     }
-    
-    return geoJSONGenerator.prepareGeoJSON(filteredServices, selectedService?.id);
   }, [services, selectedService?.id, userLocation, maxDistance, calculateDistance]);
   
   // Helper function to ensure map is ready for operations
@@ -93,7 +115,12 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
     
     if (mapStyleLoadedRef.current) {
-      callback();
+      try {
+        callback();
+      } catch (err) {
+        console.error('Error executing callback in ensureMapIsReady:', err);
+        setError(err instanceof Error ? err.message : 'Map operation failed');
+      }
     } else {
       pendingUpdatesRef.current.push(callback);
     }
@@ -107,8 +134,9 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     for (const update of updates) {
       try {
         update();
-      } catch (error) {
-        console.error('Error processing pending update:', error);
+      } catch (err) {
+        console.error('Error processing pending update:', err);
+        setError(err instanceof Error ? err.message : 'Failed to update map');
       }
     }
   }, []);
@@ -138,8 +166,12 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             ]
           );
         }
-      } catch (error) {
-        console.error('Error updating map data:', error);
+        
+        // Clear any previous errors if this succeeds
+        setError(null);
+      } catch (err) {
+        console.error('Error updating map data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to update map data');
       }
     }, 150), 
   [serviceData, selectedService]);
@@ -211,15 +243,20 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         const animatePulse = () => {
           if (!map.current || !mapStyleLoadedRef.current) return;
           
-          // Update pulse radius for animation
-          userLocationPulseRadiusRef.current = 15 + 5 * Math.sin(Date.now() / 500);
-          
-          if (map.current.getLayer(USER_PULSE_LAYER_ID)) {
-            map.current.setPaintProperty(
-              USER_PULSE_LAYER_ID,
-              'circle-radius',
-              userLocationPulseRadiusRef.current
-            );
+          try {
+            // Update pulse radius for animation
+            userLocationPulseRadiusRef.current = 15 + 5 * Math.sin(Date.now() / 500);
+            
+            if (map.current.getLayer(USER_PULSE_LAYER_ID)) {
+              map.current.setPaintProperty(
+                USER_PULSE_LAYER_ID,
+                'circle-radius',
+                userLocationPulseRadiusRef.current
+              );
+            }
+          } catch (err) {
+            console.error('Error animating pulse:', err);
+            setError(err instanceof Error ? err.message : 'Failed to animate pulse');
           }
           
           animationFrameRef.current = requestAnimationFrame(animatePulse);
@@ -271,14 +308,19 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         }, beforeLayerId);
       }
-    } catch (error) {
-      console.error('Error updating user location on map:', error);
+      
+      // Clear any errors if successful
+      setError(null);
+    } catch (err) {
+      console.error('Error updating user location on map:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update location on map');
     }
   }, []);
   
   // Get user's current location
   const getUserLocation = useCallback(() => {
     setIsLoading(true);
+    setError(null);
     
     // First attempt to directly update user location without geolocation API
     if (userLocation) {
@@ -301,14 +343,17 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           setIsLoading(false);
           return;
         }
-      } catch (error) {
-        console.error('Error using existing user location:', error);
+      } catch (err) {
+        console.error('Error using existing user location:', err);
+        setError(err instanceof Error ? err.message : 'Failed to use saved location');
+        setIsLoading(false);
       }
     }
     
     // If no existing location or update failed, use Geolocation API
     if (!navigator.geolocation) {
       console.error('Geolocation is not supported by your browser');
+      setError('Geolocation is not supported by your browser');
       setIsLoading(false);
       return;
     }
@@ -339,8 +384,12 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
               updateMapData();
             });
           }
-        } catch (error) {
-          console.error('Error processing user location:', error);
+          
+          // Clear any errors if successful
+          setError(null);
+        } catch (err) {
+          console.error('Error processing user location:', err);
+          setError(err instanceof Error ? err.message : 'Failed to process location data');
         } finally {
           setIsLoading(false);
         }
@@ -351,17 +400,18 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         
         switch(error.code) {
           case error.PERMISSION_DENIED:
-            errorMsg = 'User denied the request for geolocation';
+            errorMsg = 'Permission denied for location access';
             break;
           case error.POSITION_UNAVAILABLE:
             errorMsg = 'Location information is unavailable';
             break;
           case error.TIMEOUT:
-            errorMsg = 'The request to get user location timed out';
+            errorMsg = 'The request to get location timed out';
             break;
         }
         
         console.error('Geolocation error:', errorMsg);
+        setError(errorMsg);
         setIsLoading(false);
         
         // Use Dublin center as fallback
@@ -475,66 +525,84 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       
       // Mark layers as initialized
       layersInitializedRef.current = true;
-    } catch (error) {
-      console.error('Error initializing map layers:', error);
+      
+      // Clear any errors if successful
+      setError(null);
+    } catch (err) {
+      console.error('Error initializing map layers:', err);
+      setError(err instanceof Error ? err.message : 'Failed to initialize map layers');
     }
   }, [serviceData, maxDistance, selectedService, userLocation, updateUserLocationOnMap]);
 
   // Create a separate function for event listeners
   const setupMapEventListeners = useCallback(() => {
     if (!map.current) return;
+    
+    try {
+      // Handle clicks on clusters with throttle
+      map.current.on('click', 'clusters', throttle((e) => {
+        if (!map.current || !e.features || e.features.length === 0) return;
 
-    // Handle clicks on clusters with throttle
-    map.current.on('click', 'clusters', throttle((e) => {
-      if (!map.current || !e.features || e.features.length === 0) return;
+        try {
+          const feature = e.features[0];
+          const clusterId = feature.properties?.cluster_id;
+          if (!clusterId) return;
 
-      const feature = e.features[0];
-      const clusterId = feature.properties?.cluster_id;
-      if (!clusterId) return;
+          const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
+          source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err || !map.current) return;
 
-      const source = map.current.getSource('services') as mapboxgl.GeoJSONSource;
-      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err || !map.current) return;
+            const coordinates = (feature.geometry as any).coordinates.slice() as [number, number];
+            map.current.easeTo({
+              center: coordinates,
+              zoom: Math.min((zoom || 0) + 1, 17),
+              duration: 500
+            });
+          });
+        } catch (err) {
+          console.error('Error handling cluster click:', err);
+          setError(err instanceof Error ? err.message : 'Failed to handle cluster click');
+        }
+      }, 200));
 
-        const coordinates = (feature.geometry as any).coordinates.slice() as [number, number];
-        map.current.easeTo({
-          center: coordinates,
-          zoom: Math.min((zoom || 0) + 1, 17),
-          duration: 500
-        });
+      // Handle clicks on individual points
+      map.current.on('click', 'service-points', throttle((e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        try {
+          const feature = e.features[0];
+          const serviceId = feature.properties?.id;
+          if (!serviceId) return;
+
+          const service = serviceMapRef.current.get(Number(serviceId));
+          if (service) {
+            onServiceClick(service);
+          }
+        } catch (err) {
+          console.error('Error handling service point click:', err);
+        }
+      }, 200));
+
+      // Change cursor on hover
+      map.current.on('mouseenter', 'service-points', () => {
+        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
       });
-    }, 200));
 
-    // Handle clicks on individual points
-    map.current.on('click', 'service-points', throttle((e) => {
-      if (!e.features || e.features.length === 0) return;
+      map.current.on('mouseleave', 'service-points', () => {
+        if (map.current) map.current.getCanvas().style.cursor = '';
+      });
 
-      const feature = e.features[0];
-      const serviceId = feature.properties?.id;
-      if (!serviceId) return;
+      map.current.on('mouseenter', 'clusters', () => {
+        if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+      });
 
-      const service = serviceMapRef.current.get(Number(serviceId));
-      if (service) {
-        onServiceClick(service);
-      }
-    }, 200));
-
-    // Change cursor on hover
-    map.current.on('mouseenter', 'service-points', () => {
-      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.current.on('mouseleave', 'service-points', () => {
-      if (map.current) map.current.getCanvas().style.cursor = '';
-    });
-
-    map.current.on('mouseenter', 'clusters', () => {
-      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.current.on('mouseleave', 'clusters', () => {
-      if (map.current) map.current.getCanvas().style.cursor = '';
-    });
+      map.current.on('mouseleave', 'clusters', () => {
+        if (map.current) map.current.getCanvas().style.cursor = '';
+      });
+    } catch (err) {
+      console.error('Error setting up map event listeners:', err);
+      setError(err instanceof Error ? err.message : 'Failed to set up map controls');
+    }
   }, [onServiceClick]);
 
   // Initialize map
@@ -595,15 +663,19 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         // Optimize zoom level handling
         newMap.on('zoom', throttle(() => {
           if (map.current && userLocation && map.current.getLayer(USER_RADIUS_LAYER_ID)) {
-            // Opacity of the circle based on zoom level for better visibility
-            const currentZoom = map.current.getZoom();
-            const opacity = Math.max(0.03, Math.min(0.12, 0.12 - (currentZoom - 12) * 0.01));
-            
-            map.current.setPaintProperty(
-              USER_RADIUS_LAYER_ID,
-              'fill-opacity',
-              opacity
-            );
+            try {
+              // Opacity of the circle based on zoom level for better visibility
+              const currentZoom = map.current.getZoom();
+              const opacity = Math.max(0.03, Math.min(0.12, 0.12 - (currentZoom - 12) * 0.01));
+              
+              map.current.setPaintProperty(
+                USER_RADIUS_LAYER_ID,
+                'fill-opacity',
+                opacity
+              );
+            } catch (err) {
+              console.error('Error updating radius opacity:', err);
+            }
           }
         }, 100));
 
@@ -645,8 +717,12 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             getUserLocation();
           }
         }
+        
+        // Clear any errors if successful
+        setError(null);
       } catch (err) {
         console.error('Error initializing map:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize map');
       }
     };
 
@@ -721,6 +797,11 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     };
   }, []);
 
+  // Handle error dismissal
+  const handleCloseError = () => {
+    setError(null);
+  };
+
   return (
     <Box
       sx={{
@@ -742,6 +823,24 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           position: 'relative'
         }}
       />
+      
+      {/* Error Snackbar */}
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{ mt: 1 }}
+      >
+        <Alert 
+          onClose={handleCloseError} 
+          severity="error"
+          variant="filled"
+          sx={{ width: '100%', boxShadow: 3 }}
+        >
+          {error}
+        </Alert>
+      </Snackbar>
       
       {/* User Location Button */}
       <Box

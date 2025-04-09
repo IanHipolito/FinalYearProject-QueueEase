@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, Typography, useTheme, Alert } from '@mui/material';
 import { API } from '../services/api';
 import PageContainer from '../components/common/PageContainer';
 import PageHeader from '../components/common/PageHeader';
@@ -12,30 +12,46 @@ const AddAppointment: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (orderID: string) => {
     if (!user?.id) {
       throw new Error('You must be logged in to add appointments');
     }
     
-    const response = await API.appointments.addAppointment(orderID, user.id);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to add appointment.');
-    }
+    setIsSubmitting(true);
+    setError('');
     
-    const data = await response.json();
-    alert('Appointment added successfully!');
-    navigate(`/appointment/${data.order_id}`);
+    try {
+      const data = await API.appointments.addAppointment(orderID, user.id);
+      
+      alert('Appointment added successfully!');
+      navigate(`/appointment/${data.order_id}`);
+    } catch (err) {
+      console.error('Error adding appointment:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add appointment.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <PageContainer maxWidth="sm" centerContent>
       <PageHeader title="Add Appointment" backUrl="/appointments" />
       
+      {error && (
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2, borderRadius: 2 }}
+          onClose={() => setError('')}
+        >
+          {error}
+        </Alert>
+      )}
+      
       <StyledCard>
-        <AppointmentForm onSubmit={handleSubmit} />
+        <AppointmentForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
       </StyledCard>
 
       <Box sx={{ mt: 3, textAlign: 'center' }}>

@@ -31,20 +31,27 @@ const NotificationsPage: React.FC = () => {
     
     setLoading(true);
     try {
-      const response = await API.admin.getNotificationSettings(currentService.id);
-      if (response.ok) {
-        const data = await response.json();
-        setFrequency(data.frequency_minutes);
-        setMessageTemplate(data.message_template);
-        setEnabled(data.is_enabled);
-      } else {
-        // If settings don't exist yet, we'll use defaults
-        setFrequency(5);
-        setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
-        setEnabled(true);
-      }
+      const data = await API.admin.getNotificationSettings(currentService.id);
+      
+      setFrequency(data.frequency_minutes);
+      setMessageTemplate(data.message_template);
+      setEnabled(data.is_enabled);
     } catch (error) {
       console.error('Error loading notification settings:', error);
+      
+      // Set default values if we couldn't load settings
+      setFrequency(5);
+      setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
+      setEnabled(true);
+      
+      // Only show error if it's not a 404
+      if (error instanceof Error && (error as any).status !== 404) {
+        setAlert({
+          open: true,
+          message: error.message || 'Failed to load notification settings',
+          severity: 'error'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -69,24 +76,19 @@ const NotificationsPage: React.FC = () => {
         message_template: messageTemplate
       });
       
-      if (response.ok) {
-        setAlert({
-          open: true,
-          message: 'Notification settings saved successfully',
-          severity: 'success'
-        });
-      } else {
-        setAlert({
-          open: true,
-          message: 'Failed to save notification settings',
-          severity: 'error'
-        });
-      }
+      setAlert({
+        open: true,
+        message: 'Notification settings saved successfully',
+        severity: 'success'
+      });
+      
+      // Refresh settings to ensure the latest
+      await loadSettings();
     } catch (error) {
       console.error('Error saving notification settings:', error);
       setAlert({
         open: true,
-        message: 'An error occurred while saving settings',
+        message: error instanceof Error ? error.message : 'An error occurred while saving settings',
         severity: 'error'
       });
     } finally {

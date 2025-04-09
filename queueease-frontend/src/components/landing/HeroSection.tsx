@@ -24,7 +24,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ displayText, fadeIn }) => {
         <Grid container spacing={5} alignItems="center">
           <Grid item xs={12} md={6} sx={{ textAlign: { xs: 'center', md: 'left' } }}>
             <Typography variant="h2" fontWeight={700} gutterBottom>
-              The Smart Way to Manage
+              The Smart Way To Manage
               <Box sx={{ 
                 display: 'block', 
                 minHeight: '4rem',
@@ -56,7 +56,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ displayText, fadeIn }) => {
               </Button>
             </Box>
             <Typography variant="body2" sx={{ mt: 2, opacity: 0.9 }}>
-              * Login required to access QR scanning and appointment features
+              * Login required to access QueueEase features.
             </Typography>
           </Grid>
           <Grid item xs={12} md={6} sx={{ display: { xs: 'none', md: 'block' } }}>

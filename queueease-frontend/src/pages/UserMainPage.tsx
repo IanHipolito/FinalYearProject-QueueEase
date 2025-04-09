@@ -50,38 +50,31 @@ const UserMainPage: React.FC = () => {
 
     const fetchDetailedQueue = async (queueId: number, isInitialLoad = false) => {
       try {
-        const detailRes = await API.queues.getDetails(queueId);
-        if (detailRes.ok) {
-          const detailData = await detailRes.json();
-
-          // Check if the queue was transferred
-          if (detailData.is_transferred) {
-            setIsTransferred(true);
-          } else {
-            setIsTransferred(false);
-          }
-
-          if (detailData.status !== 'pending') {
-            setActiveQueue(null);
-            return;
-          }
-
-          setActiveQueue((prev: UserMainPageQueue | null) => ({
-            ...(prev || {}),
-            id: detailData.queue_id,
-            service_id: detailData.service_id,
-            service_name: detailData.service_name,
-            position: detailData.current_position,
-            total_wait: detailData.total_wait,
-            expected_ready_time: detailData.expected_ready_time,
-            status: detailData.status,
-            time_created: detailData.time_created
-          }));
+        const detailData = await API.queues.getDetails(queueId);
+        
+        // Check if the queue was transferred
+        if (detailData.is_transferred) {
+          setIsTransferred(true);
         } else {
-          if (isInitialLoad) {
-            setActiveQueue(null);
-          }
+          setIsTransferred(false);
         }
+
+        if (detailData.status !== 'pending') {
+          setActiveQueue(null);
+          return;
+        }
+
+        setActiveQueue((prev: UserMainPageQueue | null) => ({
+          ...(prev || {}),
+          id: detailData.queue_id,
+          service_id: detailData.service_id,
+          service_name: detailData.service_name,
+          position: detailData.current_position,
+          total_wait: detailData.total_wait,
+          expected_ready_time: detailData.expected_ready_time,
+          status: detailData.status,
+          time_created: detailData.time_created
+        }));
       } catch (error) {
         console.error("Error fetching queue details:", error);
         if (isInitialLoad) {
@@ -111,24 +104,8 @@ const UserMainPage: React.FC = () => {
         }
 
         if (!user) return;
-        const res = await API.queues.getActive(user.id);
-
-        if (!res.ok) {
-          console.log("No active queue found (status):", res.status);
-
-          if (activeQueue !== null) {
-            setActiveQueue(null);
-          }
-
-          if (isInitialLoad) {
-            setInitialLoading(false);
-          } else {
-            setRefreshing(false);
-          }
-          return;
-        }
-
-        const data = await res.json();
+        
+        const data = await API.queues.getActive(user.id);
         console.log("Active queue response:", data);
 
         if (data && data.queue_id && data.current_position !== undefined) {
@@ -142,26 +119,25 @@ const UserMainPage: React.FC = () => {
           };
 
           setActiveQueue(basicQueue);
-
           await fetchDetailedQueue(data.queue_id, isInitialLoad);
         } else {
           console.log("Invalid queue data:", data);
+          if (activeQueue !== null) {
+            setActiveQueue(null);
+          }
+          
           if (isInitialLoad) {
             setInitialLoading(false);
           } else {
             setRefreshing(false);
           }
-
-          if (activeQueue !== null) {
-            setActiveQueue(null);
-          }
         }
       } catch (error) {
         console.error("Error fetching active queue:", error);
-        if (isInitialLoad) {
+        if (activeQueue !== null) {
           setActiveQueue(null);
         }
-
+        
         if (isInitialLoad) {
           setInitialLoading(false);
         } else {
@@ -192,7 +168,6 @@ const UserMainPage: React.FC = () => {
         setAutoCompletionAttempted(true);
 
         API.queues.completeQueue(activeQueue.id)
-          .then(response => response.json())
           .then(data => {
             console.log("Auto-completion status:", data);
             if (data.status === 'completed') {
@@ -238,56 +213,45 @@ const UserMainPage: React.FC = () => {
 
     try {
       if (!user) return;
-      const res = await API.queues.getActive(user.id);
-
-      if (!res.ok) {
-        console.log("No active queue found after refresh");
-        setActiveQueue(null);
-        setRefreshing(false);
-        return;
-      }
-
-      const data = await res.json();
-
-      if (data && data.queue_id && data.current_position !== undefined) {
+      
+      const activeQueueData = await API.queues.getActive(user.id);
+      
+      if (activeQueueData && activeQueueData.queue_id && activeQueueData.current_position !== undefined) {
         const basicQueue = {
           ...(activeQueue || {}),
-          id: data.queue_id,
-          service_id: data.service_id,
-          service_name: data.service_name,
-          position: data.current_position,
+          id: activeQueueData.queue_id,
+          service_id: activeQueueData.service_id,
+          service_name: activeQueueData.service_name,
+          position: activeQueueData.current_position,
           status: 'pending'
         };
 
         setActiveQueue(basicQueue);
 
         try {
-          const detailRes = await API.queues.getDetails(data.queue_id);
-          if (detailRes.ok) {
-            const detailData = await detailRes.json();
+          const detailData = await API.queues.getDetails(activeQueueData.queue_id);
+          
+          // Check if the queue was transferred
+          if (detailData.is_transferred) {
+            setIsTransferred(true);
+          } else {
+            setIsTransferred(false);
+          }
 
-            // Check if the queue was transferred
-            if (detailData.is_transferred) {
-              setIsTransferred(true);
-            } else {
-              setIsTransferred(false);
-            }
-
-            if (detailData.status === 'pending') {
-              setActiveQueue((prev: UserMainPageQueue | null) => ({
-                ...(prev || {}),
-                id: detailData.queue_id,
-                service_id: detailData.service_id,
-                service_name: detailData.service_name,
-                position: detailData.current_position,
-                total_wait: detailData.total_wait,
-                expected_ready_time: detailData.expected_ready_time,
-                status: detailData.status,
-                time_created: detailData.time_created,
-              }));
-            } else {
-              setActiveQueue(null);
-            }
+          if (detailData.status === 'pending') {
+            setActiveQueue((prev: UserMainPageQueue | null) => ({
+              ...(prev || {}),
+              id: detailData.queue_id,
+              service_id: detailData.service_id,
+              service_name: detailData.service_name,
+              position: detailData.current_position,
+              total_wait: detailData.total_wait,
+              expected_ready_time: detailData.expected_ready_time,
+              status: detailData.status,
+              time_created: detailData.time_created,
+            }));
+          } else {
+            setActiveQueue(null);
           }
         } catch (detailError) {
           console.error("Error fetching queue details:", detailError);
@@ -303,50 +267,32 @@ const UserMainPage: React.FC = () => {
     }
   };
 
-  const handleLeaveQueue = () => {
+  const handleLeaveQueue = async () => {
     if (!activeQueue?.id) return;
 
     setIsLeavingQueue(true);
 
-    API.queues.leaveQueue(activeQueue.id)
-      .then(response => {
-        if (response.ok) {
-          setActiveQueue(null);
-          setSnackbar({
-            open: true,
-            message: 'You have successfully left the queue',
-            severity: 'success'
-          });
-          setTimeout(() => refreshQueueData(false), 500);
-        } else {
-          // Try to get a more specific error message
-          response.json().then(errorData => {
-            setSnackbar({
-              open: true,
-              message: errorData.error || "Failed to leave the queue. Please try again.",
-              severity: 'error'
-            });
-          }).catch(() => {
-            setSnackbar({
-              open: true,
-              message: `Failed to leave the queue: ${response.status} ${response.statusText}`,
-              severity: 'error'
-            });
-          });
-        }
-      })
-      .catch(error => {
-        console.error("Error leaving queue:", error);
-        setSnackbar({
-          open: true,
-          message: "Network error occurred while trying to leave the queue",
-          severity: 'error'
-        });
-      })
-      .finally(() => {
-        setIsLeavingQueue(false);
-        setConfirmDialogOpen(false);
+    try {
+      await API.queues.leaveQueue(activeQueue.id);
+      
+      setActiveQueue(null);
+      setSnackbar({
+        open: true,
+        message: 'You have successfully left the queue',
+        severity: 'success'
       });
+      setTimeout(() => refreshQueueData(false), 500);
+    } catch (error) {
+      console.error("Error leaving queue:", error);
+      setSnackbar({
+        open: true,
+        message: error instanceof Error ? error.message : "Failed to leave the queue. Please try again.",
+        severity: 'error'
+      });
+    } finally {
+      setIsLeavingQueue(false);
+      setConfirmDialogOpen(false);
+    }
   };
 
   const handleNavigateToTransfer = () => {

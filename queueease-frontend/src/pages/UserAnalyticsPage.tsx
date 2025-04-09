@@ -267,13 +267,7 @@ const UserAnalyticsPage: React.FC = () => {
     if (!user) return;
     
     try {
-      const historyRes = await API.queues.getUserQueues(user.id);
-      
-      if (!historyRes.ok) {
-        throw new Error('Failed to fetch queue history');
-      }
-      
-      const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
+      const historyData = await API.queues.getUserQueues(user.id);
       
       // Ensure proper status field values
       const normalizedData = historyData.map((item: AnalyticsHistoryEntry) => ({
@@ -282,13 +276,8 @@ const UserAnalyticsPage: React.FC = () => {
       }));
       
       // Fetch appointments data
-      const appointmentsRes = await API.appointments.getAll(user.id);
-      let appointmentCount = 0;
-      
-      if (appointmentsRes.ok) {
-        const appointmentsData = await appointmentsRes.json();
-        appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
-      }
+      const appointmentsData = await API.appointments.getAll(user.id);
+      const appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
       
       const processedData = processAnalyticsData(normalizedData, timeRange);
       setAnalyticsData({
@@ -306,23 +295,19 @@ const UserAnalyticsPage: React.FC = () => {
     if (!user) return;
     
     try {
-      const feedbackRes = await API.feedback.getUserFeedbackHistory(user.id);
+      const feedback = await API.feedback.getUserFeedbackHistory(user.id);
+      setFeedbackData(feedback);
       
-      if (feedbackRes.ok) {
-        const feedback = await feedbackRes.json();
-        setFeedbackData(feedback);
+      // Calculate average rating if we have feedback data
+      if (Array.isArray(feedback) && feedback.length > 0) {
+        const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
+        const avgRating = Math.round((totalRating / feedback.length) * 10) / 10;
         
-        // Calculate average rating if we have feedback data
-        if (Array.isArray(feedback) && feedback.length > 0) {
-          const totalRating = feedback.reduce((sum, item) => sum + item.rating, 0);
-          const avgRating = Math.round((totalRating / feedback.length) * 10) / 10;
-          
-          setAnalyticsData(prev => ({
-            ...prev,
-            averageRating: avgRating,
-            userFeedback: feedback
-          }));
-        }
+        setAnalyticsData(prev => ({
+          ...prev,
+          averageRating: avgRating,
+          userFeedback: feedback
+        }));
       }
     } catch (err) {
       console.error("Error fetching feedback data:", err);
@@ -334,16 +319,10 @@ const UserAnalyticsPage: React.FC = () => {
     setError('');
     
     try {
-      // Fetch analytics data
-      const analyticsRes = await API.queues.getUserAnalytics(user!.id, timeRange);
-      
-      if (!analyticsRes.ok) {
-        console.log('Analytics API failed, falling back to raw queue data');
-        // Fall back to processing raw queue data
-        await fetchRawQueueData();
-      } else {
-        // Use the data from the analytics endpoint
-        const responseData = await analyticsRes.json() as AnalyticsApiResponse;
+      // Try to get data from the analytics endpoint
+      try {
+        // Fetch analytics data
+        const responseData = await API.queues.getUserAnalytics(user!.id, timeRange);
         
         // Handle queue history data - with fallback if missing
         let normalizedQueueHistory: AnalyticsHistoryEntry[] = [];
@@ -357,25 +336,17 @@ const UserAnalyticsPage: React.FC = () => {
         } 
         else {
           // Fetch raw queue data if not provided
-          const historyRes = await API.queues.getUserQueues(user!.id);
+          const historyData = await API.queues.getUserQueues(user!.id);
           
-          if (historyRes.ok) {
-            const historyData = await historyRes.json() as AnalyticsHistoryEntry[];
-            normalizedQueueHistory = historyData.map((item: AnalyticsHistoryEntry) => ({
-              ...item,
-              status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
-            }));
-          }
+          normalizedQueueHistory = historyData.map((item: AnalyticsHistoryEntry) => ({
+            ...item,
+            status: item.status?.toLowerCase() === 'cancelled' ? 'canceled' : item.status
+          }));
         }
 
         // Fetch appointments data
-        const appointmentsRes = await API.appointments.getAll(user!.id);
-        let appointmentCount = 0;
-        
-        if (appointmentsRes.ok) {
-          const appointmentsData = await appointmentsRes.json();
-          appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
-        }
+        const appointmentsData = await API.appointments.getAll(user!.id);
+        const appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
         
         setAnalyticsData({
           totalQueues: responseData.totalQueues || 0,
@@ -389,6 +360,10 @@ const UserAnalyticsPage: React.FC = () => {
           waitTimeByHour: responseData.waitTimeByHour || [],
           busyTimes: responseData.busyTimes || []
         });
+      } catch (analyticsError) {
+        console.log('Analytics API failed, falling back to raw queue data:', analyticsError);
+        // Fall back to processing raw queue data
+        await fetchRawQueueData();
       }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
@@ -410,7 +385,7 @@ const UserAnalyticsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, timeRange, fetchRawQueueData]);
+  }, [user, timeRange, fetchRawQueueData, ensureAllDaysPresent]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);

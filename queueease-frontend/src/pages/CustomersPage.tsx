@@ -53,18 +53,7 @@ const CustomersPage: React.FC = () => {
       setError('');
       
       try {
-        const response = await API.admin.getCustomers(currentService.id);
-        
-        if (!response.ok) {
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to load customers: HTTP ${response.status}`);
-          } catch (jsonError) {
-            throw new Error(`Failed to load customers: HTTP ${response.status}`);
-          }
-        }
-        
-        const data = await response.json();
+        const data = await API.admin.getCustomers(currentService.id);
         
         // Check if data is array
         if (!Array.isArray(data)) {
@@ -90,9 +79,9 @@ const CustomersPage: React.FC = () => {
           activeCustomers: transformedCustomers.filter(c => c.is_active).length,
           totalOrders: transformedCustomers.reduce((sum, c) => sum + c.orders, 0)
         });
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching customers:', err);
-        setError(err.message || 'Failed to load customer data');
+        setError(err instanceof Error ? err.message : 'Failed to load customer data');
         setCustomers([]);
       } finally {
         setLoading(false);
@@ -164,6 +153,39 @@ const CustomersPage: React.FC = () => {
     </svg>
   );
 
+  const handleRetry = async () => {
+    if (!currentService?.id) return;
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const data = await API.admin.getCustomers(currentService.id);
+      
+      const transformedCustomers = data.map((customer: any) => ({
+        id: customer.id,
+        name: customer.name || 'Unknown Customer',
+        email: customer.email || '',
+        phone: customer.phone || '',
+        status: customer.is_active ? 'Active' : 'Inactive',
+        orders: customer.order_count || 0,
+        is_active: customer.is_active,
+        last_visit: customer.last_visit || null
+      }));
+      
+      setCustomers(transformedCustomers);
+      setCustomerStats({
+        totalCustomers: transformedCustomers.length,
+        activeCustomers: transformedCustomers.filter((c: any) => c.is_active).length,
+        totalOrders: transformedCustomers.reduce((sum: number, c: any) => sum + c.orders, 0)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load customer data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
       <Typography variant="h5" fontWeight="500" gutterBottom>
@@ -173,37 +195,7 @@ const CustomersPage: React.FC = () => {
       {error && (
         <ErrorDisplay 
           error={error} 
-          onRetry={() => {
-            if (currentService?.id) {
-              setLoading(true);
-              setError('');
-              API.admin.getCustomers(currentService.id)
-                .then(response => API.handleResponse(response))
-                .then(data => {
-                  const transformedCustomers = data.map((customer: any) => ({
-                    id: customer.id,
-                    name: customer.name || 'Unknown Customer',
-                    email: customer.email || '',
-                    phone: customer.phone || '',
-                    status: customer.is_active ? 'Active' : 'Inactive',
-                    orders: customer.order_count || 0,
-                    is_active: customer.is_active,
-                    last_visit: customer.last_visit || null
-                  }));
-                  setCustomers(transformedCustomers);
-                  setCustomerStats({
-                    totalCustomers: transformedCustomers.length,
-                    activeCustomers: transformedCustomers.filter((c: any) => c.is_active).length,
-                    totalOrders: transformedCustomers.reduce((sum: number, c: any) => sum + c.orders, 0)
-                  });
-                  setLoading(false);
-                })
-                .catch(err => {
-                  setError(err.message || 'Failed to load customer data');
-                  setLoading(false);
-                });
-            }
-          }}
+          onRetry={handleRetry}
         />
       )}
 

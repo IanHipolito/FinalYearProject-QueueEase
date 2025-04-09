@@ -26,24 +26,28 @@ const AppointmentsList: React.FC = () => {
   const theme = useTheme();
 
   useEffect(() => {
-    if (user) {
-      setLoading(true);
-      API.appointments.getAll(user.id)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to fetch appointments');
-          }
-          return response.json();
-        })
-        .then(data => {
-          setAppointments(data);
-          setLoading(false);
-        })
-        .catch(error => {
-          console.error('Error fetching appointments:', error);
-          setLoading(false);
+    const fetchAppointments = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        
+        const data = await API.appointments.getAll(user.id);
+        
+        setAppointments(data);
+      } catch (err) {
+        console.error('Error fetching appointments:', err);
+        setAlert({
+          open: true,
+          message: err instanceof Error ? err.message : 'Failed to fetch appointments',
+          severity: 'error'
         });
-    }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAppointments();
   }, [user]);
 
   const handleViewDetails = (orderId: string) => {
@@ -52,28 +56,22 @@ const AppointmentsList: React.FC = () => {
 
   const handleRemoveAppointment = async (orderId: string) => {
     try {
-      const response = await API.appointments.deleteAppointment(orderId);
+      await API.appointments.deleteAppointment(orderId);
       
-      if (response.ok) {
-        setAlert({
-          open: true,
-          message: "Appointment removed successfully",
-          severity: 'success'
-        });
-        setAppointments(appointments.filter(app => app.order_id !== orderId));
-      } else {
-        const data = await response.json();
-        setAlert({
-          open: true,
-          message: `Failed to remove appointment: ${data.error}`,
-          severity: 'error'
-        });
-      }
-    } catch (error) {
-      console.error("Error removing appointment:", error);
+      // If we get here, deletion was successful
       setAlert({
         open: true,
-        message: "An error occurred while removing the appointment.",
+        message: "Appointment removed successfully",
+        severity: 'success'
+      });
+      
+      // Update local state to remove the appointment
+      setAppointments(appointments.filter(app => app.order_id !== orderId));
+    } catch (err) {
+      console.error("Error removing appointment:", err);
+      setAlert({
+        open: true,
+        message: err instanceof Error ? err.message : "An error occurred while removing the appointment.",
         severity: 'error'
       });
     }

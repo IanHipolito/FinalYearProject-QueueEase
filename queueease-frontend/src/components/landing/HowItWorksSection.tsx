@@ -14,7 +14,7 @@ const HowItWorksSection: React.FC = () => {
     {
       icon: <CalendarTodayIcon sx={{ fontSize: 40, color: '#6f42c1' }} />,
       title: '2. Join Any Service',
-      description: 'Queue for restaurants, retail, healthcare, government services and more'
+      description: 'Queue for the for various types of services'
     },
     {
       icon: <MapIcon sx={{ fontSize: 40, color: '#6f42c1' }} />,

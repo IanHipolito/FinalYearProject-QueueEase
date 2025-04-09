@@ -26,8 +26,7 @@ const QueuesPage: React.FC = () => {
       setError('');
       
       try {
-        const response = await API.admin.getQueueDetails(currentService.id);
-        const data = await API.handleResponse(response);
+        const data = await API.admin.getQueueDetails(currentService.id);
         
         const transformedData = data.map((queue: any) => ({
           id: queue.id,
@@ -40,8 +39,8 @@ const QueuesPage: React.FC = () => {
         }));
         
         setQueues(transformedData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load queue data');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load queue data');
         console.error('Error fetching queues:', err);
       } finally {
         setLoading(false);
@@ -73,26 +72,22 @@ const QueuesPage: React.FC = () => {
     setActionLoading(true);
     
     try {
-      const response = await API.admin.updateQueueStatus(queueId, newStatus);
+      const result = await API.admin.updateQueueStatus(queueId, newStatus);
       
-      if (response.ok) {
-        // Update queue status in local state
-        setQueues(queues.map(q => 
-          q.id === queueId 
-            ? { ...q, status: newStatus ? 'Active' : 'Inactive', is_active: newStatus } 
-            : q
-        ));
-        
-        setSuccessMessage(`Queue ${newStatus ? 'activated' : 'deactivated'} successfully`);
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || `Failed to update queue status (status: ${response.status})`);
-      }
-    } catch (err: any) {
-      setError(err.message);
+      // Update queue status in local state
+      setQueues(queues.map(q => 
+        q.id === queueId 
+          ? { ...q, status: newStatus ? 'Active' : 'Inactive', is_active: newStatus } 
+          : q
+      ));
+      
+      setSuccessMessage(`Queue ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update queue status');
+      console.error('Error updating queue status:', err);
     } finally {
       setActionLoading(false);
     }

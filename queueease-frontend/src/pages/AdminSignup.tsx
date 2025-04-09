@@ -51,18 +51,18 @@ const AdminSignup: React.FC = () => {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await API.services.listWithStatus();
+        setError("");
         
-        if (response.ok) {
-          const data = await response.json();
-          setServices(data);
-          const availableServices = data.filter((service: ServiceAdmin) => !service.has_admin);
-          setFilteredServices(availableServices);
-        } else {
-          setError("Failed to load services");
-        }
+        const data = await API.services.listWithStatus();
+        
+        setServices(data);
+        const availableServices = data.filter((service: ServiceAdmin) => !service.has_admin);
+        setFilteredServices(availableServices);
       } catch (err) {
-        setError("Error connecting to server");
+        console.error("Error fetching services:", err);
+        setError(err instanceof Error ? err.message : "Failed to load services");
+        setServices([]);
+        setFilteredServices([]);
       } finally {
         setLoading(false);
       }
@@ -157,28 +157,22 @@ const AdminSignup: React.FC = () => {
     setSubmitting(true);
     
     try {
-      const response = await API.auth.adminSignup({
+      await API.auth.adminSignup({
         name: formData.name,
         email: formData.email,
         phoneNumber: formData.phoneNumber,
         password: formData.password,
         serviceId: formData.serviceId
       });
-
-      const data = await response.json();
       
-      if (response.ok) {
-        navigate("/admin-login", { 
-          state: { 
-            message: "Admin account created successfully! Please sign in." 
-          } 
-        });
-      } else {
-        setError(data.error || "Registration failed");
-      }
-    } catch (error) {
-      console.error("Error during registration:", error);
-      setError("An error occurred. Please try again.");
+      navigate("/admin-login", { 
+        state: { 
+          message: "Admin account created successfully! Please sign in." 
+        } 
+      });
+    } catch (err) {
+      console.error("Error during admin registration:", err);
+      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
       setSubmitting(false);
     }

@@ -67,7 +67,7 @@ const IOSInstallGuide: React.FC = () => {
         </Typography>
         
         <Typography variant="body1" sx={{ mb: 2 }}>
-          To receive notifications when you're not using the app, install QueueEase to your home screen:
+          To receive notifications, install QueueEase to your home screen:
         </Typography>
         
         <Box sx={{ mb: 2 }}>

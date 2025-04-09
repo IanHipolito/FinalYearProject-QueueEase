@@ -26,26 +26,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Regular user login
   const login = async (email: string, password: string) => {
     try {
-      const response = await API.auth.login(email, password);
-
-      if (response.ok) {
-        const data = await response.json();
-        const newUser = { 
-          id: data.user_id, 
-          name: data.name, 
-          email: data.email,
-          user_type: data.user_type,
-          is_admin: data.user_type === 'admin'
-        };
-        
-        setUser(newUser);
-        setIsAdmin(data.user_type === 'admin');
-        
-        // Save to localStorage
-        localStorage.setItem('user', JSON.stringify(newUser));
-        return;
-      } 
-      throw new Error('Invalid email or password');
+      const data = await API.auth.login(email, password);
+      
+      const newUser = { 
+        id: data.user_id, 
+        name: data.name, 
+        email: data.email,
+        user_type: data.user_type,
+        is_admin: data.user_type === 'admin'
+      };
+      
+      setUser(newUser);
+      setIsAdmin(data.user_type === 'admin');
+      
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(newUser));
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -55,39 +50,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Admin-specific login
   const adminLogin = async (email: string, password: string) => {
     try {
-      const response = await API.auth.adminLogin(email, password);
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (!data.is_admin) {
-          throw new Error('This account does not have admin privileges');
-        }
-        
-        const newUser = { 
-          id: data.user_id, 
-          name: data.name, 
-          email: data.email,
-          user_type: 'admin',
-          is_admin: true
-        };
-        
-        setUser(newUser);
-        setIsAdmin(true);
-        
-        if (data.managed_services && Array.isArray(data.managed_services)) {
-          setManagedServices(data.managed_services);
-          if (data.managed_services.length > 0) {
-            setCurrentService(data.managed_services[0]);
-          }
-        }
-        
-        // Save to localStorage
-        localStorage.setItem('user', JSON.stringify(newUser));
-        localStorage.setItem('managedServices', JSON.stringify(data.managed_services || []));
-        return;
+      const data = await API.auth.adminLogin(email, password);
+      
+      if (!data.is_admin) {
+        throw new Error('This account does not have admin privileges');
       }
-      throw new Error('Invalid email or password');
+      
+      const newUser = { 
+        id: data.user_id, 
+        name: data.name, 
+        email: data.email,
+        user_type: 'admin',
+        is_admin: true
+      };
+      
+      setUser(newUser);
+      setIsAdmin(true);
+      
+      if (data.managed_services && Array.isArray(data.managed_services)) {
+        setManagedServices(data.managed_services);
+        if (data.managed_services.length > 0) {
+          setCurrentService(data.managed_services[0]);
+        }
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify(newUser));
+      localStorage.setItem('managedServices', JSON.stringify(data.managed_services || []));
     } catch (error) {
       console.error('Admin login error:', error);
       throw error;
@@ -126,22 +115,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshServiceData = async (serviceId: number) => {
     try {
-      const response = await API.services.getServiceDetails(serviceId);
+      const updatedService = await API.services.getServiceDetails(serviceId);
       
-      if (response.ok) {
-        const updatedService = await response.json();
-        setManagedServices(prev => 
-          prev.map(service => service.id === serviceId ? {...service, ...updatedService} : service)
-        );
-        if (currentService?.id === serviceId) {
-          setCurrentService(prev => prev ? {...prev, ...updatedService} : null);
-        }
-        return updatedService;
+      setManagedServices(prev => 
+        prev.map(service => service.id === serviceId ? {...service, ...updatedService} : service)
+      );
+      
+      if (currentService?.id === serviceId) {
+        setCurrentService(prev => prev ? {...prev, ...updatedService} : null);
       }
+      
+      return updatedService;
     } catch (error) {
       console.error("Error refreshing service data:", error);
+      return null;
     }
-    return null;
   };
   
   // Add a function to switch between managed services

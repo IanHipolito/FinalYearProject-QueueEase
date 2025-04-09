@@ -42,15 +42,8 @@ const DashboardPage: React.FC = () => {
     
     try {
       console.log(`Fetching dashboard data for service ID ${serviceId} with timeRange=${timeRangeParam}`);
-      const response = await API.admin.getDashboardData(serviceId, timeRangeParam);
       
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('Dashboard API error:', errorText);
-        throw new Error(`Failed to load dashboard data: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const data = await API.admin.getDashboardData(serviceId, timeRangeParam);
       
       let processedCustomerStats = data.customer_stats || [];
       if (processedCustomerStats.length === 0) {
@@ -94,9 +87,9 @@ const DashboardPage: React.FC = () => {
         growth: data.growth || 0,
         service_type: data.service_type || currentService?.service_type || 'immediate'
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError(err.message || 'Failed to load dashboard data');
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       
       // Set default values when API fails
       const placeholderCount = timeRangeParam === 'daily' ? 7 : timeRangeParam === 'weekly' ? 5 : 12;

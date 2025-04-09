@@ -19,7 +19,7 @@ const CallToAction: React.FC = () => {
             Ready to Skip the Line?
           </Typography>
           <Typography variant="h6" paragraph sx={{ mb: 4, opacity: 0.9 }}>
-            Join thousands of people who have already simplified their waiting experience
+            Join to simplify your waiting experience
           </Typography>
           <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
             <Button 

@@ -6,136 +6,198 @@ const API_BASE =
 export const API = {
     // Authentication endpoints
     auth: {
-        login: (email: string, password: string) =>
-            fetch(`${API_BASE}/login/`, {
+        login: async (email: string, password: string) => {
+            const response = await fetch(`${API_BASE}/login/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
-            }),
-        signup: (data: any) =>
-            fetch(`${API_BASE}/signup/`, {
+            });
+            return API.handleResponse(response);
+        },
+        signup: async (data: any) => {
+            const response = await fetch(`${API_BASE}/signup/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
-            }),
-        adminLogin: (email: string, password: string) =>
-            fetch(`${API_BASE}/login/`, {
+            });
+            return API.handleResponse(response);
+        },
+        adminLogin: async (email: string, password: string) => {
+            const response = await fetch(`${API_BASE}/login/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
-            }),
-        adminSignup: (data: any) =>
-            fetch(`${API_BASE}/admin-signup/`, {
+            });
+            return API.handleResponse(response);
+        },
+        adminSignup: async (data: any) => {
+            const response = await fetch(`${API_BASE}/admin-signup/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
-            }),
-        saveFcmToken: (userId: number, fcmToken: string) =>
-            fetch(`${API_BASE}/save-fcm-token/`, {
+            });
+            return API.handleResponse(response);
+        },
+        saveFcmToken: async (userId: number, fcmToken: string) => {
+            const response = await fetch(`${API_BASE}/save-fcm-token/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: userId,
                     fcm_token: fcmToken
                 }),
-            }),
+            });
+            return API.handleResponse(response);
+        },
     },
 
     // Admin dashboard endpoints
     admin: {
-        getDashboardData: (serviceId: number, timeRangeParam: string = 'daily') =>
-            fetch(`${API_BASE}/admin/dashboard-data/?service_id=${serviceId}&time_range=${timeRangeParam}`),
-        getCustomers: (serviceId: number) =>
-            fetch(`${API_BASE}/admin/customers/?service_id=${serviceId}`),
-        getQueueDetails: (serviceId: number) =>
-            fetch(`${API_BASE}/service_queues/${serviceId}/`),
-        getAnalytics: (serviceId: number, period: string = 'month') =>
-            fetch(`${API_BASE}/admin-get-analytics/?service_id=${serviceId}&period=${period}`, {
+        getDashboardData: async (serviceId: number, timeRangeParam: string = 'daily') => {
+            const response = await fetch(`${API_BASE}/admin/dashboard-data/?service_id=${serviceId}&time_range=${timeRangeParam}`);
+            return API.handleResponse(response);
+        },
+        getCustomers: async (serviceId: number) => {
+            const response = await fetch(`${API_BASE}/admin/customers/?service_id=${serviceId}`);
+            return API.handleResponse(response);
+        },
+        getQueueDetails: async (serviceId: number) => {
+            const response = await fetch(`${API_BASE}/service_queues/${serviceId}/`);
+            return API.handleResponse(response);
+        },
+        getAnalytics: async (serviceId: number, period: string = 'month') => {
+            const response = await fetch(`${API_BASE}/admin-get-analytics/?service_id=${serviceId}&period=${period}`, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
                 method: 'GET'
-            }),
-        updateQueueStatus: (queueId: number, isActive: boolean) =>
-            fetch(`${API_BASE}/update-queue-position/${queueId}/`, {
+            });
+            return API.handleResponse(response);
+        },
+        updateQueueStatus: async (queueId: number, isActive: boolean) => {
+            const response = await fetch(`${API_BASE}/update-queue-position/${queueId}/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_active: isActive }),
-            }),
-        createCustomer: (serviceId: number, data: any) =>
-            fetch(`${API_BASE}/admin/customers/create/`, {
+            });
+            return API.handleResponse(response);
+        },
+        createCustomer: async (serviceId: number, data: any) => {
+            const response = await fetch(`${API_BASE}/admin/customers/create/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     service_id: serviceId,
                     ...data
                 }),
-            }),
-        getNotificationSettings: (serviceId: number) =>
-            fetch(`${API_BASE}/admin/notification-settings/?service_id=${serviceId}`),
-        updateNotificationSettings: (data: any) =>
-            fetch(`${API_BASE}/admin/notification-settings/`, {
+            });
+            return API.handleResponse(response);
+        },
+        getNotificationSettings: async (serviceId: number) => {
+            const response = await fetch(`${API_BASE}/admin/notification-settings/?service_id=${serviceId}`);
+            return API.handleResponse(response);
+        },
+        updateNotificationSettings: async (data: any) => {
+            const response = await fetch(`${API_BASE}/admin/notification-settings/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
-            }),
-        getCompanyInfo: (userId: number) =>
-            fetch(`${API_BASE}/admin/company-info/${userId}/`),
-
-        updateCompanyInfo: (formData: FormData) =>
-            fetch(`${API_BASE}/admin/update-company-info/`, {
+            });
+            return API.handleResponse(response);
+        },
+        getCompanyInfo: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/admin/company-info/${userId}/`);
+            return API.handleResponse(response);
+        },
+        updateCompanyInfo: async (formData: FormData) => {
+            const response = await fetch(`${API_BASE}/admin/update-company-info/`, {
                 method: 'POST',
                 body: formData,
-            }),
-
-        changePassword: (data: any) =>
-            fetch(`${API_BASE}/admin/change-password/`, {
+            });
+            return API.handleResponse(response);
+        },
+        changePassword: async (data: any) => {
+            const response = await fetch(`${API_BASE}/admin/change-password/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
-            }),
+            });
+            return API.handleResponse(response);
+        },
     },
 
     // Service management
     services: {
-        list: () => fetch(`${API_BASE}/list_services/`),
-        listWithStatus: () => fetch(`${API_BASE}/list_services_with_status/`),
-        getServiceDetails: (serviceId: number) => fetch(`${API_BASE}/service/${serviceId}/`),
-        getAvailableTimes: (serviceId: number, date: string) =>
-            fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`),
+        list: async () => {
+            const response = await fetch(`${API_BASE}/list_services/`);
+            return API.handleResponse(response);
+        },
+        listWithStatus: async () => {
+            const response = await fetch(`${API_BASE}/list_services_with_status/`);
+            return API.handleResponse(response);
+        },
+        getServiceDetails: async (serviceId: number) => {
+            const response = await fetch(`${API_BASE}/service/${serviceId}/`);
+            return API.handleResponse(response);
+        },
+        getAvailableTimes: async (serviceId: number, date: string) => {
+            const response = await fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`);
+            return API.handleResponse(response);
+        },
     },
 
     // Queue management
     queues: {
-        getActive: (userId: number) => fetch(`${API_BASE}/active-queue/${userId}/`),
-        getDetails: (queueId: number) => fetch(`${API_BASE}/queue-detail/${queueId}/`),
-        getUserQueues: (userId: number) => fetch(`${API_BASE}/user-queues/${userId}/`),
-        createQueue: (userId: number, serviceId: number) =>
-            fetch(`${API_BASE}/create-queue/`, {
+        getActive: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/active-queue/${userId}/`);
+            return API.handleResponse(response);
+        },
+        getDetails: async (queueId: number) => {
+            const response = await fetch(`${API_BASE}/queue-detail/${queueId}/`);
+            return API.handleResponse(response);
+        },
+        getUserQueues: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/user-queues/${userId}/`);
+            return API.handleResponse(response);
+        },
+        createQueue: async (userId: number, serviceId: number) => {
+            const response = await fetch(`${API_BASE}/create-queue/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: userId,
                     service_id: serviceId
                 }),
-            }),
-        joinQueue: (queueId: number, customerId: number) =>
-            fetch(`${API_BASE}/join-queue/`, {
+            });
+            return API.handleResponse(response);
+        },
+        joinQueue: async (queueId: number, customerId: number) => {
+            const response = await fetch(`${API_BASE}/join-queue/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ queue_id: queueId, customer_id: customerId }),
-            }),
-        leaveQueue: (queueId: number) =>
-            fetch(`${API_BASE}/leave-queue/${queueId}/`, { method: 'POST' }),
-        completeQueue: (queueId: number) =>
-            fetch(`${API_BASE}/queue-complete/${queueId}/`, { method: 'POST' }),
-        getQRCode: (queueId: number) =>
-            fetch(`${API_BASE}/get-qr-code/${queueId}/`),
-        getUserAnalytics: (userId: number, timeRange: string = 'month') =>
-            fetch(`${API_BASE}/user-analytics/${userId}/?time_range=${timeRange}`),
-        transferQueue: (originalQueueId: number, targetServiceId: number, userId: number): Promise<Response> =>
-            fetch(`${API_BASE}/transfer-queue/`, {
+            });
+            return API.handleResponse(response);
+        },
+        leaveQueue: async (queueId: number) => {
+            const response = await fetch(`${API_BASE}/leave-queue/${queueId}/`, { method: 'POST' });
+            return API.handleResponse(response);
+        },
+        completeQueue: async (queueId: number) => {
+            const response = await fetch(`${API_BASE}/queue-complete/${queueId}/`, { method: 'POST' });
+            return API.handleResponse(response);
+        },
+        getQRCode: async (queueId: number) => {
+            const response = await fetch(`${API_BASE}/get-qr-code/${queueId}/`);
+            return API.handleResponse(response);
+        },
+        getUserAnalytics: async (userId: number, timeRange: string = 'month') => {
+            const response = await fetch(`${API_BASE}/user-analytics/${userId}/?time_range=${timeRange}`);
+            return API.handleResponse(response);
+        },
+        transferQueue: async (originalQueueId: number, targetServiceId: number, userId: number) => {
+            const response = await fetch(`${API_BASE}/transfer-queue/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -143,83 +205,126 @@ export const API = {
                     target_service_id: targetServiceId,
                     user_id: userId
                 }),
-            }),
-        validateQR: (qrHash: string) =>
-            fetch(`${API_BASE}/validate-qr/`, {
+            });
+            return API.handleResponse(response);
+        },
+        validateQR: async (qrHash: string) => {
+            const response = await fetch(`${API_BASE}/validate-qr/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qrHash }),
-            }),
+            });
+            return API.handleResponse(response);
+        },
     },
 
     // Appointment management
     appointments: {
-        getAll: (userId: number) => fetch(`${API_BASE}/appointments/${userId}/`),
-        getAppointmentDetails: (orderId: string) => fetch(`${API_BASE}/appointment/${orderId}/`),
-        addAppointment: (orderID: string, userId: number) =>
-            fetch(`${API_BASE}/appointment/add-existing/`, {
+        getAll: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/appointments/${userId}/`);
+            return API.handleResponse(response);
+        },
+        getAppointmentDetails: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/appointment/${orderId}/`);
+            return API.handleResponse(response);
+        },
+        addAppointment: async (orderID: string, userId: number) => {
+            const response = await fetch(`${API_BASE}/appointment/add-existing/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order_id: orderID, user_id: userId }),
-            }),
-        deleteAppointment: (orderId: string) =>
-            fetch(`${API_BASE}/appointment/delete/${orderId}/`, { method: 'DELETE' }),
-        createAppointment: (data: any) =>
-            fetch(`${API_BASE}/create-appointment/`, {
+            });
+            return API.handleResponse(response);
+        },
+        deleteAppointment: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/appointment/delete/${orderId}/`, { method: 'DELETE' });
+            return API.handleResponse(response);
+        },
+        createAppointment: async (data: any) => {
+            const response = await fetch(`${API_BASE}/create-appointment/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
-            }),
-        cancelAppointment: (orderId: string) =>
-            fetch(`${API_BASE}/appointment/cancel/${orderId}/`, {
+            });
+            return API.handleResponse(response);
+        },
+        cancelAppointment: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/appointment/cancel/${orderId}/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-            }),
-        checkAndUpdateAppointments: () =>
-            fetch(`${API_BASE}/check-appointments/`),
-        checkStatus: (orderId: string) =>
-            fetch(`${API_BASE}/appointment/check-status/${orderId}/`),
-
+            });
+            return API.handleResponse(response);
+        },
+        checkAndUpdateAppointments: async () => {
+            const response = await fetch(`${API_BASE}/check-appointments/`);
+            return API.handleResponse(response);
+        },
+        checkStatus: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/appointment/check-status/${orderId}/`);
+            return API.handleResponse(response);
+        },
     },
 
     // Feedback management
     feedback: {
-        getCategories: () =>
-            fetch(`${API_BASE}/feedback/categories/`),
-        submitFeedback: (feedbackData: any) =>
-            fetch(`${API_BASE}/feedback/submit/`, {
+        getCategories: async () => {
+            const response = await fetch(`${API_BASE}/feedback/categories/`);
+            return API.handleResponse(response);
+        },
+        submitFeedback: async (feedbackData: any) => {
+            const response = await fetch(`${API_BASE}/feedback/submit/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(feedbackData),
-            }),
-        getUserFeedbackHistory: (userId: number) =>
-            fetch(`${API_BASE}/feedback/user/${userId}/`),
-        getUserEligibleServices: (userId: number) =>
-            fetch(`${API_BASE}/feedback/eligible-services/${userId}/`, {
+            });
+            return API.handleResponse(response);
+        },
+        getUserFeedbackHistory: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/feedback/user/${userId}/`);
+            return API.handleResponse(response);
+        },
+        getUserEligibleServices: async (userId: number) => {
+            const response = await fetch(`${API_BASE}/feedback/eligible-services/${userId}/`, {
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 }
-            }),
+            });
+            return API.handleResponse(response);
+        },
     },
 
     // Helper methods for common operations
     async handleResponse(response: Response) {
         if (!response.ok) {
+            let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+            
             try {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(
-                    errorData.error || errorData.detail || `API Error: ${response.status} ${response.statusText}`
-                );
-            } catch (e) {
-                if (e instanceof Error) {
-                    throw e;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.detail || errorMessage;
+                } else {
+                    const textError = await response.text();
+                    if (textError) errorMessage = textError;
                 }
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            } catch (parseError) {
+                console.error("Error parsing API error response:", parseError);
             }
+            
+            const error = new Error(errorMessage);
+            (error as any).status = response.status;
+            (error as any).response = response;
+            throw error;
         }
-        return await response.json();
+        
+        try {
+            return await response.json();
+        } catch (jsonError) {
+            // Handle empty responses or non-JSON responses
+            return {};
+        }
     },
 };

@@ -13,7 +13,7 @@ import EmptyState from '../components/feedback/EmptyState';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import HistoryIcon from '@mui/icons-material/History';
 import RateReviewIcon from '@mui/icons-material/RateReview';
-import {  FeedbackCategory,  ServiceWithOrderDetails, UserFeedbackHistory } from '../types/feedbackTypes';
+import { FeedbackCategory, ServiceWithOrderDetails, UserFeedbackHistory } from '../types/feedbackTypes';
 
 const FeedbackPage: React.FC = () => {
   const { user } = useAuth();
@@ -36,50 +36,8 @@ const FeedbackPage: React.FC = () => {
         setLoadingServices(true);
         setError('');
         
-        const response = await API.feedback.getUserEligibleServices(user.id);
+        const data = await API.feedback.getUserEligibleServices(user.id);
         
-        if (!response.ok) {
-          try {
-            const errorData = await response.json();
-            console.error('API response error:', errorData);
-            
-            if (errorData.error && errorData.error.includes("time_created")) {
-              console.log("Using fallback for eligible services due to time_created field error");
-              
-              const historyResponse = await API.feedback.getUserFeedbackHistory(user.id);
-              if (historyResponse.ok) {
-                const historyData = await historyResponse.json();
-                const serviceMap = new Map();
-                historyData.forEach((item: any) => {
-                  serviceMap.set(item.service_id, {
-                    id: item.service_id,
-                    name: item.service_name || 'Unknown Service',
-                    order_id: item.id || 0,
-                    order_details: `Service #${item.service_id}`,
-                    date: new Date().toISOString(),
-                    has_feedback: true
-                  });
-                });
-                
-                setServices(Array.from(serviceMap.values()));
-                setLoadingServices(false);
-                return;
-              }
-              
-              throw new Error(
-                "Unable to retrieve your eligible services due to a database field mismatch. Please contact the administrator."
-              );
-            } else {
-              throw new Error(`Failed to load services: ${response.status}`);
-            }
-          } catch (jsonError) {
-            const errorText = await response.text().catch(() => '');
-            console.error('API response error:', errorText);
-            throw new Error(`Failed to load services: ${response.status}`);
-          }
-        }
-        
-        const data = await response.json();
         const validatedData = Array.isArray(data) ? data.map(service => ({
           id: service.id || 0,
           name: service.name || 'Unknown Service',
@@ -90,10 +48,42 @@ const FeedbackPage: React.FC = () => {
         })) : [];
         
         setServices(validatedData);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching eligible services:', err);
-        setError(err.message || 'Failed to load services');
-        setServices([]);
+        
+        // Try to handle the time_created field error with a fallback approach
+        if (err instanceof Error && err.message.includes("time_created")) {
+          console.log("Using fallback for eligible services due to time_created field error");
+          
+          try {
+            // Use history as a fallback to get services
+            const historyData = await API.feedback.getUserFeedbackHistory(user.id);
+            const serviceMap = new Map();
+            
+            historyData.forEach((item: any) => {
+              serviceMap.set(item.service_id, {
+                id: item.service_id,
+                name: item.service_name || 'Unknown Service',
+                order_id: item.id || 0,
+                order_details: `Service #${item.service_id}`,
+                date: new Date().toISOString(),
+                has_feedback: true
+              });
+            });
+            
+            setServices(Array.from(serviceMap.values()));
+          } catch (fallbackErr) {
+            setError(
+              "Unable to retrieve your eligible services due to a database field mismatch. Please contact the administrator."
+            );
+          }
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load services');
+        }
+        
+        if (!services.length) {
+          setServices([]);
+        }
       } finally {
         setLoadingServices(false);
       }
@@ -108,15 +98,10 @@ const FeedbackPage: React.FC = () => {
       
       try {
         setLoadingHistory(true);
-        const response = await API.feedback.getUserFeedbackHistory(user.id);
         
-        if (!response.ok) {
-          throw new Error(`Failed to load feedback history: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = await API.feedback.getUserFeedbackHistory(user.id);
         setFeedbackHistory(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching feedback history:', err);
       } finally {
         setLoadingHistory(false);
@@ -130,17 +115,12 @@ const FeedbackPage: React.FC = () => {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const response = await API.feedback.getCategories();
         
-        if (!response.ok) {
-          throw new Error(`Failed to load categories: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = await API.feedback.getCategories();
         setCategories(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error fetching categories:', err);
-        setError(err.message || 'Failed to load categories');
+        setError(err instanceof Error ? err.message : 'Failed to load categories');
       } finally {
         setLoadingCategories(false);
       }
@@ -157,7 +137,7 @@ const FeedbackPage: React.FC = () => {
     setSelectedService(service);
   };
 
-  const handleSubmitSuccess = () => {
+  const handleSubmitSuccess = async () => {
     if (user?.id) {
       setServices(prevServices => 
         prevServices.map(service => 
@@ -167,13 +147,13 @@ const FeedbackPage: React.FC = () => {
         )
       );
       
-      API.feedback.getUserFeedbackHistory(user.id)
-        .then(response => response.json())
-        .then(data => {
-          setFeedbackHistory(data);
-          setActiveTab(1);
-        })
-        .catch(err => console.error('Error refreshing feedback history:', err));
+      try {
+        const data = await API.feedback.getUserFeedbackHistory(user.id);
+        setFeedbackHistory(data);
+        setActiveTab(1);
+      } catch (err) {
+        console.error('Error refreshing feedback history:', err);
+      }
     }
   };
 
