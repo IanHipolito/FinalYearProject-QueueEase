@@ -77,3 +77,25 @@ export interface FeedbackTableProps {
 export interface FrequentServicesChartProps {
   services: ServiceData[];
 }
+
+export interface InsightItem {
+  id: string;
+  title: string;
+  description: string;
+  severity: 'positive' | 'negative' | 'neutral' | 'warning';
+  recommendations?: string[];
+  metric?: string;
+  change?: string;
+  icon?: React.ReactNode;
+}
+
+export interface InsightsSectionProps {
+  analyticsData: AnalyticsData;
+  timeRange: string;
+}
+
+export interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}

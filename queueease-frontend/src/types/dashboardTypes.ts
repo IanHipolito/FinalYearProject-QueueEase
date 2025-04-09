@@ -35,7 +35,6 @@ export interface LatestOrdersListProps {
   isImmediateService: () => boolean;
   onRefresh: () => void;
   onOrderClick: (order: Order) => void;
-  onViewAll: () => void;
   getStatusColor: (status?: string) => string;
 }
 

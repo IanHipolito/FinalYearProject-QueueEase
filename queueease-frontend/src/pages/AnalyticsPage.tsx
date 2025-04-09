@@ -3,11 +3,12 @@ import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
-import { Box, Grid, Typography, SelectChangeEvent } from '@mui/material';
+import { Box, Grid, Typography, SelectChangeEvent, Tabs, Tab, Paper } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';
-import { AnalyticsData } from 'types/analyticsTypes';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import { AnalyticsData, TabPanelProps } from 'types/analyticsTypes';
 import StatisticCard from '../components/analytics/StatisticCard';
 import FeedbackDistributionChart from '../components/analytics/FeedbackDistributionChart';
 import SatisfactionDonutChart from '../components/analytics/SatisfactionDonutChart';
@@ -15,6 +16,35 @@ import FeedbackTable from '../components/analytics/FeedbackTable';
 import CustomerComments from '../components/analytics/CustomerComments';
 import SentimentTrendChart from '../components/analytics/SentimentTrendChart';
 import FeedbackKeywordCloud from '../components/analytics/FeedbackKeywordCloud';
+import InsightsSection from '../components/analytics/InsightsSection';
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`analytics-tabpanel-${index}`}
+      aria-labelledby={`analytics-tab-${index}`}
+      {...other}
+      style={{ paddingTop: '16px' }}
+    >
+      {value === index && (
+        <Box>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `analytics-tab-${index}`,
+    'aria-controls': `analytics-tabpanel-${index}`,
+  };
+}
 
 const AnalyticsPage: React.FC = () => {
   const { currentService } = useAuth();
@@ -22,11 +52,12 @@ const AnalyticsPage: React.FC = () => {
   const [error, setError] = useState('');
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState('month');
   const [commentFilter, setCommentFilter] = useState('recent');
+  const [activeTab, setActiveTab] = useState(0);
   
   // Separate state for sentiment trend
   const [sentimentTrendData, setSentimentTrendData] = useState<number[]>([]);
 
-  // Updated analyticsData initial state to include our new keys
+  // analyticsData initial state
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     feedback_distribution: [],
     customer_comments: [],
@@ -45,10 +76,14 @@ const AnalyticsPage: React.FC = () => {
     feedback_distribution: feedbackData,
     customer_comments: customerFeedback,
     total_reports: totalReports,
-    satisfied_pct, // our customer satisfaction percentage
+    satisfied_pct,
     average_wait_time: averageWaitTime,
     feedback_keywords: keywordData
   } = analyticsData;
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
 
   // Separate fetch for sentiment trend remains unchanged
   const fetchSentimentTrend = useCallback(async () => {
@@ -136,79 +171,125 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
-      <Typography variant="h5" fontWeight="500" gutterBottom>
-        Analytics
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" fontWeight="500">
+          Analytics
+        </Typography>
+      </Box>
 
       {error && <ErrorDisplay error={error} onRetry={() => setAnalyticsTimeRange(analyticsTimeRange)} />}
 
-      {/* Top Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <StatisticCard
-            title="Total Feedback Reports"
-            value={totalReports}
-            icon={<FeedbackIcon />}
-            bgGradient="linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
+      <Paper sx={{ mb: 3, borderRadius: 2 }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange} 
+          aria-label="analytics tabs"
+          sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            '& .MuiTab-root': { 
+              minHeight: 64,
+              fontWeight: 500
+            },
+            '& .Mui-selected': {
+              color: theme => theme.palette.primary.main
+            }
+          }}
+        >
+          <Tab 
+            icon={<AssessmentIcon />} 
+            label="Overview" 
+            iconPosition="start"
+            sx={{ '& .MuiTab-iconWrapper': { mr: 1 } }}
+            {...a11yProps(0)} 
           />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <StatisticCard
-            title="Customer Satisfaction"
-            value={`${satisfied_pct}%`}
-            icon={<InsightsIcon />}
-            bgGradient="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
+          <Tab 
+            icon={<LightbulbIcon />} 
+            label="Insights" 
+            iconPosition="start"
+            sx={{ '& .MuiTab-iconWrapper': { mr: 1 } }}
+            {...a11yProps(1)} 
           />
+        </Tabs>
+      </Paper>
+
+      <TabPanel value={activeTab} index={0}>
+        {/* Top Stats Cards */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <StatisticCard
+              title="Total Feedback Reports"
+              value={totalReports}
+              icon={<FeedbackIcon />}
+              bgGradient="linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)"
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <StatisticCard
+              title="Customer Satisfaction"
+              value={`${satisfied_pct}%`}
+              icon={<InsightsIcon />}
+              bgGradient="linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)"
+            />
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <StatisticCard
+              title="Average Wait Time"
+              value={`${averageWaitTime} min`}
+              icon={<AssessmentIcon />}
+              bgGradient="linear-gradient(135deg, #198754 0%, #28a745 100%)"
+            />
+          </Grid>
         </Grid>
 
-        <Grid item xs={12} md={4}>
-          <StatisticCard
-            title="Average Wait Time"
-            value={`${averageWaitTime} min`}
-            icon={<AssessmentIcon />}
-            bgGradient="linear-gradient(135deg, #198754 0%, #28a745 100%)"
-          />
-        </Grid>
-      </Grid>
+        {/* Charts Row */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={8}>
+            <SentimentTrendChart
+              data={sentimentTrendData}
+              timeRange={analyticsTimeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+            />
+          </Grid>
 
-      {/* Charts Row */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={8}>
-          <SentimentTrendChart
-            data={sentimentTrendData}
-            timeRange={analyticsTimeRange}
-            onTimeRangeChange={handleTimeRangeChange}
-          />
-        </Grid>
+          <Grid item xs={12} md={4}>
+            {/* Pass satisfied_pct into the donut chart */}
+            <SatisfactionDonutChart satisfactionRate={satisfied_pct} />
+          </Grid>
 
-        <Grid item xs={12} md={4}>
-          {/* Pass satisfied_pct into the donut chart */}
-          <SatisfactionDonutChart satisfactionRate={satisfied_pct} />
-        </Grid>
+          <Grid item xs={12} md={8}>
+            <FeedbackDistributionChart
+              data={feedbackData}
+              timeRange={analyticsTimeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+            />
+          </Grid>
 
-        <Grid item xs={12} md={8}>
-          <FeedbackDistributionChart
-            data={feedbackData}
-            timeRange={analyticsTimeRange}
-            onTimeRangeChange={handleTimeRangeChange}
-          />
+          <Grid item xs={12} md={4}>
+            <FeedbackKeywordCloud keywords={keywordData} />
+          </Grid>
         </Grid>
 
-        <Grid item xs={12} md={4}>
-          <FeedbackKeywordCloud keywords={keywordData} />
-        </Grid>
-      </Grid>
+        {/* Feedback Data Table */}
+        <FeedbackTable data={feedbackData} />
 
-      {/* Feedback Data Table */}
-      <FeedbackTable data={feedbackData} />
+        {/* Customer Feedback Comments */}
+        <CustomerComments
+          comments={filteredComments}
+          filter={commentFilter}
+          onFilterChange={handleCommentFilterChange}
+        />
+      </TabPanel>
 
-      {/* Customer Feedback Comments */}
-      <CustomerComments
-        comments={filteredComments}
-        filter={commentFilter}
-        onFilterChange={handleCommentFilterChange}
-      />
+      <TabPanel value={activeTab} index={1}>
+        {/* Insights Tab Content */}
+        <InsightsSection 
+          analyticsData={analyticsData} 
+          timeRange={analyticsTimeRange} 
+        />
+      </TabPanel>
     </Box>
   );
 };

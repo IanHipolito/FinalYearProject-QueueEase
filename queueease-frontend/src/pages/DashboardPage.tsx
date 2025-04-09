@@ -220,14 +220,6 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const handleViewAllOrders = () => {
-    if (isImmediateService()) {
-      console.log('View all queues clicked');
-    } else {
-      console.log('View all appointments clicked');
-    }
-  };
-
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
       <DashboardHeader 
@@ -302,7 +294,6 @@ const DashboardPage: React.FC = () => {
                 isImmediateService={isImmediateService}
                 onRefresh={handleRefreshData}
                 onOrderClick={handleOrderClick}
-                onViewAll={handleViewAllOrders}
                 getStatusColor={getStatusColor}
               />
             </Box>
