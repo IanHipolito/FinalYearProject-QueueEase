@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
-import { Box, Container, Typography, Paper, IconButton, Tab, Tabs, CircularProgress, Alert, useTheme } from '@mui/material';
+import { 
+  Box, Container, Typography, Paper, IconButton, Tab, Tabs, 
+  CircularProgress, Alert, useTheme, Pagination, 
+  Stack, FormControl, Select, MenuItem, SelectChangeEvent
+} from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { API } from '../services/api';
 import HistoryFilterBar from '../components/history/HistoryFilterBar';
@@ -20,9 +24,15 @@ const QueueHistory: React.FC = () => {
     // States
     const [history, setHistory] = useState<HistoryEntry[]>([]);
     const [filteredHistory, setFilteredHistory] = useState<HistoryEntry[]>([]);
+    const [displayedHistory, setDisplayedHistory] = useState<HistoryEntry[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [tabValue, setTabValue] = useState<string>('all');
+
+    // Pagination states
+    const [page, setPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [totalPages, setTotalPages] = useState(1);
 
     // Filters
     const [searchQuery, setSearchQuery] = useState<string>('');
@@ -65,7 +75,7 @@ const QueueHistory: React.FC = () => {
 
                 try {
                     queueData = await API.queues.getUserQueues(user.id);
-                    console.log("Successfully fetched queue history:", queueData);
+                    console.error("Successfully fetched queue history:", queueData);
                 } catch (error) {
                     queueError = "Error fetching queue history";
                     console.error(queueError, error);
@@ -73,7 +83,7 @@ const QueueHistory: React.FC = () => {
 
                 try {
                     appointmentData = await API.appointments.getAll(user.id);
-                    console.log("Successfully fetched appointments:", appointmentData);
+                    console.error("Successfully fetched appointments:", appointmentData);
                 } catch (error) {
                     appointmentError = "Error fetching appointments";
                     console.error(appointmentError, error);
@@ -113,6 +123,8 @@ const QueueHistory: React.FC = () => {
 
                 setHistory(combinedHistory);
                 setFilteredHistory(combinedHistory);
+                // Reset to first page when data changes
+                setPage(1);
 
                 // Set error state based on results
                 if (combinedHistory.length === 0) {
@@ -199,6 +211,8 @@ const QueueHistory: React.FC = () => {
         });
 
         setFilteredHistory(filtered);
+        // Reset to first page when filters change
+        setPage(1);
     }, [
         history,
         searchQuery,
@@ -211,6 +225,25 @@ const QueueHistory: React.FC = () => {
         sortOrder
     ]);
 
+    // Pagination effect - update displayed items based on current page
+    useEffect(() => {
+        // Calculate total pages
+        const calculatedTotalPages = Math.ceil(filteredHistory.length / itemsPerPage);
+        setTotalPages(calculatedTotalPages || 1); // Ensure at least 1 page even when empty
+        
+        // Get current page items
+        const startIndex = (page - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const currentPageItems = filteredHistory.slice(startIndex, endIndex);
+        
+        setDisplayedHistory(currentPageItems);
+        
+        // Handle case where current page is now out of bounds
+        if (page > calculatedTotalPages && calculatedTotalPages > 0) {
+            setPage(calculatedTotalPages);
+        }
+    }, [filteredHistory, page, itemsPerPage]);
+
     // Event handlers
     const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
         setTabValue(newValue);
@@ -218,6 +251,20 @@ const QueueHistory: React.FC = () => {
 
     const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(event.target.value);
+    };
+
+    const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+        setPage(value);
+        // Scroll to top of history list when page changes
+        window.scrollTo({
+            top: document.getElementById('history-list-container')?.offsetTop || 0,
+            behavior: 'smooth'
+        });
+    };
+
+    const handleItemsPerPageChange = (event: SelectChangeEvent<number>) => {
+        setItemsPerPage(event.target.value as number);
+        setPage(1); // Reset to first page when items per page changes
     };
 
     const handleViewDetails = useCallback((entry: HistoryEntry) => {
@@ -308,13 +355,13 @@ const QueueHistory: React.FC = () => {
         }
     }, [authenticated, user?.id, history]);
 
-    // Generate date groups for the filtered history
+    // Generate date groups for the displayed history (paginated)
     const dateGroups = React.useMemo(() => {
-        if (filteredHistory.length === 0) return {};
+        if (displayedHistory.length === 0) return {};
 
         const groups: { [key: string]: HistoryEntry[] } = {};
 
-        filteredHistory.forEach(entry => {
+        displayedHistory.forEach(entry => {
             const date = new Date(entry.date_created).toLocaleDateString();
             if (!groups[date]) {
                 groups[date] = [];
@@ -323,7 +370,7 @@ const QueueHistory: React.FC = () => {
         });
 
         return groups;
-    }, [filteredHistory]);
+    }, [displayedHistory]);
 
     // Show loading indicator during authentication check
     if (authLoading) {
@@ -425,40 +472,102 @@ const QueueHistory: React.FC = () => {
                     />
                 )}
 
-                {/* Loading indicator */}
-                {loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-                        <CircularProgress sx={{ color: theme.palette.primary.main }} />
-                    </Box>
-                ) : filteredHistory.length === 0 ? (
-                    <Paper
-                        sx={{
-                            p: 4,
-                            borderRadius: 3,
-                            textAlign: 'center',
-                            bgcolor: 'white'
-                        }}
-                    >
-                        <Typography variant="h6" color="text.secondary" gutterBottom>
-                            No history found
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || serviceTypeFilter !== 'all' || startDate || endDate ?
-                                'Try adjusting your filters to see more results.' :
-                                'You have not joined any queues or booked any appointments yet.'
-                            }
-                        </Typography>
-                    </Paper>
-                ) : (
-                    <HistoryList
-                        dateGroups={dateGroups}
-                        handleViewDetails={handleViewDetails}
-                        formatDate={formatDate}
-                        formatTime={formatTime}
-                        filteredHistory={filteredHistory}
-                        onRefresh={refreshData}
-                    />
-                )}
+                {/* History List Container with ID for scroll targeting */}
+                <Box id="history-list-container">
+                    {/* Loading indicator */}
+                    {loading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+                            <CircularProgress sx={{ color: theme.palette.primary.main }} />
+                        </Box>
+                    ) : filteredHistory.length === 0 ? (
+                        <Paper
+                            sx={{
+                                p: 4,
+                                borderRadius: 3,
+                                textAlign: 'center',
+                                bgcolor: 'white'
+                            }}
+                        >
+                            <Typography variant="h6" color="text.secondary" gutterBottom>
+                                No history found
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || serviceTypeFilter !== 'all' || startDate || endDate ?
+                                    'Try adjusting your filters to see more results.' :
+                                    'You have not joined any queues or booked any appointments yet.'
+                                }
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <>
+                            <HistoryList
+                                dateGroups={dateGroups}
+                                handleViewDetails={handleViewDetails}
+                                formatDate={formatDate}
+                                formatTime={formatTime}
+                                filteredHistory={displayedHistory} // Use paginated history
+                                onRefresh={refreshData}
+                            />
+                            
+                            {/* Pagination Controls */}
+                            {filteredHistory.length > 0 && (
+                                <Paper
+                                    sx={{
+                                        p: 2,
+                                        mt: 3,
+                                        borderRadius: 3,
+                                        bgcolor: 'white',
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 2
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Showing {Math.min((page - 1) * itemsPerPage + 1, filteredHistory.length)}-
+                                            {Math.min(page * itemsPerPage, filteredHistory.length)} of {filteredHistory.length} items
+                                        </Typography>
+                                        
+                                        <FormControl variant="outlined" size="small" sx={{ minWidth: 80 }}>
+                                            <Select
+                                                value={itemsPerPage}
+                                                onChange={handleItemsPerPageChange}
+                                                displayEmpty
+                                                sx={{ height: 36 }}
+                                            >
+                                                <MenuItem value={5}>5</MenuItem>
+                                                <MenuItem value={10}>10</MenuItem>
+                                                <MenuItem value={25}>25</MenuItem>
+                                                <MenuItem value={50}>50</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                    
+                                    <Pagination 
+                                        count={totalPages}
+                                        page={page}
+                                        onChange={handlePageChange}
+                                        color="primary"
+                                        size="medium"
+                                        showFirstButton
+                                        showLastButton
+                                        sx={{ 
+                                            '& .MuiPaginationItem-root': {
+                                                color: theme.palette.text.primary,
+                                            },
+                                            '& .Mui-selected': {
+                                                bgcolor: `${theme.palette.primary.main} !important`,
+                                                color: 'white !important'
+                                            }
+                                        }}
+                                    />
+                                </Paper>
+                            )}
+                        </>
+                    )}
+                </Box>
             </Container>
         </Box>
     );

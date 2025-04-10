@@ -105,7 +105,19 @@ const UserMainPage: React.FC = () => {
         if (!user) return;
         
         const data = await API.queues.getActive(user.id);
+        
+        // If data is null, it means no active queue (expected state)
+        if (!data) {
+          setActiveQueue(null);
+          if (isInitialLoad) {
+            setInitialLoading(false);
+          } else {
+            setRefreshing(false);
+          }
+          return;
+        }
 
+        // If we get here, we have active queue data
         if (data && data.queue_id && data.current_position !== undefined) {
           const basicQueue = {
             ...(activeQueue || {}),

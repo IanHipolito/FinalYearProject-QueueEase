@@ -445,12 +445,21 @@ def complete_queue(request, queue_id):
     
 @api_view(['GET'])
 def active_queue(request, user_id):
+    # Look for active queue
     queue_item = Queue.objects.filter(user_id=user_id, status='pending', is_active=True).order_by('date_created').first()
-    if not queue_item:
-        return Response({"message": "No active queue found"}, status=404)
     
+    # If no active queue found, return a successful response with clear indication
+    if not queue_item:
+        return Response({
+            "queue_found": False,
+            "message": "No active queue found for this user"
+        }, status=200)  # Return 200 OK
+    
+    # If queue found, return the queue data
     data = {
+        "queue_found": True,
         "queue_id": queue_item.id,
+        "service_id": queue_item.service.id,
         "service_name": queue_item.service.name,
         "current_position": Queue.objects.filter(
             service=queue_item.service,
@@ -651,41 +660,6 @@ def leave_queue(request, queue_id):
             update_service_queue_status(service_queue.id)
         
         return Response({"message": "Successfully left the queue"})
-        
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-@api_view(['POST'])
-def check_and_complete_queue(request, queue_id):
-    try:
-        queue_item = get_object_or_404(Queue, id=queue_id)
-        
-        if queue_item.status != 'pending':
-            return Response({
-                "message": "Queue is already processed",
-                "status": queue_item.status
-            })
-        
-        # Check if the expected_ready_time has passed
-        if queue_item.expected_ready_time and queue_item.expected_ready_time <= timezone.now():
-            queue_item.status = 'completed'
-            queue_item.save()
-            
-            # Record wait time for analytics
-            if queue_item.date_created:
-                wait_time = int((queue_item.expected_ready_time - queue_item.date_created).total_seconds() / 60)
-                ServiceWaitTime.objects.create(service=queue_item.service, wait_time=wait_time)
-            
-            return Response({
-                "message": "Queue automatically marked as completed", 
-                "status": "completed"
-            })
-            
-        return Response({
-            "message": "Queue is still pending",
-            "status": "pending",
-            "remaining_time": int((queue_item.expected_ready_time - timezone.now()).total_seconds())
-        })
         
     except Exception as e:
         return Response({"error": str(e)}, status=500)

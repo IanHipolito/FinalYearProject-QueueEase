@@ -7,11 +7,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Initialize Firebase Admin SDK - use environment variable for credentials path in production
+# Initialize Firebase Admin SDK
 FIREBASE_CREDENTIAL_PATH = os.environ.get('FIREBASE_CREDENTIAL_PATH')
 if not FIREBASE_CREDENTIAL_PATH:
     logger.warning("FIREBASE_CREDENTIAL_PATH not set in environment variables")
-    
+
 def get_firebase_credentials():
     """Get Firebase credentials safely parsing JSON content"""
     try:

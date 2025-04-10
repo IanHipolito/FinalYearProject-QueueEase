@@ -235,11 +235,32 @@ export const API = {
     // Queue management
     queues: {
         getActive: async (userId: number) => {
-            const response = await fetch(`${API_BASE}/active-queue/${userId}/`, {
-                headers: getCommonHeaders(),
-                credentials: 'include', 
-            });
-            return API.handleResponse(response);
+            try {
+                const response = await fetch(`${API_BASE}/active-queue/${userId}/`, {
+                    headers: getCommonHeaders(),
+                    credentials: 'include', 
+                });
+                
+                const data = await response.json();
+                
+                // If the response indicates no queue found, return null
+                if (response.ok && data && data.queue_found === false) {
+                    console.log(`No active queue for user ${userId} (expected state)`);
+                    return null;
+                }
+                
+                // For actual errors, throw
+                if (!response.ok) {
+                    const error = new Error(data.error || data.message || `API Error: ${response.status}`);
+                    (error as any).status = response.status;
+                    throw error;
+                }
+                
+                return data;
+            } catch (error) {
+                console.error("Error in getActive:", error);
+                throw error;
+            }
         },
         getDetails: async (queueId: number) => {
             const response = await fetch(`${API_BASE}/queue-detail/${queueId}/`, {

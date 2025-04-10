@@ -184,7 +184,6 @@ const SuccessPage: React.FC = () => {
 
   useEffect(() => {
     if (remainingTime <= 0 && queueData && queueData.status === 'pending' && !completionTriggered) {
-      // When timer reaches zero, call the check_and_complete_queue endpoint
       setCompletionTriggered(true);
       
       API.queues.completeQueue(queueData.queue_id)

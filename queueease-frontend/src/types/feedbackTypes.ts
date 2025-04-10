@@ -17,6 +17,15 @@ export interface FeedbackData {
   sentiment?: string;
 }
 
+export interface FilterBarProps {
+  searchQuery: string;
+  showDateFilter: boolean;
+  handleSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  toggleDateFilter: () => void;
+  clearFilters: () => void;
+  hasActiveFilters: boolean;
+}
+
 export interface UserFeedbackHistory {
   id: number;
   service_name: string;

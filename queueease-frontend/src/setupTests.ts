@@ -37,7 +37,6 @@ jest.mock('mapbox-gl', () => ({
   AttributionControl: jest.fn(),
 }));
 
-// MOST IMPORTANT SECTION - override the console.error before any tests run
 // This completely prevents the React act() warning from being displayed
 const originalConsoleError = console.error;
 console.error = function (message: any, ...args: any[]) {

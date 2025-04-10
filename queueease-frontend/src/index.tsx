@@ -6,6 +6,13 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 
+// const noop = () => {};
+// console.log = noop;
+// console.error = noop;
+// console.warn = noop;
+// console.info = noop;
+// console.debug = noop;
+
 // Register service worker for PWA (for push notifications)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
