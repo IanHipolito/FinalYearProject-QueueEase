@@ -3,8 +3,6 @@ import {
   TableContainer, Paper, Table, TableHead, TableRow, 
   TableCell, TableBody, Chip, IconButton,Tooltip
 } from '@mui/material';
-import ToggleOnIcon from '@mui/icons-material/ToggleOn';
-import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 import { TableSkeleton } from '../skeletons/LoadingSkeletons';
 import { QueueTableProps } from 'types/queueTypes';
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
-import { Grid, Alert, Snackbar, Typography, Stack, useTheme } from '@mui/material';
+import { Grid, Alert, Snackbar, Typography, Stack, useTheme, CircularProgress, Box } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PageContainer from '../components/common/PageContainer';
 import PageHeader from '../components/common/PageHeader';
@@ -12,8 +12,11 @@ import AppointmentCard from '../components/appointments/AppointmentCard';
 import { formatDate } from '../utils/formatters';
 import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
 import { Appointment } from 'types/appointmentTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const AppointmentsList: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard();
+  
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,15 +29,38 @@ const AppointmentsList: React.FC = () => {
   const theme = useTheme();
 
   useEffect(() => {
+    // Only fetch appointments if user is authenticated
+    if (!authenticated || !user?.id) return;
+    
     const fetchAppointments = async () => {
-      if (!user) return;
-      
       try {
         setLoading(true);
         
+        // First check and update appointment status
+        try {
+          await API.appointments.checkAndUpdateAppointments();
+        } catch (checkError) {
+          console.warn('Error checking appointments status:', checkError);
+        }
+        
         const data = await API.appointments.getAll(user.id);
         
-        setAppointments(data);
+        // Add type safety by ensuring data is an array
+        if (Array.isArray(data)) {
+          setAppointments(data.map(appointment => ({
+            ...appointment,
+            // Ensure required fields exist with defaults
+            order_id: appointment.order_id || `APT-${Math.random().toString(36).substr(2, 9)}`,
+            service_name: appointment.service_name || 'Unknown Service',
+            appointment_date: appointment.appointment_date || new Date().toISOString().split('T')[0],
+            appointment_time: appointment.appointment_time || '12:00',
+            status: appointment.status || 'pending'
+          })));
+        } else {
+          // Handle case where API doesn't return an array
+          setAppointments([]);
+          throw new Error('Invalid data format received from server');
+        }
       } catch (err) {
         console.error('Error fetching appointments:', err);
         setAlert({
@@ -48,13 +74,20 @@ const AppointmentsList: React.FC = () => {
     };
     
     fetchAppointments();
-  }, [user]);
+  }, [authenticated, user?.id]);
 
   const handleViewDetails = (orderId: string) => {
     navigate(`/appointment/${orderId}`);
   };
 
   const handleRemoveAppointment = async (orderId: string) => {
+    // Confirm deletion with the user for better UX
+    const confirmDelete = window.confirm(
+      'Are you sure you want to remove this appointment? This action cannot be undone.'
+    );
+    
+    if (!confirmDelete) return;
+    
     try {
       await API.appointments.deleteAppointment(orderId);
       
@@ -81,6 +114,15 @@ const AppointmentsList: React.FC = () => {
     setAlert({...alert, open: false});
   };
 
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress size={40} sx={{ color: theme.palette.primary.main }} />
+      </Box>
+    );
+  }
+
   return (
     <PageContainer maxWidth="md">
       <PageHeader title="Your Appointments" backUrl="/usermainpage" />
@@ -98,7 +140,6 @@ const AppointmentsList: React.FC = () => {
           >
             Add Appointment
           </StyledButton>
-          {/* Remove the Generate Demo Appointments button */}
         </Stack>
       </StyledCard>
 
@@ -119,7 +160,6 @@ const AppointmentsList: React.FC = () => {
             No appointments found
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            {/* Message */}
             Add a new appointment to get started.
           </Typography>
         </StyledCard>

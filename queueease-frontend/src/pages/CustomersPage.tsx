@@ -3,7 +3,7 @@ import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import {
   Box, Typography, Grid, Card, CardContent, Skeleton,
-  Snackbar, Alert, TableRow, TableCell,
+  Snackbar, Alert, TableRow, TableCell, CircularProgress
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
@@ -14,8 +14,11 @@ import CustomerFilters from '../components/customers/CustomerFilters';
 import CustomerTable from '../components/customers/CustomerTable';
 import CustomerDetailsDialog from '../components/customers/CustomerDetailsDialog';
 import { Customer, CustomerStats } from '../types/customerTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const CustomersPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard({});
+  
   const { currentService } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,9 @@ const CustomersPage: React.FC = () => {
   
   // Fetch customer data for the current service
   useEffect(() => {
+    // Only fetch if user is authenticated
+    if (!authenticated) return;
+    
     const fetchCustomers = async () => {
       if (!currentService?.id) {
         setLoading(false);
@@ -89,7 +95,7 @@ const CustomersPage: React.FC = () => {
     };
     
     fetchCustomers();
-  }, [currentService?.id]);
+  }, [currentService?.id, authenticated]);
   
   // Filter customers based on search term and status filter
   const filteredCustomers = customers.filter(customer => {
@@ -154,7 +160,7 @@ const CustomersPage: React.FC = () => {
   );
 
   const handleRetry = async () => {
-    if (!currentService?.id) return;
+    if (!authenticated || !currentService?.id) return;
     
     setLoading(true);
     setError('');
@@ -185,6 +191,25 @@ const CustomersPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} />
+        <Typography variant="body1" color="text.secondary">
+          Loading customer data...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>

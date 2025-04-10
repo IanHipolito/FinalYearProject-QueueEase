@@ -4,15 +4,16 @@ import {
   FormControlLabel, Divider, Chip, CircularProgress, Alert, Snackbar
 } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
-import SettingsIcon from '@mui/icons-material/Settings';
 import TimerIcon from '@mui/icons-material/Timer';
 import SaveIcon from '@mui/icons-material/Save';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const NotificationsPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard({});
+  
   const { currentService } = useAuth();
   const [frequency, setFrequency] = useState<number>(5);
   const [messageTemplate, setMessageTemplate] = useState<string>('');
@@ -27,53 +28,91 @@ const NotificationsPage: React.FC = () => {
 
   // Wrap loadSettings with useCallback to memoize it
   const loadSettings = useCallback(async () => {
-    if (!currentService?.id) return;
+    if (!authenticated || !currentService?.id) return;
     
     setLoading(true);
     try {
       const data = await API.admin.getNotificationSettings(currentService.id);
       
-      setFrequency(data.frequency_minutes);
-      setMessageTemplate(data.message_template);
-      setEnabled(data.is_enabled);
+      // Update state with fetched settings
+      setFrequency(data.frequency_minutes || 5);
+      setMessageTemplate(data.template_message || '');
+      setEnabled(data.enabled === undefined ? true : data.enabled);
     } catch (error) {
       console.error('Error loading notification settings:', error);
-      
-      // Set default values if we couldn't load settings
-      setFrequency(5);
-      setMessageTemplate("Your order is in queue. Position: {queue_position}, remaining time: {remaining_time} minutes.");
-      setEnabled(true);
-      
-      // Only show error if it's not a 404
-      if (error instanceof Error && (error as any).status !== 404) {
-        setAlert({
-          open: true,
-          message: error.message || 'Failed to load notification settings',
-          severity: 'error'
-        });
-      }
+      setAlert({
+        open: true,
+        message: error instanceof Error ? error.message : 'Failed to load notification settings',
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
-  }, [currentService?.id]);
+  }, [currentService?.id, authenticated]);
 
-  // Add loadSettings to the useEffect dependencies
+  // Load notification settings on component mount
   useEffect(() => {
-    if (currentService) {
-      loadSettings();
-    }
-  }, [currentService, loadSettings]);
+    if (!authenticated) return;
+    loadSettings();
+  }, [loadSettings, authenticated]);
 
-  const handleSave = async () => {
-    if (!currentService?.id) return;
+  // Placeholder variables for message template
+  const sampleVariables = [
+    { name: '{{customer_name}}', description: 'Customer\'s name' },
+    { name: '{{queue_position}}', description: 'Current position in queue' },
+    { name: '{{expected_wait}}', description: 'Expected wait time' },
+    { name: '{{service_name}}', description: 'Name of the service' }
+  ];
+
+  // Handle frequency change
+  const handleFrequencyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(event.target.value);
+    if (value > 0) {
+      setFrequency(value);
+    }
+  };
+
+  // Toggle enabled state
+  const handleToggleEnabled = () => {
+    setEnabled(!enabled);
+  };
+
+  // Handle template message change
+  const handleMessageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setMessageTemplate(event.target.value);
+  };
+
+  // Insert variable into message template
+  const insertVariable = (variable: string) => {
+    setMessageTemplate(prev => {
+      // Get cursor position or end of message
+      const cursorPosition = document.activeElement === document.getElementById('message-template')
+        ? (document.activeElement as HTMLInputElement).selectionStart || prev.length
+        : prev.length;
+      
+      // Insert variable at cursor position
+      return prev.substring(0, cursorPosition) + variable + prev.substring(cursorPosition);
+    });
+  };
+
+  // Handle save notification settings
+  const handleSaveSettings = async () => {
+    if (!authenticated || !currentService?.id) {
+      setAlert({
+        open: true,
+        message: 'Authentication required to save settings',
+        severity: 'error'
+      });
+      return;
+    }
     
     setSaveLoading(true);
     try {
-      const response = await API.admin.updateNotificationSettings({
+      await API.admin.updateNotificationSettings({
         service_id: currentService.id,
-        is_enabled: enabled,
         frequency_minutes: frequency,
-        message_template: messageTemplate
+        template_message: messageTemplate,
+        enabled: enabled
       });
       
       setAlert({
@@ -81,14 +120,11 @@ const NotificationsPage: React.FC = () => {
         message: 'Notification settings saved successfully',
         severity: 'success'
       });
-      
-      // Refresh settings to ensure the latest
-      await loadSettings();
     } catch (error) {
       console.error('Error saving notification settings:', error);
       setAlert({
         open: true,
-        message: error instanceof Error ? error.message : 'An error occurred while saving settings',
+        message: error instanceof Error ? error.message : 'Failed to save notification settings',
         severity: 'error'
       });
     } finally {
@@ -96,14 +132,26 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
+  // Handle close alert
   const handleCloseAlert = () => {
-    setAlert({...alert, open: false});
+    setAlert(prev => ({ ...prev, open: false }));
   };
 
-  if (loading) {
+  // Show loading state during auth check
+  if (authLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} />
+        <Typography variant="body1" color="text.secondary">
+          Loading notification settings...
+        </Typography>
       </Box>
     );
   }
@@ -111,211 +159,209 @@ const NotificationsPage: React.FC = () => {
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>
       <Typography variant="h5" fontWeight="500" gutterBottom>
-        Push Notifications
+        Notification Settings
       </Typography>
-
-      {/* Top Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        {/* Notifications Stats Card */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ 
-            borderRadius: 4, 
-            background: 'linear-gradient(135deg, #6f42c1 0%, #8551d9 100%)',
-            color: '#fff',
-            overflow: 'visible',
-            position: 'relative',
-            height: '100%'
-          }}>
-            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
-                  <NotificationsIcon />
-                </Box>
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="h3" fontWeight="bold">
-                  {enabled ? 'Active' : 'Inactive'}
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
-                  Notification Status
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Frequency Card */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ 
-            borderRadius: 4, 
-            background: 'linear-gradient(135deg, #0d6efd 0%, #3d8bfd 100%)',
-            color: '#fff',
-            height: '100%',
-            position: 'relative',
-          }}>
-            <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Box sx={{ bgcolor: 'rgba(255,255,255,0.1)', p: 1, borderRadius: 2 }}>
-                  <TimerIcon />
-                </Box>
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="h3" fontWeight="bold">
-                  {frequency} min
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>
-                  Notification Frequency
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Settings Card */}
-      <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+      
+      <Card sx={{ borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-            <SettingsIcon sx={{ mr: 1, color: '#6f42c1' }} />
+            <NotificationsIcon sx={{ mr: 1, color: '#6f42c1' }} />
             <Typography variant="h6" fontWeight="500">
-              Push Notification Configuration
+              Queue Notifications
             </Typography>
           </Box>
           
-          <Divider sx={{ mb: 4 }} />
-
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={6}>
-              <FormControlLabel
-                control={
-                  <Switch 
-                    checked={enabled} 
-                    onChange={(e) => setEnabled(e.target.checked)}
-                    color="primary"
+          <Divider sx={{ mb: 3 }} />
+          
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={enabled} 
+                      onChange={handleToggleEnabled} 
+                      color="primary"
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': {
+                          color: '#6f42c1',
+                          '&:hover': {
+                            backgroundColor: 'rgba(111, 66, 193, 0.08)',
+                          },
+                        },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          backgroundColor: '#6f42c1',
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography fontWeight="500">
+                      {enabled ? 'Notifications Enabled' : 'Notifications Disabled'}
+                    </Typography>
+                  }
+                />
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body1" fontWeight="500" gutterBottom>
+                    Notification Frequency
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    How often to send position updates to waiting customers
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
+                  <TimerIcon sx={{ color: 'text.secondary', mr: 1, my: 0.5 }} />
+                  <TextField
+                    id="frequency-input"
+                    label="Minutes between notifications"
+                    type="number"
+                    variant="outlined"
+                    value={frequency}
+                    onChange={handleFrequencyChange}
+                    InputProps={{
+                      inputProps: { min: 1 }
+                    }}
                     sx={{ 
-                      '& .MuiSwitch-switchBase.Mui-checked': {
-                        color: '#6f42c1',
-                      },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                        backgroundColor: '#8551d9',
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2
                       }
                     }}
                   />
-                }
-                label={
-                  <Typography variant="subtitle1" fontWeight="500">
-                    Enable Push Notifications
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Box sx={{ p: 2, bgcolor: 'rgba(111, 66, 193, 0.08)', borderRadius: 2, height: '100%', display: 'flex', alignItems: 'center' }}>
+                  <InfoOutlinedIcon sx={{ mr: 2, color: '#6f42c1' }} />
+                  <Typography variant="body2">
+                    Shorter intervals will keep customers better informed but may increase server load and notification fatigue.
                   </Typography>
-                }
-                sx={{ mb: 3 }}
-              />
+                </Box>
+              </Grid>
               
-              <TextField
-                label="Notification Frequency (minutes)"
-                type="number"
-                value={frequency}
-                onChange={(e) => setFrequency(parseInt(e.target.value) || 0)}
-                fullWidth
-                variant="outlined"
-                InputProps={{
-                  endAdornment: <Box component="span" sx={{ color: 'text.secondary' }}>minutes</Box>,
-                }}
-                sx={{ 
-                  mb: 3,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              
-              <Box sx={{ 
-                bgcolor: '#e3f2fd', 
-                p: 2, 
-                borderRadius: 2, 
-                display: 'flex',
-                alignItems: 'flex-start',
-                mb: 3
-              }}>
-                <InfoOutlinedIcon sx={{ color: '#2196f3', mr: 1 }} />
-                <Typography variant="body2" color="text.secondary">
-                  Setting the frequency too low may lead to customers receiving too many notifications. 
-                  We recommend a minimum of 5 minutes between notifications.
+              <Grid item xs={12}>
+                <Typography variant="body1" fontWeight="500" gutterBottom>
+                  Message Template
                 </Typography>
-              </Box>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Customize the notification message sent to customers
+                </Typography>
+                
+                <TextField
+                  id="message-template"
+                  multiline
+                  rows={4}
+                  value={messageTemplate}
+                  onChange={handleMessageChange}
+                  fullWidth
+                  variant="outlined"
+                  placeholder="Hello {{customer_name}}, your current position is {{queue_position}}. Estimated waiting time: {{expected_wait}} minutes."
+                  sx={{ 
+                    mt: 1,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2
+                    }
+                  }}
+                />
+                
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" gutterBottom>
+                    Available variables:
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                    {sampleVariables.map((variable) => (
+                      <Chip
+                        key={variable.name}
+                        label={variable.name}
+                        onClick={() => insertVariable(variable.name)}
+                        title={variable.description}
+                        sx={{
+                          backgroundColor: 'rgba(111, 66, 193, 0.1)',
+                          color: '#6f42c1',
+                          '&:hover': {
+                            backgroundColor: 'rgba(111, 66, 193, 0.2)',
+                          },
+                          fontFamily: 'monospace'
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: 'rgba(25, 118, 210, 0.08)', 
+                  borderRadius: 2, 
+                  mb: 2, 
+                  display: 'flex', 
+                  alignItems: 'flex-start' 
+                }}>
+                  <InfoOutlinedIcon sx={{ mr: 2, mt: 0.5, color: '#1976d2' }} />
+                  <Box>
+                    <Typography variant="body2">
+                      <strong>Preview:</strong> Here's how your message will look with sample data:
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        mt: 1, 
+                        p: 1.5, 
+                        bgcolor: 'white', 
+                        borderRadius: 1,
+                        border: '1px dashed rgba(0, 0, 0, 0.1)'
+                      }}
+                    >
+                      {messageTemplate
+                        .replace('{{customer_name}}', 'John Doe')
+                        .replace('{{queue_position}}', '3')
+                        .replace('{{expected_wait}}', '12')
+                        .replace('{{service_name}}', currentService?.name || 'Our Service')
+                      }
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+              
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={saveLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                    onClick={handleSaveSettings}
+                    disabled={saveLoading}
+                    sx={{ 
+                      borderRadius: 2, 
+                      bgcolor: '#6f42c1',
+                      '&:hover': {
+                        bgcolor: '#8551d9',
+                      },
+                      px: 3
+                    }}
+                  >
+                    {saveLoading ? 'Saving...' : 'Save Settings'}
+                  </Button>
+                </Box>
+              </Grid>
             </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1" fontWeight="500" gutterBottom>
-                Message Template
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Customize the notification message sent to customers. You can use the following variables:
-              </Typography>
-              
-              <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Chip label="{queue_position}" color="primary" size="small" />
-                <Chip label="{remaining_time}" color="primary" size="small" />
-                <Chip label="{queue_name}" color="primary" size="small" />
-                <Chip label="{customer_name}" color="primary" size="small" />
-              </Box>
-              
-              <TextField
-                multiline
-                rows={6}
-                value={messageTemplate}
-                onChange={(e) => setMessageTemplate(e.target.value)}
-                fullWidth
-                variant="outlined"
-                placeholder="Enter your notification message template here..."
-                sx={{ 
-                  mb: 3,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              
-              <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 2, mb: 3 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Preview:
-                </Typography>
-                <Typography variant="body2">
-                  {messageTemplate
-                    .replace('{queue_position}', '3')
-                    .replace('{remaining_time}', '12')
-                    .replace('{queue_name}', 'General Service')
-                    .replace('{customer_name}', 'John Doe')}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-            <Button 
-              variant="contained" 
-              startIcon={saveLoading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={saveLoading}
-              sx={{ 
-                borderRadius: 2, 
-                bgcolor: '#6f42c1', 
-                px: 4,
-                '&:hover': { 
-                  bgcolor: '#8551d9' 
-                }
-              }}
-            >
-              {saveLoading ? 'Saving...' : 'Save Settings'}
-            </Button>
-          </Box>
+          )}
         </CardContent>
       </Card>
-
-      <Snackbar 
-        open={alert.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={alert.open}
+        autoHideDuration={6000}
         onClose={handleCloseAlert}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
         <Alert 
           onClose={handleCloseAlert} 

@@ -14,8 +14,11 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import HistoryIcon from '@mui/icons-material/History';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import { FeedbackCategory, ServiceWithOrderDetails, UserFeedbackHistory } from '../types/feedbackTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const FeedbackPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard();
+  
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
@@ -29,9 +32,10 @@ const FeedbackPage: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Only fetch eligible services if authenticated and user exists
+    if (!authenticated || !user?.id) return;
+    
     const fetchEligibleServices = async () => {
-      if (!user?.id) return;
-      
       try {
         setLoadingServices(true);
         setError('');
@@ -90,12 +94,13 @@ const FeedbackPage: React.FC = () => {
     };
     
     fetchEligibleServices();
-  }, [user?.id]);
+  }, [authenticated, user?.id]);
 
   useEffect(() => {
+    // Only fetch feedback history if authenticated and user exists
+    if (!authenticated || !user?.id) return;
+    
     const fetchFeedbackHistory = async () => {
-      if (!user?.id) return;
-      
       try {
         setLoadingHistory(true);
         
@@ -109,9 +114,12 @@ const FeedbackPage: React.FC = () => {
     };
     
     fetchFeedbackHistory();
-  }, [user?.id]);
+  }, [authenticated, user?.id]);
 
   useEffect(() => {
+    // Only fetch categories if authenticated
+    if (!authenticated) return;
+    
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
@@ -127,7 +135,7 @@ const FeedbackPage: React.FC = () => {
     };
     
     fetchCategories();
-  }, []);
+  }, [authenticated]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -138,22 +146,22 @@ const FeedbackPage: React.FC = () => {
   };
 
   const handleSubmitSuccess = async () => {
-    if (user?.id) {
-      setServices(prevServices => 
-        prevServices.map(service => 
-          service.id === selectedService?.id 
-            ? { ...service, has_feedback: true } 
-            : service
-        )
-      );
-      
-      try {
-        const data = await API.feedback.getUserFeedbackHistory(user.id);
-        setFeedbackHistory(data);
-        setActiveTab(1);
-      } catch (err) {
-        console.error('Error refreshing feedback history:', err);
-      }
+    if (!authenticated || !user?.id) return;
+    
+    setServices(prevServices => 
+      prevServices.map(service => 
+        service.id === selectedService?.id 
+          ? { ...service, has_feedback: true } 
+          : service
+      )
+    );
+    
+    try {
+      const data = await API.feedback.getUserFeedbackHistory(user.id);
+      setFeedbackHistory(data);
+      setActiveTab(1);
+    } catch (err) {
+      console.error('Error refreshing feedback history:', err);
     }
   };
 
@@ -164,9 +172,24 @@ const FeedbackPage: React.FC = () => {
   const availableServiceCount = services.filter(service => !service.has_feedback).length;
   const submittedFeedbackCount = services.filter(service => service.has_feedback).length;
 
-  if (!user) {
-    navigate('/login');
-    return null;
+  // Show loading state during auth check instead of redirecting
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh', 
+        bgcolor: '#f8f9fa',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} sx={{ color: '#6f42c1' }} />
+        <Typography variant="body1" color="text.secondary">
+          Loading feedback page...
+        </Typography>
+      </Box>
+    );
   }
 
   return (
@@ -199,7 +222,11 @@ const FeedbackPage: React.FC = () => {
         </Typography>
         
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert 
+            severity="error" 
+            sx={{ mb: 3 }}
+            onClose={() => setError('')}
+          >
             {error}
           </Alert>
         )}
@@ -270,16 +297,23 @@ const FeedbackPage: React.FC = () => {
                       <ArrowBackIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
                       <Typography variant="body2">Back to services</Typography>
                     </Box>
-                    <FeedbackForm
-                      serviceId={selectedService.id}
-                      serviceName={selectedService.name}
-                      orderId={selectedService.order_id}
-                      orderDetails={selectedService.order_details}
-                      userId={user.id}
-                      onSubmitSuccess={handleSubmitSuccess}
-                      availableCategories={categories}
-                      isLoading={loadingCategories}
-                    />
+                    
+                    {authenticated && user?.id ? (
+                      <FeedbackForm
+                        serviceId={selectedService.id}
+                        serviceName={selectedService.name}
+                        orderId={selectedService.order_id}
+                        orderDetails={selectedService.order_details}
+                        userId={user.id}
+                        onSubmitSuccess={handleSubmitSuccess}
+                        availableCategories={categories}
+                        isLoading={loadingCategories}
+                      />
+                    ) : (
+                      <Alert severity="warning">
+                        You need to be logged in to submit feedback.
+                      </Alert>
+                    )}
                   </>
                 ) : loadingServices ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', py: 4, flexDirection: 'column', alignItems: 'center' }}>

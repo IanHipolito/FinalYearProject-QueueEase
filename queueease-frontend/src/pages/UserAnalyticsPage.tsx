@@ -30,10 +30,12 @@ import {
   BusyTimeEntry,
   UserFeedback,
   AnalyticsData,
-  AnalyticsApiResponse 
 } from '../types/userAnalyticsTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const UserAnalyticsPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard();
+  
   const navigate = useNavigate();
   const { user } = useAuth();
   const theme = useTheme();
@@ -264,7 +266,8 @@ const UserAnalyticsPage: React.FC = () => {
   }, [ensureAllDaysPresent, calculateWaitTimeByDay, calculateWaitTimeByHour, calculateBusyTimes]);
 
   const fetchRawQueueData = useCallback(async () => {
-    if (!user) return;
+    // Only proceed if authenticated and user exists
+    if (!authenticated || !user?.id) return;
     
     try {
       const historyData = await API.queues.getUserQueues(user.id);
@@ -289,10 +292,11 @@ const UserAnalyticsPage: React.FC = () => {
       console.error("Error in fetchRawQueueData:", error);
       throw error;
     }
-  }, [user, timeRange, processAnalyticsData]);
+  }, [authenticated, user, timeRange, processAnalyticsData]);
 
   const fetchFeedbackData = useCallback(async () => {
-    if (!user) return;
+    // Only proceed if authenticated and user exists
+    if (!authenticated || !user?.id) return;
     
     try {
       const feedback = await API.feedback.getUserFeedbackHistory(user.id);
@@ -311,10 +315,14 @@ const UserAnalyticsPage: React.FC = () => {
       }
     } catch (err) {
       console.error("Error fetching feedback data:", err);
+      // Don't set the main error state for feedback, as it's not critical to the page
     }
-  }, [user]);
+  }, [authenticated, user]);
 
   const fetchAnalyticsData = useCallback(async () => {
+    // Only proceed if authenticated and user exists
+    if (!authenticated || !user?.id) return;
+    
     setLoading(true);
     setError('');
     
@@ -322,7 +330,7 @@ const UserAnalyticsPage: React.FC = () => {
       // Try to get data from the analytics endpoint
       try {
         // Fetch analytics data
-        const responseData = await API.queues.getUserAnalytics(user!.id, timeRange);
+        const responseData = await API.queues.getUserAnalytics(user.id, timeRange);
         
         // Handle queue history data - with fallback if missing
         let normalizedQueueHistory: AnalyticsHistoryEntry[] = [];
@@ -336,7 +344,7 @@ const UserAnalyticsPage: React.FC = () => {
         } 
         else {
           // Fetch raw queue data if not provided
-          const historyData = await API.queues.getUserQueues(user!.id);
+          const historyData = await API.queues.getUserQueues(user.id);
           
           normalizedQueueHistory = historyData.map((item: AnalyticsHistoryEntry) => ({
             ...item,
@@ -345,7 +353,7 @@ const UserAnalyticsPage: React.FC = () => {
         }
 
         // Fetch appointments data
-        const appointmentsData = await API.appointments.getAll(user!.id);
+        const appointmentsData = await API.appointments.getAll(user.id);
         const appointmentCount = Array.isArray(appointmentsData) ? appointmentsData.length : 0;
         
         setAnalyticsData({
@@ -367,9 +375,9 @@ const UserAnalyticsPage: React.FC = () => {
       }
     } catch (err) {
       console.error("Error fetching analytics data:", err);
-      setError('Failed to load analytics data. Please try again later.');
+      setError(err instanceof Error ? err.message : 'Failed to load analytics data. Please try again later.');
       
-      // On error, clear data 
+      // On error, set empty data with defensive defaults
       setAnalyticsData({
         totalQueues: 0,
         completedQueues: 0,
@@ -385,7 +393,7 @@ const UserAnalyticsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, timeRange, fetchRawQueueData, ensureAllDaysPresent]);
+  }, [authenticated, user, timeRange, fetchRawQueueData, ensureAllDaysPresent]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -395,17 +403,36 @@ const UserAnalyticsPage: React.FC = () => {
     setActiveTab(newValue);
   };
 
+  // Fetch data when authenticated, time range changes, or refresh is triggered
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+    // Only fetch data when authenticated and user exists
+    if (!authenticated || !user?.id) return;
     
     fetchAnalyticsData();
     fetchFeedbackData();
-  }, [user, timeRange, refreshKey, fetchAnalyticsData, fetchFeedbackData, navigate]);
+  }, [authenticated, user, timeRange, refreshKey, fetchAnalyticsData, fetchFeedbackData]);
 
-  if (loading) {
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2,
+        bgcolor: alpha(theme.palette.primary.main, 0.03)
+      }}>
+        <CircularProgress color="primary" size={50} />
+        <Typography variant="subtitle1" color="text.secondary">
+          Preparing your analytics...
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (loading && authenticated) {
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -442,6 +469,7 @@ const UserAnalyticsPage: React.FC = () => {
               borderRadius: 2, 
               boxShadow: '0 2px 10px rgba(0,0,0,0.08)' 
             }}
+            onClose={() => setError('')}
           >
             {error}
           </Alert>
@@ -854,7 +882,7 @@ const UserAnalyticsPage: React.FC = () => {
           <FeedbackAnalyticsSection 
             userFeedback={analyticsData.userFeedback || []} 
             averageRating={analyticsData.averageRating || 0}
-            userId={user!.id}
+            userId={user?.id || 0}
           />
         )}
       </Container>

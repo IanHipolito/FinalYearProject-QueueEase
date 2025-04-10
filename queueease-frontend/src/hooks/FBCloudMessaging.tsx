@@ -18,41 +18,68 @@ const FBCloudMessaging: React.FC = () => {
 
     // Save token to backend
     const saveTokenToServer = useCallback(async (token: string) => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            console.log('No user ID available, skipping FCM token save');
+            return;
+        }
         
         try {
+            console.log('Attempting to save FCM token for user:', user.id);
             const response = await API.auth.saveFcmToken(user.id, token);
             
-            if (response.ok) {
-                console.log('FCM token saved to server');
+            if (response && response.success) {
+                console.log('FCM token saved successfully');
             } else {
-                console.error('Failed to save FCM token to server');
+                console.error('Failed to save FCM token to server', response);
             }
         } catch (error) {
             console.error('Error saving FCM token:', error);
+            // Only show notification in development environment
+            if (process.env.NODE_ENV === 'development') {
+                setNotification({
+                    open: true,
+                    message: 'Notification setup encountered an issue, but the app will continue to work.',
+                    severity: 'warning'
+                });
+            }
         }
     }, [user]);
 
     const setupFCM = useCallback(() => {
+        // Don't attempt to get token if user isn't logged in
+        if (!user?.id) {
+            console.log('User not logged in, skipping FCM setup');
+            return;
+        }
+
         getToken(messaging, { 
             vapidKey: VAPID_KEY 
         }).then((token) => {
             if (token) {
-                console.log('FCM Token:', token);
+                console.log('FCM Token acquired');
                 // Save token to localStorage for persistence
                 localStorage.setItem('fcmToken', token);
                 // Send to backend if user is logged in
-                if (user?.id) {
-                    saveTokenToServer(token);
-                }
+                saveTokenToServer(token);
             } else {
-                console.log('No token received');
+                console.log('No FCM token received');
             }
         }).catch((err) => {
-            console.error('Error getting token:', err);
+            console.error('Error getting FCM token:', err);
+            if (process.env.NODE_ENV === 'development') {
+                setNotification({
+                    open: true,
+                    message: 'Could not set up notifications. You may need to refresh the page.',
+                    severity: 'warning'
+                });
+            }
         });
+    }, [user, saveTokenToServer]);
 
-        // Handle foreground messages
+    // Setup message handler
+    useEffect(() => {
+        if (!user) return;
+
         const unsubscribe = onMessage(messaging, (payload) => {
             console.log('Message received in foreground:', payload);
             
@@ -94,12 +121,7 @@ const FBCloudMessaging: React.FC = () => {
         
         // Check if iOS PWA or standard browser
         if (isIOS && isSafari && !isStandalone) {
-            console.log("For iOS Safari, please install this app as a PWA (Add to Home Screen) to receive push notifications.");
-            setNotification({
-                open: true,
-                message: 'Install this app to your home screen for notifications to work properly.',
-                severity: 'info'
-            });
+            console.log("For iOS Safari, please install this app as a PWA to receive push notifications.");
             return;
         }
 
@@ -119,9 +141,7 @@ const FBCloudMessaging: React.FC = () => {
             }
         }
         
-        // Cleanup
         return () => {
-            // Any cleanup needed
         };
     }, [user, setupFCM]);
 

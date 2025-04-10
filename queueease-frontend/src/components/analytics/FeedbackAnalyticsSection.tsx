@@ -43,7 +43,6 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
           setAverageRating(avgRating);
         }
       } catch (err) {
-        console.error('Error fetching feedback data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred while loading feedback data');
       } finally {
         setLoading(false);

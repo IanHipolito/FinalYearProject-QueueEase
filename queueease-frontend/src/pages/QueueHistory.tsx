@@ -8,8 +8,11 @@ import HistoryFilterBar from '../components/history/HistoryFilterBar';
 import AdvancedFilters from '../components/history/AdvancedFilters';
 import HistoryList from '../components/history/HistoryList';
 import { HistoryEntry } from '../types/historyTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const QueueHistory: React.FC = () => {
+    const { authenticated, loading: authLoading } = useAuthGuard();
+    
     const { user } = useAuth();
     const navigate = useNavigate();
     const theme = useTheme();
@@ -38,12 +41,15 @@ const QueueHistory: React.FC = () => {
         'healthcare', 'government'
     ];
 
-    // Fetch history data
+    // Fetch history data only when authenticated
     useEffect(() => {
-        if (!user?.id) return;
+        // Only fetch data if user is authenticated and userId exists
+        if (!authenticated || !user?.id) return;
 
         const fetchHistory = async () => {
             setLoading(true);
+            setError(null);
+            
             try {
                 let queueData: any[] = [];
                 let appointmentData: any[] = [];
@@ -54,6 +60,7 @@ const QueueHistory: React.FC = () => {
                     await API.appointments.checkAndUpdateAppointments();
                 } catch (error) {
                     console.error("Error checking appointments:", error);
+                    // Don't set global error here as this is just an update operation
                 }
 
                 try {
@@ -126,7 +133,7 @@ const QueueHistory: React.FC = () => {
         };
 
         fetchHistory();
-    }, [user?.id]);
+    }, [authenticated, user?.id]);
 
     // Apply filters whenever filter criteria changes
     useEffect(() => {
@@ -262,7 +269,10 @@ const QueueHistory: React.FC = () => {
     };
 
     const refreshData = useCallback(async () => {
-        if (!user?.id) return;
+        // Only refresh if authenticated and user ID exists
+        if (!authenticated || !user?.id) return;
+        
+        setError(null); // Clear any previous errors
         
         try {
             await API.appointments.checkAndUpdateAppointments();
@@ -296,7 +306,7 @@ const QueueHistory: React.FC = () => {
             console.error("Error refreshing data:", error);
             setError(error instanceof Error ? error.message : "Failed to refresh data. Please try again.");
         }
-    }, [user?.id, history]);
+    }, [authenticated, user?.id, history]);
 
     // Generate date groups for the filtered history
     const dateGroups = React.useMemo(() => {
@@ -314,6 +324,15 @@ const QueueHistory: React.FC = () => {
 
         return groups;
     }, [filteredHistory]);
+
+    // Show loading indicator during authentication check
+    if (authLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+                <CircularProgress size={40} sx={{ color: theme.palette.primary.main }} />
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: '#f5f7fb', py: 4, px: 2 }}>

@@ -10,17 +10,23 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#6f42c1",
   "background_color": "#ffffff",
-  "gcm_sender_id": "103953800507"
+  "gcm_sender_id": "103953800507",
+  "permissions": ["camera"],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "orientation": "portrait"
 }

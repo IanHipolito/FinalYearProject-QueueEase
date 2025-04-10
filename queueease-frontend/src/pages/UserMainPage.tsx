@@ -20,8 +20,10 @@ import InsightsIcon from '@mui/icons-material/Insights';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import { useAuth } from '../context/AuthContext';
 import { UserMainPageQueue } from '../types/queueTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const UserMainPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -76,7 +78,6 @@ const UserMainPage: React.FC = () => {
           time_created: detailData.time_created
         }));
       } catch (error) {
-        console.error("Error fetching queue details:", error);
         if (isInitialLoad) {
           setActiveQueue(null);
         }
@@ -97,8 +98,6 @@ const UserMainPage: React.FC = () => {
       }
 
       try {
-        console.log("Fetching active queue for user:", user.id);
-
         if (isInitialLoad) {
           setActiveQueue(null);
         }
@@ -106,7 +105,6 @@ const UserMainPage: React.FC = () => {
         if (!user) return;
         
         const data = await API.queues.getActive(user.id);
-        console.log("Active queue response:", data);
 
         if (data && data.queue_id && data.current_position !== undefined) {
           const basicQueue = {
@@ -121,7 +119,6 @@ const UserMainPage: React.FC = () => {
           setActiveQueue(basicQueue);
           await fetchDetailedQueue(data.queue_id, isInitialLoad);
         } else {
-          console.log("Invalid queue data:", data);
           if (activeQueue !== null) {
             setActiveQueue(null);
           }
@@ -133,7 +130,6 @@ const UserMainPage: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error("Error fetching active queue:", error);
         if (activeQueue !== null) {
           setActiveQueue(null);
         }
@@ -169,7 +165,6 @@ const UserMainPage: React.FC = () => {
 
         API.queues.completeQueue(activeQueue.id)
           .then(data => {
-            console.log("Auto-completion status:", data);
             if (data.status === 'completed') {
               setActiveQueue(null);
               setTimeout(() => {
@@ -182,7 +177,6 @@ const UserMainPage: React.FC = () => {
             }
           })
           .catch(error => {
-            console.error("Error in auto-completion check:", error);
             // Reset on error so we can try again
             setTimeout(() => setAutoCompletionAttempted(false), 30000);
           });
@@ -254,13 +248,11 @@ const UserMainPage: React.FC = () => {
             setActiveQueue(null);
           }
         } catch (detailError) {
-          console.error("Error fetching queue details:", detailError);
         }
       } else {
         setActiveQueue(null);
       }
     } catch (error) {
-      console.error("Error refreshing queue data:", error);
       setActiveQueue(null);
     } finally {
       setRefreshing(false);
@@ -283,7 +275,6 @@ const UserMainPage: React.FC = () => {
       });
       setTimeout(() => refreshQueueData(false), 500);
     } catch (error) {
-      console.error("Error leaving queue:", error);
       setSnackbar({
         open: true,
         message: error instanceof Error ? error.message : "Failed to leave the queue. Please try again.",
@@ -304,6 +295,11 @@ const UserMainPage: React.FC = () => {
   if (!user) {
     navigate('/login');
     return null;
+  }
+
+  // Show loading state during auth check
+  if (authLoading) {
+    return <CircularProgress />;
   }
 
   return (

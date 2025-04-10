@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
-import { Box, Typography, Alert } from '@mui/material';
+import { Box, Typography, Alert, CircularProgress } from '@mui/material';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
 import QueueStatsOverview from '../components/queues/QueueStatsOverview';
 import QueueManagement from '../components/queues/QueueManagement';
 import { Queue } from '../types/queueTypes';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const QueuesPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard({});
+  
   const { currentService } = useAuth();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,9 +22,10 @@ const QueuesPage: React.FC = () => {
 
   // Fetch queues for the current service
   useEffect(() => {
+    // Only fetch if authenticated
+    if (!authenticated || !currentService?.id) return;
+    
     const fetchQueues = async () => {
-      if (!currentService?.id) return;
-      
       setLoading(true);
       setError('');
       
@@ -48,7 +52,7 @@ const QueuesPage: React.FC = () => {
     };
     
     fetchQueues();
-  }, [currentService?.id]);
+  }, [currentService?.id, authenticated]);
 
   // Filter queues based on search term
   const filteredQueues = queues.filter(queue => 
@@ -67,7 +71,7 @@ const QueuesPage: React.FC = () => {
 
   // Handle queue status toggle
   const handleToggleQueueStatus = async (queueId: number, newStatus: boolean) => {
-    if (!currentService?.id) return;
+    if (!authenticated || !currentService?.id) return;
     
     setActionLoading(true);
     
@@ -92,6 +96,25 @@ const QueuesPage: React.FC = () => {
       setActionLoading(false);
     }
   };
+
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} />
+        <Typography variant="body1" color="text.secondary">
+          Loading queue management...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ bgcolor: '#f5f7fb', minHeight: '100vh', p: 3 }}>

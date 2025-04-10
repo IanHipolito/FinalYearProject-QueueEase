@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { API } from '../services/api';
 import { User, ManagedService, AuthContextType } from '../types/authContextTypes';
+import { secureStorage } from '../utils/secureStorage';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -39,8 +40,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(newUser);
       setIsAdmin(data.user_type === 'admin');
       
-      // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(newUser));
+      // Save to secure storage with 12 hour expiry
+      secureStorage.setItem('user', newUser, 12);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -74,9 +75,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
-      // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(newUser));
-      localStorage.setItem('managedServices', JSON.stringify(data.managed_services || []));
+      // Save to secure storage with 12 hour expiry
+      secureStorage.setItem('user', newUser, 12);
+      secureStorage.setItem('managedServices', data.managed_services || [], 12);
     } catch (error) {
       console.error('Admin login error:', error);
       throw error;
@@ -88,25 +89,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAdmin(false);
     setManagedServices([]);
     setCurrentService(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('managedServices');
+    secureStorage.removeItem('user');
+    secureStorage.removeItem('managedServices');
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    const savedServices = localStorage.getItem('managedServices');
+    const savedUser = secureStorage.getItem('user');
+    const savedServices = secureStorage.getItem('managedServices');
     
     if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      setUser(parsedUser);
-      setIsAdmin(parsedUser.is_admin || parsedUser.user_type === 'admin');
+      setUser(savedUser);
+      setIsAdmin(savedUser.is_admin || savedUser.user_type === 'admin');
     }
     
     if (savedServices) {
-      const parsedServices = JSON.parse(savedServices);
-      setManagedServices(parsedServices);
-      if (parsedServices.length > 0) {
-        setCurrentService(parsedServices[0]);
+      setManagedServices(savedServices);
+      if (savedServices.length > 0) {
+        setCurrentService(savedServices[0]);
       }
     }
     

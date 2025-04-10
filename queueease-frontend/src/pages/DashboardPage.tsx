@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
-import { Box, Grid, Card, SelectChangeEvent } from '@mui/material';
+import { Box, Grid, Card, SelectChangeEvent, CircularProgress } from '@mui/material';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
 import StatCard from '../components/dashboard/StatCard';
@@ -12,8 +12,15 @@ import { Order, DashboardData } from '../types/dashboardTypes';
 import ShoppingBagIcon from '@mui/icons-material/ShoppingBag';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const DashboardPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard({ 
+    adminRequired: true,
+    serviceRequired: true,
+    redirectTo: '/admin-login'
+  });
+  
   const { managedServices, currentService, switchService } = useAuth();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     customerCount: 0,
@@ -32,7 +39,8 @@ const DashboardPage: React.FC = () => {
 
   // Function to fetch dashboard data with time range parameters
   const fetchDashboardData = async (serviceId?: number, timeRangeParam = statsTimeRange) => {
-    if (!serviceId) {
+    // Only proceed if authenticated
+    if (!authenticated || !serviceId) {
       setLoading(false);
       return;
     }
@@ -106,14 +114,14 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // Fetch dashboard data when service changes
+  // Fetch dashboard data when service changes and user is authenticated
   useEffect(() => {
-    if (currentService?.id) {
+    if (authenticated && currentService?.id) {
       fetchDashboardData(currentService.id, statsTimeRange);
     } else {
       setLoading(false);
     }
-  }, [currentService?.id, statsTimeRange]);
+  }, [authenticated, currentService?.id, statsTimeRange]);
 
   // Generate appropriate time period labels based on selected time range
   const generateTimeLabels = (timeRange: string): string[] => {
@@ -179,6 +187,15 @@ const DashboardPage: React.FC = () => {
   const isImmediateService = () => {
     return currentService?.service_type === 'immediate' || dashboardData.service_type === 'immediate';
   };
+
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   // If loading and no data available yet, show loading indicator
   if (loading && !dashboardData.customerStats.length) {

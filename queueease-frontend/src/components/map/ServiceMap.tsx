@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Box, Button, CircularProgress, Alert, Snackbar } from '@mui/material';
+import { Box, Button, CircularProgress, Alert, Snackbar, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { Service, ServiceMapProps } from 'types/serviceTypes';
 import { geoJSONGenerator, getServicePointLayer, getServiceSymbolLayer, addMapStyles, DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN, removeMapStyles } from 'utils/mapUtils';
 import * as turf from '@turf/turf';
 import throttle from 'lodash/throttle';
 import debounce from 'lodash/debounce';
+import { geolocationHelper } from '../../utils/geolocationHelper';
 
 const USER_LAYER_ID = 'user-location';
 const USER_RADIUS_LAYER_ID = 'user-radius';
@@ -36,6 +37,8 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   
   // Recreate service map when services change
   useEffect(() => {
@@ -317,8 +320,14 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, []);
   
-  // Get user's current location
+  // Replace the current getUserLocation function with this
   const getUserLocation = useCallback(() => {
+    // If we haven't asked for permission yet, show dialog
+    if (!locationPermissionRequested) {
+      setShowPermissionDialog(true);
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -350,31 +359,27 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       }
     }
     
-    // If no existing location or update failed, use Geolocation API
-    if (!navigator.geolocation) {
-      console.error('Geolocation is not supported by your browser');
-      setError('Geolocation is not supported by your browser');
-      setIsLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          
+    // Create a Dublin center fallback
+    const dublinFallback = { 
+      latitude: DUBLIN_CENTER[1], 
+      longitude: DUBLIN_CENTER[0] 
+    };
+    
+    geolocationHelper.getCurrentPosition(dublinFallback)
+      .then(result => {
+        if (result.location) {
           // Update parent component with new location
-          onUserLocationChange({ latitude, longitude });
+          onUserLocationChange(result.location);
           
+          // Update map with new location
           if (map.current) {
-            // Force update user location on map
             ensureMapIsReady(() => {
-              updateUserLocationOnMap(latitude, longitude, maxDistance);
+              updateUserLocationOnMap(result.location!.latitude, result.location!.longitude, maxDistance);
               
               // Fly to user location
               if (map.current) {
                 map.current.flyTo({
-                  center: [longitude, latitude],
+                  center: [result.location!.longitude, result.location!.latitude],
                   zoom: 14,
                   essential: true
                 });
@@ -384,51 +389,51 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
               updateMapData();
             });
           }
-          
-          // Clear any errors if successful
+        }
+        
+        if (result.error) {
+          setError(result.error);
+        } else {
           setError(null);
-        } catch (err) {
-          console.error('Error processing user location:', err);
-          setError(err instanceof Error ? err.message : 'Failed to process location data');
-        } finally {
-          setIsLoading(false);
         }
-      },
-      (error) => {
-        // Geolocation errors
-        let errorMsg = 'Unknown error getting location';
-        
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = 'Permission denied for location access';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = 'Location information is unavailable';
-            break;
-          case error.TIMEOUT:
-            errorMsg = 'The request to get location timed out';
-            break;
-        }
-        
-        console.error('Geolocation error:', errorMsg);
-        setError(errorMsg);
+      })
+      .finally(() => {
         setIsLoading(false);
-        
-        // Use Dublin center as fallback
-        const dublinCenter = { 
-          latitude: DUBLIN_CENTER[1], 
-          longitude: DUBLIN_CENTER[0] 
-        };
-        onUserLocationChange(dublinCenter);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  }, [maxDistance, onUserLocationChange, updateUserLocationOnMap, updateMapData, userLocation, ensureMapIsReady]);
+      });
+  }, [maxDistance, onUserLocationChange, updateUserLocationOnMap, updateMapData, userLocation, ensureMapIsReady, locationPermissionRequested]);
   
+  // Add this function to handle permission consent
+  const handleLocationPermission = (granted: boolean) => {
+    setLocationPermissionRequested(true);
+    setShowPermissionDialog(false);
+    
+    if (granted) {
+      // Now proceed with getting location
+      getUserLocation();
+    } else {
+      // Handle rejection - use Dublin center
+      setError("Location access denied. Using Dublin city center instead.");
+      
+      // Use Dublin center as fallback
+      const dublinFallback = { 
+        latitude: DUBLIN_CENTER[1], 
+        longitude: DUBLIN_CENTER[0] 
+      };
+      onUserLocationChange(dublinFallback);
+      
+      if (map.current) {
+        ensureMapIsReady(() => {
+          updateUserLocationOnMap(dublinFallback.latitude, dublinFallback.longitude, maxDistance);
+          map.current?.flyTo({
+            center: [dublinFallback.longitude, dublinFallback.latitude],
+            zoom: 12,
+            essential: true
+          });
+        });
+      }
+    }
+  };
+
   // Initialize map layers
   const initializeMapLayers = useCallback(() => {
     if (!map.current || !mapStyleLoadedRef.current || layersInitializedRef.current) return;
@@ -881,6 +886,27 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           )}
         </Button>
       </Box>
+
+      {/* Location Permission Dialog */}
+      {showPermissionDialog && (
+        <Dialog open={showPermissionDialog} onClose={() => handleLocationPermission(false)}>
+          <DialogTitle>Allow Location Access?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              QueueEase would like to access your location to show nearby services and calculate distances.
+              This helps you find the closest services and enables queue transfers.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => handleLocationPermission(false)} color="primary">
+              No, use Dublin center
+            </Button>
+            <Button onClick={() => handleLocationPermission(true)} color="primary" variant="contained">
+              Allow location access
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };

@@ -42,15 +42,11 @@ def admin_dashboard_data(request):
             is_active=True
         ).count()
         
-        # If no customers, set a default minimum for UI rendering
-        if customer_count == 0:
-            customer_count = 0
-        
-        # Get or set a default queue count (never show 0)
-        queue_count = max(1, QueueSequence.objects.filter(
+        # Get actual queue count without minimum value
+        queue_count = QueueSequence.objects.filter(
             items__service=service, 
             is_active=True
-        ).distinct().count())
+        ).distinct().count()
         
         # Get latest orders with proper timezone handling
         latest_orders = []
@@ -61,8 +57,7 @@ def admin_dashboard_data(request):
                 service=service
             ).select_related('user').order_by('-date_created')[:5]
             
-            # Debug output to trace data
-            print(f"Found {latest_queue_entries.count()} latest queue entries")
+            logger.debug(f"Found {latest_queue_entries.count()} latest queue entries")
             
             for queue in latest_queue_entries:
                 try:
@@ -82,7 +77,7 @@ def admin_dashboard_data(request):
                         'type': 'immediate'
                     })
                 except Exception as e:
-                    print(f"Error processing queue entry {queue.id}: {e}")
+                    logger.error(f"Error processing queue entry {queue.id}: {e}")
                     continue
                     
             order_count = Queue.objects.filter(service=service).count()
@@ -104,7 +99,7 @@ def admin_dashboard_data(request):
                         'type': 'appointment'
                     })
                 except Exception as e:
-                    print(f"Error processing appointment {appt.id}: {e}")
+                    logger.error(f"Error processing appointment {appt.id}: {e}")
                     continue
                 
             order_count = AppointmentDetails.objects.filter(service=service).count()
@@ -135,7 +130,7 @@ def admin_dashboard_data(request):
         # Calculate customer stats for charting with proper timezone handling
         customer_stats = []
         
-        # Generate sample data if we don't have real data
+        # Use actual number of days based on time range
         if time_range == 'daily':
             days_to_check = 5
         else:
@@ -148,23 +143,17 @@ def admin_dashboard_data(request):
             day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
             day_end = timezone.make_aware(datetime.combine(day_date, datetime.max.time()))
             
-            # Get count with proper filtering
+            # Get actual count without scaling
             day_count = Queue.objects.filter(
                 service=service,
                 date_created__gte=day_start,
                 date_created__lte=day_end
             ).count()
             
-            # Ensure we have visible data even with no queue entries
-            scaled_count = min(80, max(20, day_count * 10)) if day_count else 20
-            customer_stats.append(scaled_count)
+            customer_stats.append(day_count)
         
         # Reverse to get chronological order
         customer_stats.reverse()
-        
-        # Generate sample data if we don't have enough
-        if len(customer_stats) < 5:
-            customer_stats = [20, 35, 25, 40, 30]  # Sample data
             
         response_data = {
             'customer_count': customer_count,
@@ -176,24 +165,18 @@ def admin_dashboard_data(request):
             'service_type': service.service_type
         }
         
-        print(f"Response data: {response_data}")
+        logger.debug(f"Response data: {response_data}")
         return Response(response_data)
         
     except Exception as e:
-        print(f"Dashboard data error: {str(e)}")
-        print(traceback.format_exc())
+        logger.error(f"Dashboard data error: {str(e)}")
+        logger.error(traceback.format_exc())
         
-        # Return a minimal valid response when an error occurs
+        # Return an error response instead of fake data
         return Response({
-            'customer_count': 0,
-            'queue_count': 1,
-            'order_count': 0,
-            'growth': 0,
-            'latest_orders': [],
-            'customer_stats': [20, 30, 25, 35, 30],
-            'service_type': 'immediate',
-            'error_info': str(e) 
-        })
+            'error': 'An unexpected error occurred while retrieving dashboard data',
+            'details': str(e)
+        }, status=500)
     
 @api_view(['GET'])
 def admin_customers(request):

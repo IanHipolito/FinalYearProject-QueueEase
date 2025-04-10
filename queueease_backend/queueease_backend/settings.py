@@ -21,12 +21,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY = config('SECRET_KEY')
-SECRET_KEY = 'django-insecure-nd!t0p79rj(u%jo)@&g(w)tyg_==s-ua7)xt&+%c(+4_4syh-m'
+SECRET_KEY = config('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-DEBUG = False
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
@@ -63,6 +60,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOW_CREDENTIALS = True
+
 CORS_ALLOWED_ORIGINS = [
     "https://m2xb3cv3-8000.eun1.devtunnels.ms",
     "https://m2xb3cv3-3000.eun1.devtunnels.ms",
@@ -77,6 +76,27 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "https://queueease-5945e.web.app",
     "https://C21436494.pythonanywhere.com",
+]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 
@@ -107,24 +127,14 @@ WSGI_APPLICATION = 'queueease_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'queueease_db',
-        'USER': 'queueease_user',
-        'PASSWORD': 'fyp123',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': config('DB_NAME', 'queueease_db'),
+        'USER': config('DB_USER', 'queueease_user'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', 'localhost'),
+        'PORT': config('DB_PORT', '5432'),
     }
 }
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'queueease_db',
-#         'USER': 'queueease_user',
-#         'PASSWORD': 'fyp123',
-#         'HOST': 'C21436494-4463.postgres.pythonanywhere-services.com',
-#         'PORT': '14463',
-#     }
-# }
 
 
 # Password validation

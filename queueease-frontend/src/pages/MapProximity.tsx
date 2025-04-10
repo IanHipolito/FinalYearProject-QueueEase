@@ -20,8 +20,12 @@ import { UserMainPageQueue } from '../types/queueTypes';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import debounce from 'lodash/debounce';
 import throttle from 'lodash/throttle';
+import { geolocationHelper } from '../utils/geolocationHelper';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const MapProximity: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard({});
+  
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -79,7 +83,8 @@ const MapProximity: React.FC = () => {
 
   // Fetch the active queue for the logged-in user
   useEffect(() => {
-    if (!user) return;
+    // Only fetch if user is authenticated
+    if (!authenticated || !user) return;
 
     const fetchActiveQueue = async () => {
       try {
@@ -126,7 +131,7 @@ const MapProximity: React.FC = () => {
         activeQueueInterval.current = null;
       }
     };
-  }, [user]);
+  }, [authenticated, user]);
 
   const isEligibleForTransfer = useCallback((service: Service) => {
     if (!activeQueue || !activeQueue.service_name || !activeQueue.id) return false;
@@ -160,7 +165,14 @@ const MapProximity: React.FC = () => {
 
   // Handle transfer confirmation
   const handleConfirmTransfer = async () => {
-    if (!activeQueue || !targetService || !user) return;
+    if (!authenticated || !activeQueue || !targetService || !user) {
+      setSnackbarState({
+        open: true,
+        message: 'You need to be logged in to transfer queues',
+        severity: 'warning'
+      });
+      return;
+    }
 
     setTransferring(true);
 
@@ -220,65 +232,33 @@ const MapProximity: React.FC = () => {
   const getUserLocation = useCallback(() => {
     setLocationLoading(true);
     
-    if (!navigator.geolocation) {
-      console.error('Geolocation is not supported by your browser');
-      fallbackToDublinCenter();
-      return;
-    }
+    // Create a Dublin center fallback
+    const dublinFallback = { 
+      latitude: DUBLIN_CENTER[1], 
+      longitude: DUBLIN_CENTER[0] 
+    };
     
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          
-          // Update state without saving to localStorage
-          setUserLocation({ latitude, longitude });
-          setLocationLoading(false);
-        } catch (error) {
-          console.error('Error processing user location:', error);
-          fallbackToDublinCenter();
+    geolocationHelper.getCurrentPosition(dublinFallback)
+      .then(result => {
+        if (result.location) {
+          setUserLocation(result.location);
         }
-      },
-      (error) => {
-        let errorMsg = 'Unknown error getting location';
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMsg = 'User denied the request for geolocation';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMsg = 'Location information is unavailable';
-            break;
-          case error.TIMEOUT:
-            errorMsg = 'The request to get user location timed out';
-            break;
+        
+        if (result.error) {
+          const message = result.fallbackUsed 
+            ? `Using Dublin center as fallback location. ${result.error}`
+            : result.error;
+            
+          setSnackbarState({
+            open: true,
+            message: message,
+            severity: result.fallbackUsed ? 'info' : 'warning'
+          });
         }
-        console.error('Geolocation error:', errorMsg);
-        setSnackbarState({
-          open: true,
-          message: `Using Dublin center as fallback location. ${errorMsg}`,
-          severity: 'info'
-        });
-        fallbackToDublinCenter();
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-    
-    // Helper function to use Dublin center as fallback
-    function fallbackToDublinCenter() {
-      console.log('Using Dublin center as fallback');
-      // Using DUBLIN_CENTER from imported constants
-      const dublinCenter = { 
-        latitude: DUBLIN_CENTER[1], 
-        longitude: DUBLIN_CENTER[0] 
-      };
-      
-      setUserLocation(dublinCenter);
-      setLocationLoading(false);
-    }
+      })
+      .finally(() => {
+        setLocationLoading(false);
+      });
   }, []);
 
   // Get the user's current location on mount if not already set
@@ -500,7 +480,7 @@ const MapProximity: React.FC = () => {
 
   // Handle join queue - only for appointment services
   const handleJoinQueue = useCallback(async (serviceId: number) => {
-    if (!user) {
+    if (!authenticated || !user) {
       navigate('/login', { state: { from: '/mapproximity', service: serviceId } });
       return;
     }
@@ -523,7 +503,7 @@ const MapProximity: React.FC = () => {
         severity: 'error'
       });
     }
-  }, [navigate, user, services]);
+  }, [navigate, authenticated, user, services]);
 
   const renderServiceRow = useCallback((service: Service) => {
     const isSelected = selectedService?.id === service.id;
@@ -627,6 +607,25 @@ const MapProximity: React.FC = () => {
       </DialogActions>
     </Dialog>
   ), [transferDialogOpen, transferring, activeQueue?.service_name, targetService?.name]);
+
+  // Show loading during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} sx={{ color: '#6f42c1' }} />
+        <Typography variant="body1" color="text.secondary">
+          Loading map...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box

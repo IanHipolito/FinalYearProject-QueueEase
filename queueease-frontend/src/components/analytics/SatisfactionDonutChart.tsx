@@ -63,7 +63,6 @@ const SatisfactionDonutChart: React.FC<SatisfactionDonutChartProps> = ({
           }
         }
       } catch (err) {
-        console.error('Error fetching satisfaction data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load satisfaction data');
       } finally {
         setLoading(false);

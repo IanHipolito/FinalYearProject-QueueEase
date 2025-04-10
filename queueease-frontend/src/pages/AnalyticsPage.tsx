@@ -3,7 +3,7 @@ import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import ErrorDisplay from '../components/common/ErrorDisplay';
 import LoadingIndicator from '../components/common/LoadingIndicator';
-import { Box, Grid, Typography, SelectChangeEvent, Tabs, Tab, Paper } from '@mui/material';
+import { Box, Grid, Typography, SelectChangeEvent, Tabs, Tab, Paper, CircularProgress } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FeedbackIcon from '@mui/icons-material/Feedback';
@@ -17,6 +17,7 @@ import CustomerComments from '../components/analytics/CustomerComments';
 import SentimentTrendChart from '../components/analytics/SentimentTrendChart';
 import FeedbackKeywordCloud from '../components/analytics/FeedbackKeywordCloud';
 import InsightsSection from '../components/analytics/InsightsSection';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
@@ -47,6 +48,8 @@ function a11yProps(index: number) {
 }
 
 const AnalyticsPage: React.FC = () => {
+  const { authenticated, loading: authLoading } = useAuthGuard();
+  
   const { currentService } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -87,7 +90,8 @@ const AnalyticsPage: React.FC = () => {
 
   // Separate fetch for sentiment trend
   const fetchSentimentTrend = useCallback(async () => {
-    if (!currentService?.id) return;
+    // Only proceed if authenticated and current service exists
+    if (!authenticated || !currentService?.id) return;
 
     try {
       const data = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
@@ -96,13 +100,14 @@ const AnalyticsPage: React.FC = () => {
       console.error('Error fetching sentiment trend:', err);
       setSentimentTrendData([]);
     }
-  }, [currentService?.id, analyticsTimeRange]);
+  }, [authenticated, currentService?.id, analyticsTimeRange]);
 
   // Main analytics data fetch
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (!currentService?.id) return;
+    // Only proceed if authenticated and current service exists
+    if (!authenticated || !currentService?.id) return;
 
+    const fetchAnalytics = async () => {
       setLoading(true);
       setError('');
 
@@ -133,7 +138,7 @@ const AnalyticsPage: React.FC = () => {
     };
 
     fetchAnalytics();
-  }, [currentService?.id, analyticsTimeRange, fetchSentimentTrend]);
+  }, [authenticated, currentService?.id, analyticsTimeRange, fetchSentimentTrend]);
 
   // Time range change handler
   const handleTimeRangeChange = (event: SelectChangeEvent) => {
@@ -155,7 +160,8 @@ const AnalyticsPage: React.FC = () => {
 
   // Retry function for the error display component
   const handleRetry = () => {
-    if (!currentService?.id) return;
+    if (!authenticated || !currentService?.id) return;
+    
     setLoading(true);
     setError('');
     
@@ -165,7 +171,7 @@ const AnalyticsPage: React.FC = () => {
   
   // Fetch analytics helper function (extracted for reuse)
   const fetchAnalytics = async () => {
-    if (!currentService?.id) return;
+    if (!authenticated || !currentService?.id) return;
     
     try {
       const data = await API.admin.getAnalytics(currentService.id, analyticsTimeRange);
@@ -192,6 +198,25 @@ const AnalyticsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Show loading state during auth check
+  if (authLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={40} />
+        <Typography variant="body1" color="text.secondary">
+          Loading analytics...
+        </Typography>
+      </Box>
+    );
+  }
 
   // Loading state
   if (loading && !feedbackData.length) {

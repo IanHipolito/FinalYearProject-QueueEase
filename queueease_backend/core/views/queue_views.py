@@ -12,7 +12,7 @@ import traceback
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import timedelta
-import random
+from django.db import transaction
 import numpy as np
 
 from ..models import (
@@ -758,11 +758,10 @@ def service_queues(request, service_id):
                 'description': service.description,
                 'is_active': sq.is_active,
                 'current_customers': sq.current_member_count,
-                'max_capacity': 50  # Default or you can store this in the model
+                'max_capacity': 50  # Default
             })
         
         # If no active service queues but there are individual queue members,
-        # include them as legacy support
         if not service_queues.exists():
             # Count customers with pending status for this service
             current_customers = Queue.objects.filter(
@@ -906,18 +905,30 @@ def user_analytics(request, user_id):
 @api_view(['POST'])
 def transfer_queue(request):
     try:
+        # Validate input parameters
         original_queue_id = request.data.get('original_queue_id')
         target_service_id = request.data.get('target_service_id')
+        user_id = request.data.get('user_id')
         
-        if not all([original_queue_id, target_service_id]):
+        if not all([original_queue_id, target_service_id, user_id]):
             return Response({"error": "Missing required parameters"}, status=400)
         
-        original_queue = get_object_or_404(Queue, id=original_queue_id)
-        target_service = get_object_or_404(Service, id=target_service_id)
+        # Get objects with proper error handling
+        try:
+            original_queue = Queue.objects.get(id=original_queue_id)
+        except Queue.DoesNotExist:
+            return Response({"error": f"Original queue with ID {original_queue_id} not found"}, status=404)
+            
+        try:
+            target_service = Service.objects.get(id=target_service_id)
+        except Service.DoesNotExist:
+            return Response({"error": f"Target service with ID {target_service_id} not found"}, status=404)
         
-        if original_queue.user.id != request.data.get('user_id'):
+        # Authorization check
+        if original_queue.user.id != user_id:
             return Response({"error": "Not authorized to transfer this queue"}, status=403)
         
+        # Business rules validation
         time_window = timedelta(minutes=2)
         if timezone.now() - original_queue.date_created > time_window:
             return Response(
@@ -934,52 +945,63 @@ def transfer_queue(request):
         if original_queue.service.id == target_service.id:
             return Response({"error": "Cannot transfer to the same service location"}, status=400)
         
-        original_queue.status = 'transferred'
-        original_queue.save()
-        
-        pending_queues = Queue.objects.filter(
-            service=target_service,
-            status='pending',
-            is_active=True
-        ).order_by('date_created')
-        
-        position = pending_queues.count() + 1
-        
-        service_queue = ServiceQueue.objects.filter(
-            service=target_service,
-            is_active=True
-        ).first()
-        
-        if not service_queue:
-            service_queue = ServiceQueue.objects.create(
+        # Use transaction to ensure data consistency
+        with transaction.atomic():
+            # Mark original queue as transferred
+            original_queue.status = 'transferred'
+            original_queue.save()
+            
+            # Find or create service queue for target service
+            service_queue, created = ServiceQueue.objects.get_or_create(
                 service=target_service,
-                current_member_count=0
+                is_active=True,
+                defaults={'current_member_count': 0}
             )
+            
+            # Increment member count
+            service_queue.current_member_count += 1
+            service_queue.save()
+            
+            # Calculate position
+            position = Queue.objects.filter(
+                service=target_service,
+                status='pending',
+                is_active=True
+            ).count() + 1
+            
+            # Get historical wait time data for accurate estimation
+            historical_data = fetch_historical_data(target_service.id)
+            
+            # Create new queue with reference to original
+            new_queue = Queue.objects.create(
+                user=original_queue.user,
+                service=target_service,
+                service_queue=service_queue,
+                sequence_number=position,
+                status='pending',
+                transferred_from=original_queue
+            )
+            
+            # Calculate expected ready time
+            new_queue.expected_ready_time = compute_expected_ready_time(
+                target_service, position, historical_data
+            )
+            new_queue.save()
+            
+            # Update QR code to point to new queue
+            try:
+                qr_code = QRCode.objects.get(queue=original_queue)
+                qr_code.queue = new_queue
+                qr_code.save()
+            except QRCode.DoesNotExist:
+                # Create new QR code if the original one doesn't exist
+                qr_data = f"Queue ID: {new_queue.id}"
+                QRCode.objects.create(queue=new_queue, qr_hash=qr_data)
         
-        service_queue.current_member_count += 1
-        service_queue.save()
-        
-        historical_data = fetch_historical_data(target_service.id)
-        
-        new_queue = Queue.objects.create(
-            user=original_queue.user,
-            service=target_service,
-            service_queue=service_queue,
-            sequence_number=position,
-            status='pending',
-            transferred_from=original_queue
-        )
-        
-        new_queue.expected_ready_time = compute_expected_ready_time(target_service, position, historical_data)
-        new_queue.save()
-        
-        qr_code = QRCode.objects.get(queue=original_queue)
-        qr_code.queue = new_queue
-        qr_code.save()
-        
-        now = timezone.now()
+        # Calculate wait minutes for response
         wait_minutes = 0
         if new_queue.expected_ready_time:
+            now = timezone.now()
             wait_seconds = max(0, (new_queue.expected_ready_time - now).total_seconds())
             wait_minutes = int(wait_seconds / 60)
         
@@ -995,4 +1017,4 @@ def transfer_queue(request):
     except Exception as e:
         logger.error(f"Error in transfer_queue: {str(e)}")
         logger.error(traceback.format_exc())
-        return Response({"error": str(e)}, status=500)
+        return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
