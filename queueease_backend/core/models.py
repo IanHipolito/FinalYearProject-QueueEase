@@ -151,6 +151,7 @@ class Queue(models.Model):
     expected_ready_time = models.DateTimeField(null=True, blank=True)
     transferred_from = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='transferred_to')
     last_notification_time = models.DateTimeField(null=True, blank=True)
+    last_notified_position = models.IntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['sequence_number']
@@ -194,6 +195,13 @@ class AppointmentDetails(models.Model):
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
     queue_status = models.CharField(max_length=50, choices=QUEUE_STATUS_CHOICES, default='not_started')
     is_active = models.BooleanField(default=True)
+    actual_start_time = models.DateTimeField(null=True, blank=True)
+    actual_end_time = models.DateTimeField(null=True, blank=True)
+    expected_duration = models.IntegerField(default=30)
+    delay_notified = models.BooleanField(default=False)
+    last_delay_minutes = models.IntegerField(null=True, blank=True)
+    reminder_sent = models.BooleanField(default=False)
+    last_reminder_sent = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Appointment {self.order_id} - {self.user.name}"

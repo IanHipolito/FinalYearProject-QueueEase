@@ -112,6 +112,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const loadCurrentService = async () => {
+      if (currentService?.id) {
+        try {
+          // Fetch the service details including service_type
+          const serviceDetails = await API.services.getServiceDetails(currentService.id);
+          setCurrentService(prev => ({
+            ...prev,
+            ...serviceDetails,
+            service_type: serviceDetails.service_type
+          }));
+          console.log("Loaded service details:", serviceDetails);
+        } catch (error) {
+          console.error("Error loading service details:", error);
+        }
+      }
+    };
+
+    if (user && currentService?.id && !currentService?.service_type) {
+      loadCurrentService();
+    }
+  }, [user, currentService?.id]);
+
   const refreshServiceData = async (serviceId: number) => {
     try {
       const updatedService = await API.services.getServiceDetails(serviceId);
@@ -131,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
   
-  // Add a function to switch between managed services
+  // Function to switch between managed services
   const switchService = (serviceId: number) => {
     const service = managedServices.find(s => s.id === serviceId);
     if (service) {

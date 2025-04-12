@@ -12,7 +12,7 @@ from core.models import (
     User, Service, Queue, AppointmentDetails
 )
 from core.views.appointment_views import (
-    user_appointments, appointment_detail, get_or_create_appointment,
+    user_appointments, appointment_detail,
     generate_order_id, delete_appointment, create_appointment,
     check_and_update_appointments, check_appointment_status
 )
@@ -129,74 +129,6 @@ class AppointmentDetailTests(AppointmentBaseTest):
         # Status should be updated to 'completed'
         past_appointment.refresh_from_db()
         self.assertEqual(past_appointment.status, 'completed')
-
-
-class GetOrCreateAppointmentTests(AppointmentBaseTest):
-    def test_get_existing_appointment(self):
-        data = {
-            'order_id': self.appointment.order_id,
-            'user_id': self.user.id
-        }
-        request = self.factory.get('/', data)
-        request.query_params = request.GET
-        
-        response = get_or_create_appointment(request)
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['order_id'], self.appointment.order_id)
-    
-    @patch('core.views.appointment_views.Service.objects.get')
-    @patch('core.views.appointment_views.generate_order_id')
-    @patch('core.views.appointment_views.User.objects.get')
-    def test_create_new_appointment(self, mock_user_get, mock_generate_order_id, mock_service_get):
-        # Setup mocks
-        mock_service_get.return_value = self.service
-        mock_user_get.return_value = self.user
-        mock_generate_order_id.return_value = "NEW-APPT-12345"
-        
-        tomorrow = (timezone.now().date() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        data = {
-            'user_id': self.user.id,
-            'service_id': self.service.id,
-            'appointment_date': tomorrow,
-            'appointment_time': '16:30'
-        }
-        
-        # Create a request factory
-        request = self.factory.post('/', json.dumps(data), content_type='application/json')
-        request.data = data
-        
-        try:
-            response = create_appointment(request)
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            raise
-        
-        # Ensure the response status is 201 (CREATED)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED, 
-                        f"Unexpected response: {response.data}")
-        
-        # Check that an order ID was returned
-        self.assertIn('order_id', response.data)
-        self.assertEqual(response.data['order_id'], "NEW-APPT-12345")
-        
-    def test_get_or_create_missing_parameters(self):
-        # Test GET without order_id
-        request = self.factory.get('/', {'user_id': self.user.id})
-        request.query_params = request.GET
-        
-        response = get_or_create_appointment(request)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        
-        # Test POST without required fields
-        data = {'user_id': self.user.id}  # Missing service_id, appointment_date, etc.
-        request = self.factory.post('/', data, format='json')
-        request.data = data
-        
-        response = get_or_create_appointment(request)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
 
 class GenerateOrderIdTests(AppointmentBaseTest):
     def test_order_id_format(self):

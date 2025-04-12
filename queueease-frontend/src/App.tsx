@@ -10,8 +10,6 @@ import SuccessPage from './pages/SuccessPage';
 import MapProximity from './pages/MapProximity';
 import AppointmentsList from './pages/AppointmentsList';
 import AppointmentDetail from './pages/AppointmentDetail';
-import OrderIDInput from './pages/OrderIDInput';
-import AddAppointment from './pages/AddAppointment';
 import ServiceSelection from './pages/ServiceSelection';
 import AdminLayout from './components/Layout/AdminLayout';
 import FBCloudMessaging from './hooks/FBCloudMessaging';
@@ -69,12 +67,6 @@ const App: React.FC = () => {
           <Route path="/appointment/:orderId" element={
             <PrivateRoute>
               <AppointmentDetail />
-            </PrivateRoute>
-          } />
-          <Route path="/orderid" element={<OrderIDInput />} />
-          <Route path="/add-appointment" element={
-            <PrivateRoute>
-              <AddAppointment />
             </PrivateRoute>
           } />
           <Route path="/services" element={<ServiceSelection />} />

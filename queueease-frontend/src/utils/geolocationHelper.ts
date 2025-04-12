@@ -1,8 +1,18 @@
+import { TIMEZONE } from './timezoneUtils';
+
 interface GeolocationResult {
   location: { latitude: number; longitude: number } | null;
   error: string | null;
   fallbackUsed: boolean;
 }
+
+// If there's any timestamp handling, ensure it's using Irish timezone
+// For example, if recording when location was captured:
+
+const recordLocationTimestamp = () => {
+  // Use the current time without timezone complications
+  return new Date().toISOString().replace('Z', '');
+};
 
 export const geolocationHelper = {
   // Check if geolocation is supported

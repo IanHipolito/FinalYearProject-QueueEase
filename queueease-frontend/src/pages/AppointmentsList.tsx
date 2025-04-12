@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'context/AuthContext';
 import { API } from '../services/api';
 import { Grid, Alert, Snackbar, Typography, Stack, useTheme, CircularProgress, Box } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import PageContainer from '../components/common/PageContainer';
 import PageHeader from '../components/common/PageHeader';
 import StyledCard from '../components/common/StyledCard';
-import StyledButton from '../components/common/StyledButton';
 import AppointmentCard from '../components/appointments/AppointmentCard';
 import { formatDate } from '../utils/formatters';
 import LoadingSkeleton from '../components/skeletons/LoadingSkeletons';
@@ -126,23 +124,6 @@ const AppointmentsList: React.FC = () => {
   return (
     <PageContainer maxWidth="md">
       <PageHeader title="Your Appointments" backUrl="/usermainpage" />
-      
-      <StyledCard sx={{ p: 2, mb: 3, bgcolor: 'white', border: `1px solid ${theme.palette.divider}` }}>
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          spacing={2} 
-          sx={{ width: '100%' }}
-        >
-          <StyledButton
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/add-appointment')}
-            sx={{ flex: { xs: '1', sm: '0 0 auto' } }}
-          >
-            Add Appointment
-          </StyledButton>
-        </Stack>
-      </StyledCard>
-
       {loading ? (
         <LoadingSkeleton variant="list" />
       ) : appointments.length === 0 ? (

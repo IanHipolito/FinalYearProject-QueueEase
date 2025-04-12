@@ -101,7 +101,7 @@ class Command(BaseCommand):
                 name_lower = service.name.lower()
                 
                 # McDonald's and similar fast food
-                if any(chain in name_lower for chain in ['mcdonald', 'burger king', 'kfc', 'subway', 'wendy']):
+                if any(chain in name_lower for chain in ['mcdonald', 'burger king', 'kfc', 'subway']):
                     base_range = (3, 8)
                     peak_range = (5, 15)
                 

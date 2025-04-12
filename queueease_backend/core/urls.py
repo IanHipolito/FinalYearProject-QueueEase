@@ -13,20 +13,23 @@ from .views import (
     list_services_with_status,
     
     # Appointment views
-    user_appointments, appointment_detail, get_or_create_appointment,
+    user_appointments, appointment_detail,
     delete_appointment, create_appointment, check_and_update_appointments, 
-    check_appointment_status, cancel_appointment,
+    check_appointment_status, cancel_appointment, start_appointment_service,
+    complete_appointment_service, propagate_appointment_delays,
     
     # Admin views
     admin_dashboard_data, admin_customers, admin_create_customer,
     test_notification, admin_get_analytics, notification_settings,
     admin_company_info, admin_update_company_info, admin_change_password,
+    admin_todays_appointments,
     
     # Feedback views
     submit_feedback, get_feedback_categories, get_user_feedback_history,
     get_eligible_services,
 )
 from django.http import JsonResponse
+
 
 def test_view(request):
     return JsonResponse({"message": "This is a test view!"})
@@ -59,13 +62,15 @@ urlpatterns = [
     # Appointment endpoints
     path('appointments/<int:user_id>/', user_appointments, name='user-appointments'),
     path('appointment/<str:order_id>/', appointment_detail, name='appointment-detail'),
-    path('appointment/add-existing/', get_or_create_appointment, name='get_or_create_appointment'),
     path('appointment/delete/<str:order_id>/', delete_appointment, name='delete-appointment'),
     path('create-appointment/', create_appointment, name='create-appointment'),
     path('available-times/<int:service_id>/', available_appointment_times, name='available-times'),
     path('check-appointments/', check_and_update_appointments, name='check-appointments'),
     path('appointment/check-status/<str:order_id>/', check_appointment_status, name='check-appointment-status'),
     path('appointment/cancel/<str:order_id>/', cancel_appointment, name='cancel-appointment'),
+    path('start-appointment/', start_appointment_service, name='start-appointment-service'),
+    path('complete-appointment/', complete_appointment_service, name='complete-appointment-service'),
+    path('propagate-delays/', propagate_appointment_delays, name='propagate-appointment-delays'),
 
     # Service endpoints
     path('list_services/', list_services, name='list_services'),
@@ -83,6 +88,7 @@ urlpatterns = [
     path('admin/company-info/<int:user_id>/', admin_company_info, name='admin-company-info'),
     path('admin/update-company-info/', admin_update_company_info, name='admin-update-company-info'),
     path('admin/change-password/', admin_change_password, name='admin-change-password'),
+    path('admin/todays-appointments/', admin_todays_appointments, name='admin-todays-appointments'),
     
     # Feedback endpoints
     path('feedback/submit/', submit_feedback, name='submit_feedback'),

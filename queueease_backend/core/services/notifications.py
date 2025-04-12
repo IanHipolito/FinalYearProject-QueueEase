@@ -4,6 +4,7 @@ import os
 import json
 from typing import Dict, Any, Optional, List
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,28 @@ class NotificationService:
         }
         
         return NotificationService.send_push_notification(token, title, body, data)
+    
+    @staticmethod
+    def send_appointment_delay_notification(token: str, appointment_id: str, service_name: str, 
+                                            delay_minutes: int, new_time: datetime) -> Dict[str, Any]:
+        """Send a notification for appointment delays"""
+        title = f"Appointment Delay: {service_name}"
+        
+        # Format the time nicely for display
+        formatted_time = new_time.strftime("%I:%M %p")
+        
+        body = f"Your appointment has been delayed by {delay_minutes} minutes. New expected time: {formatted_time}."
+        
+        data = {
+            "type": "appointment_delay",
+            "appointment_id": appointment_id,
+            "delay_minutes": str(delay_minutes),
+            "new_time": new_time.isoformat(),
+            "url": f"/appointment/{appointment_id}"
+        }
+        
+        return NotificationService.send_push_notification(token, title, body, data)
+    
 
 # Convenience export functions
 def send_push_notification(token, title, body, data=None):
@@ -159,3 +182,6 @@ def send_queue_almost_ready_notification(token, queue_id, service_name):
 
 def send_appointment_reminder(token, appointment_id, service_name, time_until):
     return NotificationService.send_appointment_reminder(token, appointment_id, service_name, time_until)
+
+def send_appointment_delay_notification(token, appointment_id, service_name, delay_minutes, new_time):
+    return NotificationService.send_appointment_delay_notification(token, appointment_id, service_name, delay_minutes, new_time)

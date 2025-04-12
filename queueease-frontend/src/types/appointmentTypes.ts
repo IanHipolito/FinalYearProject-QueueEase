@@ -19,6 +19,10 @@ export interface AppointmentDetail {
     queue_position: number;
     appointment_title: string;
     expected_start_time: string;
+    actual_start_time?: string | null;
+    actual_end_time?: string | null;
+    last_delay_minutes?: number | null;
+    delay_notified?: boolean;
 }
 
 export interface AppointmentCardProps {

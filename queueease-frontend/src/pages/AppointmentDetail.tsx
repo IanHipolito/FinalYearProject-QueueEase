@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { API } from '../services/api';
 import { 
   Box, Typography, Button, Dialog, DialogActions, DialogContent, 
-  DialogContentText, DialogTitle, Alert,useTheme,useMediaQuery, 
-  Paper, Grid, CircularProgress, LinearProgress
+  DialogContentText, DialogTitle, Alert, useTheme, useMediaQuery, 
+  Paper, Grid, CircularProgress
 } from '@mui/material';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
@@ -13,7 +13,15 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EventIcon from '@mui/icons-material/Event';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import QueueIcon from '@mui/icons-material/Queue';
+import WarningIcon from '@mui/icons-material/Warning';
 import { AppointmentDetail as AppointmentDetailType } from 'types/appointmentTypes';
+import { 
+  stripTimezoneDesignator, 
+  createDateFromStrings, 
+  getHoursDifference,
+  formatIrishDate,
+  formatTimeString
+} from '../utils/timezoneUtils';
 
 const AppointmentDetail: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -24,30 +32,34 @@ const AppointmentDetail: React.FC = () => {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelSuccess, setCancelSuccess] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [originalTime, setOriginalTime] = useState<string | null>(null);
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // Function to update queue status based on time and other factors
   const determineQueueStatus = (appointment: AppointmentDetailType, currentTime: Date, timeRemaining: number): string => {
-    const expectedStartTime = new Date(appointment.expected_start_time);
-    const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}Z`);
-    
-    // If the appointment is marked as completed or cancelled in the backend
+    if (appointment.queue_status === 'in_queue') return 'in_queue'; 
     if (appointment.status === 'completed') return 'completed';
     if (appointment.status === 'cancelled') return 'cancelled';
 
-    // If time remaining is zero or negative and we're past the appointment time
+    if (appointment.actual_start_time && !appointment.actual_end_time) {
+      return 'in_queue';
+    }
+
+    const expectedStartTime = new Date(stripTimezoneDesignator(appointment.expected_start_time));
+    const appointmentDateTime = createDateFromStrings(
+      appointment.appointment_date,
+      appointment.appointment_time
+    );
+    
     if (timeRemaining <= 0 && currentTime > appointmentDateTime) {
       return 'completed';
     }
     
-    // If current time is past the expected start time but not yet completed
     if (currentTime > expectedStartTime && currentTime > appointmentDateTime) {
       return 'in_queue';
     }
     
-    // If we're within 300 minutes or 5 hours of the appointment time
     const TimeBeforeQueueStart = new Date(appointmentDateTime);
     TimeBeforeQueueStart.setMinutes(TimeBeforeQueueStart.getMinutes() - 300);
     
@@ -55,8 +67,65 @@ const AppointmentDetail: React.FC = () => {
       return 'in_queue';
     }
     
-    // Default state if none of the above conditions are met
     return 'not_started';
+  };
+
+  const renderDelayInfo = () => {
+    if (!appointment || !appointment.last_delay_minutes || appointment.last_delay_minutes < 1) {
+      return null;
+    }
+    
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2.5,
+          mb: 2.5,
+          borderRadius: 2,
+          bgcolor: theme.palette.warning.light + '20',
+        }}
+      >
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          mb: 1.5,
+          gap: 1
+        }}>
+          <WarningIcon color="warning" />
+          <Typography 
+            variant="subtitle1" 
+            fontWeight="medium" 
+            color="warning.main"
+          >
+            Appointment Delayed
+          </Typography>
+        </Box>
+        
+        <Typography variant="body2" color="text.secondary" paragraph>
+          Your appointment has been delayed by {appointment.last_delay_minutes} minutes due to
+          longer service times today.
+        </Typography>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              Original Time
+            </Typography>
+            <Typography variant="body2" sx={{ textDecoration: 'line-through' }}>
+              {originalTime && formatTimeString(originalTime)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              New Expected Time
+            </Typography>
+            <Typography variant="body2" fontWeight="medium">
+              {appointment.appointment_time && formatTimeString(appointment.appointment_time)}
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
+    );
   };
 
   const handleOpenCancelDialog = () => {
@@ -77,7 +146,6 @@ const AppointmentDetail: React.FC = () => {
       setCancelSuccess(true);
       setOpenCancelDialog(false);
       
-      // Update the appointment status
       if (appointment) {
         setAppointment({
           ...appointment,
@@ -86,7 +154,6 @@ const AppointmentDetail: React.FC = () => {
         });
       }
       
-      // Reload the appointment data after a short delay
       setTimeout(() => {
         fetchAppointment();
       }, 1000);
@@ -102,9 +169,12 @@ const AppointmentDetail: React.FC = () => {
     try {
       const data = await API.appointments.getAppointmentDetails(orderId || '');
       
-      // Defensive data handling
       if (data && data.appointment_date) {
         setAppointment(data);
+        
+        if (!originalTime) {
+          setOriginalTime(data.appointment_time);
+        }
       } else {
         throw new Error('Invalid appointment data received');
       }
@@ -117,7 +187,7 @@ const AppointmentDetail: React.FC = () => {
 
   useEffect(() => {
     fetchAppointment();
-    const pollingInterval = setInterval(fetchAppointment, 60000);
+    const pollingInterval = setInterval(fetchAppointment, 30000);
     return () => clearInterval(pollingInterval);
   }, [orderId]);
 
@@ -126,12 +196,14 @@ const AppointmentDetail: React.FC = () => {
     if (appointment) {
       const updateRemainingTime = () => {
         const currentTime = new Date();
-        const expectedTime = new Date(appointment.expected_start_time);
+        
+        const expectedTimeString = stripTimezoneDesignator(appointment.expected_start_time);
+        const expectedTime = new Date(expectedTimeString);
+        
         const diffInSeconds = Math.max(0, Math.floor((expectedTime.getTime() - currentTime.getTime()) / 1000));
         
         setRemainingTime(diffInSeconds);
         
-        // Format the remaining time as days, hours, minutes, seconds
         const days = Math.floor(diffInSeconds / (24 * 60 * 60));
         const hours = Math.floor((diffInSeconds % (24 * 60 * 60)) / (60 * 60));
         const minutes = Math.floor((diffInSeconds % (60 * 60)) / 60);
@@ -149,7 +221,6 @@ const AppointmentDetail: React.FC = () => {
         
         setFormattedRemainingTime(formattedTime + ' remaining');
         
-        // Dynamically update the queue status based on time and remaining time
         if (appointment) {
           const updatedStatus = determineQueueStatus(appointment, currentTime, diffInSeconds);
           if (updatedStatus !== appointment.queue_status) {
@@ -167,52 +238,29 @@ const AppointmentDetail: React.FC = () => {
     return () => timer && clearInterval(timer);
   }, [appointment]);
 
-  // Check if appointment can be cancelled (more than 24 hours before the appointment)
   const canCancel = () => {
     if (!appointment || appointment.status !== 'pending') return false;
     
-    const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}Z`);
+    const appointmentDateTime = createDateFromStrings(
+      appointment.appointment_date,
+      appointment.appointment_time
+    );
+    
     const now = new Date();
-    const timeDifference = appointmentDateTime.getTime() - now.getTime();
-    const hoursDifference = timeDifference / (1000 * 3600);
+    
+    const hoursDifference = getHoursDifference(appointmentDateTime, now);
     
     return hoursDifference > 24;
   };
 
-  const progressPercentage = appointment 
-    ? Math.min(100, (1 - remainingTime / (appointment.estimated_wait_time * 60)) * 100)
-    : 0;
-
-  // Function to get status color
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'completed':
-        return theme.palette.success.main;
-      case 'cancelled':
-        return theme.palette.error.main;
-      case 'in_queue':
-        return theme.palette.warning.main;
-      default:
-        return theme.palette.info.main;
-    }
-  };
-
-  // Format status for display
   const formatStatus = (status: string) => {
     return status.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
 
-  // Get formatted date in a more readable format
   const getFormattedDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    return formatIrishDate(dateString);
   };
 
   if (loading) {
@@ -243,7 +291,6 @@ const AppointmentDetail: React.FC = () => {
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Header */}
       <Paper
         elevation={0}
         sx={{
@@ -278,7 +325,7 @@ const AppointmentDetail: React.FC = () => {
               textAlign: 'center'
             }}
           >
-            Order ID: {appointment?.order_id || ''}
+            Appointment ID: {appointment?.order_id || ''}
           </Typography>
         </Box>
       </Paper>
@@ -310,7 +357,6 @@ const AppointmentDetail: React.FC = () => {
               }
             }}
           >
-            {/* Status indicator at top */}
             <Box 
               sx={{ 
                 p: 2, 
@@ -344,7 +390,6 @@ const AppointmentDetail: React.FC = () => {
             </Box>
 
             <Box sx={{ p: isMobile ? 2 : 3 }}>
-              {/* Service Info */}
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center',
@@ -358,7 +403,6 @@ const AppointmentDetail: React.FC = () => {
               </Box>
               
               <Grid container spacing={2} sx={{ mb: 2.5 }}>
-                {/* Date */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ 
                     display: 'flex', 
@@ -377,7 +421,6 @@ const AppointmentDetail: React.FC = () => {
                   </Box>
                 </Grid>
                 
-                {/* Time */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ 
                     display: 'flex', 
@@ -390,13 +433,12 @@ const AppointmentDetail: React.FC = () => {
                         Appointment Time
                       </Typography>
                       <Typography variant="body1" fontWeight="medium">
-                        {appointment.appointment_time}
+                        {formatTimeString(appointment.appointment_time)}
                       </Typography>
                     </Box>
                   </Box>
                 </Grid>
                 
-                {/* Queue Position */}
                 <Grid item xs={12} sm={6}>
                   <Box sx={{ 
                     display: 'flex', 
@@ -416,7 +458,8 @@ const AppointmentDetail: React.FC = () => {
                 </Grid>
               </Grid>
               
-              {/* Time remaining section with improved styling */}
+              {renderDelayInfo()}
+              
               {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
                 <Paper
                   elevation={0}
@@ -424,47 +467,37 @@ const AppointmentDetail: React.FC = () => {
                     p: 2.5,
                     mb: 2.5,
                     borderRadius: 2,
-                    bgcolor: theme.palette.primary.light + '20', // Light version with transparency
+                    bgcolor: appointment.queue_status === 'in_queue' 
+                      ? theme.palette.warning.light + '20'
+                      : theme.palette.primary.light + '20',
                   }}
                 >
                   <Typography 
                     variant="subtitle1" 
                     fontWeight="medium" 
-                    color="primary.main"
+                    color={appointment.queue_status === 'in_queue' ? "warning.main" : "primary.main"}
                     sx={{ mb: 1.5 }}
                   >
-                    Time Remaining
+                    {appointment.queue_status === 'in_queue' 
+                      ? "Appointment In Progress" 
+                      : "Time Remaining"}
                   </Typography>
-                  
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progressPercentage}
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      mb: 2,
-                      backgroundColor: theme.palette.grey[200],
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 4,
-                        backgroundColor: theme.palette.primary.main,
-                      }
-                    }}
-                  />
-                  
                   <Box sx={{ 
                     display: 'flex', 
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 1
                   }}>
-                    <AccessTimeIcon color="primary" />
+                    <AccessTimeIcon color={appointment.queue_status === 'in_queue' ? "warning" : "primary"} />
                     <Typography 
                       variant="h6" 
                       component="p"
-                      color="primary.main"
+                      color={appointment.queue_status === 'in_queue' ? "warning.main" : "primary.main"}
                       fontWeight="medium"
                     >
-                      {formattedRemainingTime}
+                      {appointment.queue_status === 'in_queue' 
+                        ? "Currently In The Queue, Please Wait For Your Turn" 
+                        : formattedRemainingTime}
                     </Typography>
                   </Box>
                 </Paper>
@@ -474,7 +507,6 @@ const AppointmentDetail: React.FC = () => {
         </Box>
       )}
 
-      {/* Action buttons */}
       <Box 
         sx={{ 
           mt: 'auto', 
@@ -527,7 +559,6 @@ const AppointmentDetail: React.FC = () => {
         )}
       </Box>
 
-      {/* Cancel Confirmation Dialog */}
       <Dialog
         open={openCancelDialog}
         onClose={handleCloseCancelDialog}

@@ -1,3 +1,5 @@
+import { stripTimezoneDesignator } from '../utils/timezoneUtils';
+
 const API_BASE =
     window.location.hostname === "localhost"
         ? "http://127.0.0.1:8000/api"
@@ -198,6 +200,16 @@ export const API = {
             });
             return API.handleResponse(response);
         },
+        getTodaysAppointments: async (serviceId: number, date: string) => {
+            // Strip timezone designator from date if present  
+            const cleanDate = stripTimezoneDesignator(date);
+            
+            const response = await fetch(`${API_BASE}/admin/todays-appointments/?service_id=${serviceId}&date=${cleanDate}`, {
+                headers: getCommonHeaders(),
+                credentials: 'include', 
+            });
+            return API.handleResponse(response);
+        },
     },
 
     // Service management
@@ -224,7 +236,10 @@ export const API = {
             return API.handleResponse(response);
         },
         getAvailableTimes: async (serviceId: number, date: string) => {
-            const response = await fetch(`${API_BASE}/available-times/${serviceId}/?date=${date}`, {
+            // Strip timezone designator from date if present
+            const cleanDate = stripTimezoneDesignator(date);
+            
+            const response = await fetch(`${API_BASE}/available-times/${serviceId}/?date=${cleanDate}`, {
                 headers: getCommonHeaders(),
                 credentials: 'include', 
             });
@@ -367,15 +382,6 @@ export const API = {
             });
             return API.handleResponse(response);
         },
-        addAppointment: async (orderID: string, userId: number) => {
-            const response = await fetch(`${API_BASE}/appointment/add-existing/`, {
-                method: 'POST',
-                headers: getCommonHeaders(),
-                body: JSON.stringify({ order_id: orderID, user_id: userId }),
-                credentials: 'include', 
-            });
-            return API.handleResponse(response);
-        },
         deleteAppointment: async (orderId: string) => {
             const response = await fetch(`${API_BASE}/appointment/delete/${orderId}/`, {
                 method: 'DELETE',
@@ -385,10 +391,17 @@ export const API = {
             return API.handleResponse(response);
         },
         createAppointment: async (data: any) => {
+            const formattedData = {
+                ...data,
+                appointment_time: data.appointment_time 
+                    ? stripTimezoneDesignator(data.appointment_time) 
+                    : data.appointment_time
+            };
+
             const response = await fetch(`${API_BASE}/create-appointment/`, {
                 method: 'POST',
                 headers: getCommonHeaders(),
-                body: JSON.stringify(data),
+                body: JSON.stringify(formattedData),
                 credentials: 'include', 
             });
             return API.handleResponse(response);
@@ -411,6 +424,26 @@ export const API = {
         checkStatus: async (orderId: string) => {
             const response = await fetch(`${API_BASE}/appointment/check-status/${orderId}/`, {
                 headers: getCommonHeaders(),
+                credentials: 'include', 
+            });
+            return API.handleResponse(response);
+        },
+        startAppointmentService: async (orderId: string) => {
+            console.log('API call: startAppointmentService with orderId:', orderId);
+            const response = await fetch(`${API_BASE}/start-appointment/`, {
+                method: 'POST',
+                headers: getCommonHeaders(),
+                body: JSON.stringify({ order_id: orderId }),
+                credentials: 'include', 
+            });
+            console.log('Response status:', response.status);
+            return API.handleResponse(response);
+        },
+        completeAppointmentService: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/complete-appointment/`, {
+                method: 'POST',
+                headers: getCommonHeaders(),
+                body: JSON.stringify({ order_id: orderId }),
                 credentials: 'include', 
             });
             return API.handleResponse(response);

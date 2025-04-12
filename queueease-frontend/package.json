@@ -24,7 +24,7 @@
     "@types/styled-components": "^5.1.34",
     "abortcontroller-polyfill": "^1.7.8",
     "axios": "^1.7.7",
-    "date-fns": "^2.30.0",
+    "date-fns": "^2.29.3",
     "dayjs": "^1.11.13",
     "firebase": "^11.4.0",
     "framer-motion": "^12.5.0",

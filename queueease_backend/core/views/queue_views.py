@@ -75,7 +75,7 @@ def compute_expected_ready_time(service, position, historical_data=None):
                 # For positions beyond 1, use a diminishing returns model for wait time growth
                 # Formula: base + (position-1)^0.6 * factor
                 base_time = minimal_prep
-                time_factor = 2.5  # Additional time per position, with diminishing returns
+                time_factor = 0.5  # Additional time per position, with diminishing returns
                 position_factor = (position - 1) ** 0.6  # Sublinear growth
                 
                 position_wait = base_time + (position_factor * time_factor)

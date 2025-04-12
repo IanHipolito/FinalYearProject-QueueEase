@@ -12,6 +12,10 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import PageHeader from '../components/common/PageHeader';
 import ActionButton from '../components/common/ActionButton';
 import { useAuthGuard } from '../hooks/useAuthGuard';
+import { 
+  stripTimezoneDesignator, 
+  formatToISODate 
+} from '../utils/timezoneUtils';
 
 const BookAppointment: React.FC = () => {
   const { authenticated, loading: authLoading } = useAuthGuard();
@@ -68,8 +72,8 @@ const BookAppointment: React.FC = () => {
     
     try {
       setError('');
-      // Format date to YYYY-MM-DD
-      const formattedDate = date.toISOString().split('T')[0];
+      // Format date to YYYY-MM-DD without timezone complications
+      const formattedDate = formatToISODate(date);
       
       const data = await API.services.getAvailableTimes(Number(serviceId), formattedDate);
       
@@ -141,14 +145,15 @@ const BookAppointment: React.FC = () => {
         throw new Error('Cannot book appointments for past dates');
       }
       
-      // Format date to YYYY-MM-DD
-      const formattedDate = selectedDate.toISOString().split('T')[0];
+      // Format date properly without timezone suffix
+      const formattedDate = formatToISODate(selectedDate);
 
       const appointmentData = {
         user_id: user.id,
         service_id: Number(serviceId),
         appointment_date: formattedDate,
-        appointment_time: selectedTime,
+        // Ensure the time doesn't have any timezone designator
+        appointment_time: stripTimezoneDesignator(selectedTime),
       };
       
       const data = await API.appointments.createAppointment(appointmentData);

@@ -754,3 +754,51 @@ def admin_change_password(request):
         logger.error(f"Error changing password: {str(e)}")
         logger.error(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
+    
+@api_view(['GET'])
+def admin_todays_appointments(request):
+    try:
+        service_id = request.query_params.get('service_id')
+        date_str = request.query_params.get('date')
+        
+        if not service_id:
+            return Response({"error": "Service ID is required"}, status=400)
+            
+        # If no date provided, use today
+        if not date_str:
+            date = timezone.now().date()
+        else:
+            try:
+                date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
+            
+        # Get appointments for the service and date
+        appointments = AppointmentDetails.objects.filter(
+            service_id=service_id,
+            appointment_date=date
+        ).select_related('user', 'service').order_by('appointment_time')
+        
+        # Serialize and enhance data
+        result = []
+        for appointment in appointments:
+            data = {
+                'order_id': appointment.order_id,
+                'user_name': appointment.user.name,
+                'service_name': appointment.service.name,
+                'appointment_date': appointment.appointment_date.strftime('%Y-%m-%d'),
+                'appointment_time': appointment.appointment_time.strftime('%H:%M'),
+                'status': appointment.status,
+                'queue_status': appointment.queue_status,
+                'actual_start_time': appointment.actual_start_time.isoformat() if appointment.actual_start_time else None,
+                'actual_end_time': appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
+                'last_delay_minutes': appointment.last_delay_minutes
+            }
+            result.append(data)
+            
+        return Response(result)
+            
+    except Exception as e:
+        logger.error(f"Error getting today's appointments: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)

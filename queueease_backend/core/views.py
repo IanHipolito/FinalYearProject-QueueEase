@@ -14,15 +14,17 @@ from .views.service_views import (
 )
 
 from .views.appointment_views import (
-    user_appointments, appointment_detail, get_or_create_appointment,
+    user_appointments, appointment_detail,
     delete_appointment, create_appointment, cancel_appointment,
-    check_and_update_appointments, check_appointment_status
+    check_and_update_appointments, check_appointment_status, start_appointment_service,
+    complete_appointment_service, propagate_appointment_delays
 )
 
 from .views.admin_views import (
     admin_dashboard_data, admin_customers, notification_settings,
     admin_create_customer, test_notification, admin_get_analytics,
-    admin_company_info, admin_update_company_info, admin_change_password
+    admin_company_info, admin_update_company_info, admin_change_password,
+    admin_todays_appointments
 )
 
 from .views.feedback_views import (
