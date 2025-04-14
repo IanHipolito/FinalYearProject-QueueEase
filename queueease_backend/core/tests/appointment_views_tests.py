@@ -7,14 +7,12 @@ from django.contrib.auth.hashers import make_password
 import json
 from unittest.mock import patch, MagicMock
 import datetime
-
 from core.models import (
     User, Service, Queue, AppointmentDetails
 )
 from core.views.appointment_views import (
     user_appointments, appointment_detail,
     generate_order_id, delete_appointment, create_appointment,
-    check_and_update_appointments, check_appointment_status
 )
 
 class AppointmentBaseTest(TestCase):
@@ -240,73 +238,3 @@ class CreateAppointmentTests(AppointmentBaseTest):
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
-
-
-class CheckAndUpdateAppointmentsTests(AppointmentBaseTest):
-    def test_update_outdated_appointments(self):
-        # Create expired appointments
-        yesterday = timezone.now().date() - datetime.timedelta(days=1)
-        
-        for i in range(3):
-            AppointmentDetails.objects.create(
-                order_id=f"EXPIRED-{i}",
-                user=self.user,
-                service=self.service,
-                appointment_date=yesterday,
-                appointment_time=datetime.time(hour=10 + i, minute=0),
-                status='pending'
-            )
-        
-        request = self.factory.get('/')
-        response = check_and_update_appointments(request)
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 3)  # Should update 3 appointments
-        
-        # Verify that all appointments were updated
-        for i in range(3):
-            appointment = AppointmentDetails.objects.get(order_id=f"EXPIRED-{i}")
-            self.assertEqual(appointment.status, 'completed')
-
-
-class CheckAppointmentStatusTests(AppointmentBaseTest):
-    def test_check_future_appointment_status(self):
-        request = self.factory.get('/')
-        response = check_appointment_status(request, self.appointment.order_id)
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['status'], 'pending')
-        self.assertTrue(response.data['success'])
-    
-    def test_check_past_appointment_status(self):
-        # Create an appointment with a past date
-        past_appointment = AppointmentDetails.objects.create(
-            order_id="PAST-STATUS",
-            user=self.user,
-            service=self.service,
-            appointment_date=timezone.now().date() - datetime.timedelta(days=1),
-            appointment_time=datetime.time(hour=14, minute=30),
-            duration_minutes=30,
-            status='pending'
-        )
-        
-        request = self.factory.get('/')
-        response = check_appointment_status(request, past_appointment.order_id)
-        
-        # Status should be updated to 'completed' and reported back
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['status'], 'completed')
-        
-        # Check that the database was updated
-        past_appointment.refresh_from_db()
-        self.assertEqual(past_appointment.status, 'completed')
-    
-    def test_check_nonexistent_appointment_status(self):
-        request = self.factory.get('/')
-        response = check_appointment_status(request, "NONEXISTENT-ORDER")
-        
-        # Fix: Accept either 404 or 500 status for now
-        self.assertTrue(
-            response.status_code == status.HTTP_404_NOT_FOUND or 
-            response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )

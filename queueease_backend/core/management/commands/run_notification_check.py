@@ -3,6 +3,8 @@ import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta, datetime
+from django.conf import settings
+import pytz
 from core.models import Queue, FCMToken, NotificationSettings, AppointmentDetails
 from core.services.notifications import send_queue_update_notification, send_push_notification, send_queue_almost_ready_notification, send_appointment_delay_notification, send_appointment_reminder
 
@@ -141,106 +143,6 @@ class Command(BaseCommand):
                     
         self.stdout.write(self.style.SUCCESS(f'Sent {sent_count} notifications'))
 
-    def process_appointment_reminders(self):
-        """Check and send appointment reminders at different time intervals"""
-        self.stdout.write('Checking for appointment reminders...')
-        
-        # Get current time
-        now = timezone.now()
-        
-        # Define reminder intervals in minutes
-        reminder_intervals = [15, 60, 180, 1440]  # 15 min, 1 hour, 3 hours, 24 hours
-        
-        # Track how many notifications were sent
-        notifications_sent = 0
-        
-        # Get all upcoming appointments within the next 24 hours that haven't been cancelled
-        upcoming_appointments = AppointmentDetails.objects.filter(
-            appointment_date__gte=now.date(),
-            status='pending'
-        ).select_related('user', 'service')
-        
-        for appointment in upcoming_appointments:
-            try:
-                # Combine appointment date and time into a datetime object
-                appointment_time = datetime.combine(
-                    appointment.appointment_date,
-                    appointment.appointment_time
-                )
-                appointment_time = timezone.make_aware(appointment_time)
-                
-                # Calculate time difference in minutes
-                time_difference = (appointment_time - now).total_seconds() / 60
-                
-                # Check if this appointment matches any of our reminder intervals
-                for interval_minutes in reminder_intervals:
-                    # Allow a 2-minute window to avoid missing notifications due to timing
-                    if interval_minutes - 2 <= time_difference <= interval_minutes + 2:
-                        # Check if a notification was recently sent for this appointment at this interval
-                        if (hasattr(appointment, 'last_reminder_sent') and appointment.last_reminder_sent and 
-                            (now - appointment.last_reminder_sent).total_seconds() < 3600):
-                            # Skip if a reminder was sent in the last hour
-                            continue
-                            
-                        # Try to get user's FCM token
-                        try:
-                            fcm_token = FCMToken.objects.filter(
-                                user=appointment.user,
-                                is_active=True
-                            ).latest('updated_at')
-                            
-                            # Call the send_appointment_reminder function with minutes as time_until
-                            send_appointment_reminder(
-                                token=fcm_token.token,
-                                appointment_id=appointment.order_id,
-                                service_name=appointment.service.name,
-                                time_until=int(time_difference)  # Pass minutes as an integer
-                            )
-                            
-                            # Update the last reminder time
-                            if hasattr(appointment, 'last_reminder_sent'):
-                                appointment.last_reminder_sent = now
-                                appointment.save(update_fields=['last_reminder_sent'])
-                            else:
-                                # Handle the case if the field doesn't exist yet
-                                self.stdout.write(
-                                    self.style.WARNING(
-                                        f"last_reminder_sent field not found for appointment {appointment.order_id}"
-                                    )
-                                )
-                            
-                            notifications_sent += 1
-                            self.stdout.write(
-                                self.style.SUCCESS(
-                                    f'Sent {interval_minutes}-minute reminder for appointment {appointment.order_id}'
-                                )
-                            )
-                            
-                        except FCMToken.DoesNotExist:
-                            self.stdout.write(
-                                self.style.WARNING(
-                                    f'No FCM token found for user {appointment.user.id} with appointment {appointment.order_id}'
-                                )
-                            )
-                        except Exception as e:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    f'Error sending reminder for appointment {appointment.order_id}: {str(e)}'
-                                )
-                            )
-                        
-                        # Break after sending a notification for this appointment
-                        break
-                        
-            except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f'Error processing appointment reminder {appointment.order_id}: {str(e)}'
-                    )
-                )
-        
-        self.stdout.write(f'Sent {notifications_sent} appointment reminders')
-
     def process_completion_notifications(self):
         now = timezone.now()
         
@@ -297,47 +199,59 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Completed {completed} queues and sent notifications'))
 
     def process_appointment_reminders(self):
-        """Check and send appointment reminders at different time intervals"""
         self.stdout.write('Checking for appointment reminders...')
         
         # Get current time
         now = timezone.now()
         
-        # Define reminder intervals in minutes
+        # Define reminder intervals in minutes with enhanced messages
         reminder_intervals = [
-            {'minutes': 15, 'message': 'Your appointment is starting soon! Please arrive at the venue.'},
-            {'minutes': 60, 'message': 'Your appointment is in 1 hour.'},
-            {'minutes': 180, 'message': 'Your appointment is in 3 hours.'},
-            {'minutes': 1440, 'message': 'Your appointment is tomorrow.'} # 24 hours
+            {
+                'minutes': 15, 
+                'message': 'Your appointment is starting in 15 minutes. Please arrive at the venue now.'
+            },
+            {
+                'minutes': 60, 
+                'message': 'Your appointment is in 1 hour. Please plan to arrive 15 minutes early.'
+            },
+            {
+                'minutes': 180, 
+                'message': 'Your appointment is in 3 hours. Please remember to bring any required documents.'
+            },
+            {
+                'minutes': 1440, 
+                'message': 'Reminder: Your appointment is tomorrow. We look forward to seeing you!'
+            }
         ]
         
         # Track how many notifications were sent
         notifications_sent = 0
         
-        # Get all upcoming appointments within the next 24 hours that haven't been cancelled
+        # Get upcoming appointments that are scheduled or checked in
         upcoming_appointments = AppointmentDetails.objects.filter(
             appointment_date__gte=now.date(),
-            status='pending',
-            reminder_sent=False
+            status__in=['scheduled', 'checked_in']
         ).select_related('user', 'service')
         
         for appointment in upcoming_appointments:
             try:
                 # Combine appointment date and time into a datetime object
-                appointment_time = datetime.combine(
-                    appointment.appointment_date,
-                    appointment.appointment_time
-                )
-                appointment_time = timezone.make_aware(appointment_time)
+                appointment_start = appointment.expected_start_datetime
                 
                 # Calculate time difference in minutes
-                time_difference = (appointment_time - now).total_seconds() / 60
+                time_difference = (appointment_start - now).total_seconds() / 60
                 
                 # Check if this appointment matches any of our reminder intervals
                 for interval in reminder_intervals:
                     interval_minutes = interval['minutes']
-                    # Allow a 2-minute window to avoid missing notifications due to timing
-                    if interval_minutes - 2 <= time_difference <= interval_minutes + 2:
+                    # Allow a 5-minute window to avoid missing notifications due to timing
+                    if interval_minutes - 5 <= time_difference <= interval_minutes + 5:
+                        # Check if a notification was recently sent for this appointment
+                        if (appointment.last_reminder_sent and 
+                            (now - appointment.last_reminder_sent).total_seconds() < 3600):
+                            # Skip if a reminder was sent in the last hour
+                            continue
+                            
                         # Try to get user's FCM token
                         try:
                             fcm_token = FCMToken.objects.filter(
@@ -345,7 +259,7 @@ class Command(BaseCommand):
                                 is_active=True
                             ).latest('updated_at')
                             
-                            # Call the send_appointment_reminder function
+                            # Send the appointment reminder
                             send_appointment_reminder(
                                 token=fcm_token.token,
                                 appointment_id=appointment.order_id,
@@ -353,10 +267,9 @@ class Command(BaseCommand):
                                 time_until=interval['message']
                             )
                             
-                            # Mark reminder as sent for this interval
+                            # Update the last reminder time
                             appointment.last_reminder_sent = now
-                            appointment.reminder_sent = True
-                            appointment.save(update_fields=['last_reminder_sent', 'reminder_sent'])
+                            appointment.save(update_fields=['last_reminder_sent'])
                             
                             notifications_sent += 1
                             self.stdout.write(
@@ -368,17 +281,16 @@ class Command(BaseCommand):
                         except FCMToken.DoesNotExist:
                             self.stdout.write(
                                 self.style.WARNING(
-                                    f'No FCM token found for user {appointment.user.id} with appointment {appointment.order_id}'
+                                    f'No FCM token found for user {appointment.user.id}'
                                 )
                             )
                         except Exception as e:
                             self.stdout.write(
                                 self.style.ERROR(
-                                    f'Error sending reminder for appointment {appointment.order_id}: {str(e)}'
+                                    f'Error sending reminder: {str(e)}'
                                 )
                             )
-                        
-                        # Break after sending a notification for this appointment to avoid sending multiple reminders at once
+
                         break
                         
             except Exception as e:
@@ -389,3 +301,78 @@ class Command(BaseCommand):
                 )
         
         self.stdout.write(f'Sent {notifications_sent} appointment reminders')
+
+    def process_appointment_notifications(self):
+        self.stdout.write('Checking for appointment notifications...')
+        
+        # Get current time
+        now = timezone.now()
+        
+        # Find appointments that have been delayed but not notified
+        delayed_appointments = AppointmentDetails.objects.filter(
+            appointment_date__gte=now.date(),
+            status__in=['scheduled', 'checked_in'],
+            delay_minutes__gt=0,
+            delay_notified=False
+        ).select_related('user', 'service')
+        
+        self.stdout.write(f'Found {delayed_appointments.count()} delayed appointments to notify')
+        
+        notifications_sent = 0
+        for appointment in delayed_appointments:
+            try:
+                # Try to get user's FCM token
+                fcm_tokens = FCMToken.objects.filter(
+                    user=appointment.user,
+                    is_active=True
+                )
+                
+                if fcm_tokens.exists():
+                    fcm_token = fcm_tokens.latest('updated_at')
+                    
+                    # Calculate the new expected start time
+                    irish_tz = pytz.timezone(settings.TIME_ZONE)
+                    scheduled_datetime = datetime.combine(
+                        appointment.appointment_date,
+                        appointment.appointment_time
+                    )
+                    if timezone.is_naive(scheduled_datetime):
+                        scheduled_datetime = timezone.make_aware(scheduled_datetime, irish_tz)
+                    
+                    new_expected_time = scheduled_datetime + timedelta(minutes=appointment.delay_minutes)
+                    
+                    # Send the delay notification
+                    result = send_appointment_delay_notification(
+                        token=fcm_token.token,
+                        appointment_id=appointment.order_id,
+                        service_name=appointment.service.name,
+                        delay_minutes=appointment.delay_minutes,
+                        new_time=new_expected_time
+                    )
+                    
+                    if result and result.get('success'):
+                        # Mark as notified
+                        appointment.delay_notified = True
+                        appointment.save(update_fields=['delay_notified'])
+                        
+                        notifications_sent += 1
+                        self.stdout.write(
+                            self.style.SUCCESS(
+                                f'Sent delay notification ({appointment.delay_minutes} min) for appointment {appointment.order_id}'
+                            )
+                        )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'No FCM token found for user {appointment.user.id}'
+                        )
+                    )
+                        
+            except Exception as e:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f'Error processing appointment delay {appointment.order_id}: {str(e)}'
+                    )
+                )
+        
+        self.stdout.write(f'Sent {notifications_sent} appointment delay notifications')

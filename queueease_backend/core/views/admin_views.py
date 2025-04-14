@@ -11,7 +11,6 @@ import logging
 import traceback
 from django.contrib.auth.hashers import check_password, make_password
 import json
-
 from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence, NotificationSettings
 from ..utils.nlp_sentiment import KeywordExtractor, SentimentAnalyzer
 from ..services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
@@ -32,7 +31,7 @@ def admin_dashboard_data(request):
         except Service.DoesNotExist:
             return Response({'error': 'Service not found'}, status=404)
         
-        # Use timezone-aware queries for accuracy
+        # Timezone-aware queries for accuracy
         now = timezone.now()
         
         # Count pending queues - correctly with timezone awareness
@@ -43,8 +42,8 @@ def admin_dashboard_data(request):
         ).count()
         
         # Get actual queue count without minimum value
-        queue_count = QueueSequence.objects.filter(
-            items__service=service, 
+        queue_count = Queue.objects.filter(
+            service=service, 
             is_active=True
         ).distinct().count()
         
@@ -605,7 +604,6 @@ def notification_settings(request):
     
 @api_view(['GET'])
 def admin_company_info(request, user_id):
-    """Get company information for an admin user"""
     try:
         user = get_object_or_404(User, id=user_id, user_type='admin')
         
@@ -758,47 +756,76 @@ def admin_change_password(request):
 @api_view(['GET'])
 def admin_todays_appointments(request):
     try:
-        service_id = request.query_params.get('service_id')
-        date_str = request.query_params.get('date')
+        service_id = request.GET.get('service_id')
+        date_param = request.GET.get('date')
         
-        if not service_id:
-            return Response({"error": "Service ID is required"}, status=400)
-            
-        # If no date provided, use today
-        if not date_str:
-            date = timezone.now().date()
-        else:
-            try:
-                date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            except ValueError:
-                return Response({"error": "Invalid date format. Use YYYY-MM-DD"}, status=400)
-            
-        # Get appointments for the service and date
+        if not service_id or not date_param:
+            return Response({"error": "service_id and date are required"}, status=400)
+        
+        # Parse the date
+        try:
+            selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+        
+        # Get appointments for the specified date and service
         appointments = AppointmentDetails.objects.filter(
             service_id=service_id,
-            appointment_date=date
-        ).select_related('user', 'service').order_by('appointment_time')
+            appointment_date=selected_date,
+            status__in=['scheduled', 'checked_in', 'in_progress', 'completed']
+        ).order_by('appointment_time')
         
-        # Serialize and enhance data
-        result = []
+        # Get current time in the server's timezone (Europe/Dublin)
+        now = timezone.now()
+        today = now.date()
+        current_time = now.time()
+        
+        # Process each appointment to check for delays
+        appointments_data = []
         for appointment in appointments:
-            data = {
-                'order_id': appointment.order_id,
-                'user_name': appointment.user.name,
-                'service_name': appointment.service.name,
-                'appointment_date': appointment.appointment_date.strftime('%Y-%m-%d'),
-                'appointment_time': appointment.appointment_time.strftime('%H:%M'),
-                'status': appointment.status,
-                'queue_status': appointment.queue_status,
-                'actual_start_time': appointment.actual_start_time.isoformat() if appointment.actual_start_time else None,
-                'actual_end_time': appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
-                'last_delay_minutes': appointment.last_delay_minutes
+            # Calculate if the appointment should be marked as delayed
+            is_delayed = False
+            delay_minutes = 0
+            
+            # For appointments that haven't started yet and scheduled for today and time has passed
+            if (appointment.status in ['scheduled', 'checked_in'] and 
+                appointment.appointment_date == today and 
+                appointment.appointment_time < current_time):
+                # Calculate delay in minutes
+                naive_scheduled = datetime.combine(today, appointment.appointment_time)
+                aware_scheduled = timezone.make_aware(naive_scheduled)
+                delay_seconds = (now - aware_scheduled).total_seconds()
+                calculated_delay_minutes = max(0, int(delay_seconds / 60))
+                
+                # Only update delay if calculated delay is greater than existing delay
+                existing_delay = appointment.delay_minutes or 0
+                if calculated_delay_minutes > existing_delay:
+                    is_delayed = True
+                    delay_minutes = calculated_delay_minutes
+                    
+                    # Update the appointment with the new delay
+                    appointment.delay_minutes = delay_minutes
+                    appointment.save(update_fields=['delay_minutes'])
+            
+            # Format basic appointment data
+            apt_data = {
+                "order_id": appointment.order_id,
+                "user_name": appointment.user.name or f"User {appointment.user.id}",
+                "service_name": appointment.service.name,
+                "appointment_date": appointment.appointment_date.strftime('%Y-%m-%d'),
+                "appointment_time": appointment.appointment_time.strftime('%H:%M'),
+                "status": appointment.status,
+                "actual_start_time": appointment.actual_start_time.isoformat() if appointment.actual_start_time else None,
+                "actual_end_time": appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
+                "delay_minutes": appointment.delay_minutes,
+                "check_in_time": appointment.check_in_time.isoformat() if appointment.check_in_time else None
             }
-            result.append(data)
             
-        return Response(result)
-            
+            appointments_data.append(apt_data)
+        
+        return Response(appointments_data)
+        
     except Exception as e:
-        logger.error(f"Error getting today's appointments: {str(e)}")
+        logger.error(f"Error fetching today's appointments: {str(e)}")
         logger.error(traceback.format_exc())
         return Response({"error": str(e)}, status=500)

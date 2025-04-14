@@ -13,10 +13,9 @@ from .views import (
     list_services_with_status,
     
     # Appointment views
-    user_appointments, appointment_detail,
-    delete_appointment, create_appointment, check_and_update_appointments, 
-    check_appointment_status, cancel_appointment, start_appointment_service,
-    complete_appointment_service, propagate_appointment_delays,
+    user_appointments, appointment_detail, check_in_appointment,
+    delete_appointment, create_appointment, cancel_appointment, start_appointment_service,
+    complete_appointment_service, set_appointment_delay,
     
     # Admin views
     admin_dashboard_data, admin_customers, admin_create_customer,
@@ -65,12 +64,10 @@ urlpatterns = [
     path('appointment/delete/<str:order_id>/', delete_appointment, name='delete-appointment'),
     path('create-appointment/', create_appointment, name='create-appointment'),
     path('available-times/<int:service_id>/', available_appointment_times, name='available-times'),
-    path('check-appointments/', check_and_update_appointments, name='check-appointments'),
-    path('appointment/check-status/<str:order_id>/', check_appointment_status, name='check-appointment-status'),
     path('appointment/cancel/<str:order_id>/', cancel_appointment, name='cancel-appointment'),
     path('start-appointment/', start_appointment_service, name='start-appointment-service'),
     path('complete-appointment/', complete_appointment_service, name='complete-appointment-service'),
-    path('propagate-delays/', propagate_appointment_delays, name='propagate-appointment-delays'),
+    path('check-in-appointment/', check_in_appointment, name='check-in-appointment'),
 
     # Service endpoints
     path('list_services/', list_services, name='list_services'),
@@ -78,7 +75,6 @@ urlpatterns = [
     path('list_services_with_status/', list_services_with_status, name='list_services_with_status'),
     
     # Admin endpoints
-    # path('admin-services/<int:user_id>/', admin_services, name='admin-services'),
     path('admin/dashboard-data/', admin_dashboard_data, name='admin-dashboard-data'),
     path('admin/customers/', admin_customers, name='admin-customers'),
     path('admin/customers/create/', admin_create_customer, name='admin-create-customer'),
@@ -89,6 +85,7 @@ urlpatterns = [
     path('admin/update-company-info/', admin_update_company_info, name='admin-update-company-info'),
     path('admin/change-password/', admin_change_password, name='admin-change-password'),
     path('admin/todays-appointments/', admin_todays_appointments, name='admin-todays-appointments'),
+    path('set-appointment-delay/', set_appointment_delay, name='set-appointment-delay'),
     
     # Feedback endpoints
     path('feedback/submit/', submit_feedback, name='submit_feedback'),

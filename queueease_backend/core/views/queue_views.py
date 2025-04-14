@@ -14,10 +14,9 @@ from rest_framework.response import Response
 from datetime import timedelta
 from django.db import transaction
 import numpy as np
-
 from ..models import (
-    Queue, QRCode, User, Service, Feedback, ServiceWaitTime, 
-    QueueSequence, QueueSequenceItem, ServiceAdmin, FCMToken, ServiceQueue, AppointmentDetails
+    Queue, QRCode, User, Service, ServiceWaitTime, 
+    FCMToken, ServiceQueue, AppointmentDetails
 )
 from ..services.notifications import send_queue_update_notification, send_push_notification
 

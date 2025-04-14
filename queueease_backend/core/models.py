@@ -1,5 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import datetime, timedelta
+import pytz
+from django.conf import settings
 
 class User(models.Model):
     USER_TYPE_CHOICES = [
@@ -45,38 +49,6 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
-
-class Department(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
-    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, related_name="departments")
-    is_active = models.BooleanField(default=True)
-    date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-
-class Specialization(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-class EmployeeDetails(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True)
-    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True)
-    specialization = models.ForeignKey(Specialization, on_delete=models.SET_NULL, null=True)
-    is_active = models.BooleanField(default=True)
-    date_created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.name} - {self.company.name if self.company else 'No Company'}"
-
 
 class Service(models.Model):
     name = models.CharField(max_length=255)
@@ -139,7 +111,6 @@ class Queue(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     service_queue = models.ForeignKey(ServiceQueue, on_delete=models.CASCADE, related_name='members', null=True)
-    employee = models.ForeignKey(EmployeeDetails, on_delete=models.CASCADE, null=True, blank=True)
     appointment = models.ForeignKey('AppointmentDetails', on_delete=models.SET_NULL, null=True, blank=True)
     sequence_number = models.IntegerField()
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
@@ -175,15 +146,12 @@ class QRCode(models.Model):
 
 class AppointmentDetails(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
+        ('scheduled', 'Scheduled'),
+        ('checked_in', 'Checked In'),
+        ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
-    ]
-
-    QUEUE_STATUS_CHOICES = [
-        ('not_started', 'Not Started'),
-        ('in_queue', 'In Queue'),
-        ('completed', 'Completed'),
+        ('missed', 'Missed'),
     ]
 
     order_id = models.CharField(max_length=255, unique=True)
@@ -192,16 +160,75 @@ class AppointmentDetails(models.Model):
     appointment_date = models.DateField()
     appointment_time = models.TimeField()
     duration_minutes = models.IntegerField(default=30)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='pending')
-    queue_status = models.CharField(max_length=50, choices=QUEUE_STATUS_CHOICES, default='not_started')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='scheduled')
     is_active = models.BooleanField(default=True)
     actual_start_time = models.DateTimeField(null=True, blank=True)
     actual_end_time = models.DateTimeField(null=True, blank=True)
     expected_duration = models.IntegerField(default=30)
+    delay_minutes = models.IntegerField(null=True, blank=True)
     delay_notified = models.BooleanField(default=False)
-    last_delay_minutes = models.IntegerField(null=True, blank=True)
-    reminder_sent = models.BooleanField(default=False)
     last_reminder_sent = models.DateTimeField(null=True, blank=True)
+    check_in_time = models.DateTimeField(null=True, blank=True)
+    delay_reason = models.CharField(max_length=255, null=True, blank=True, help_text="Reason for the delay")
+    delay_set_by = models.ForeignKey('User', on_delete=models.SET_NULL, 
+                                null=True, blank=True, 
+                                related_name='set_delays',
+                                help_text="Staff member who set the delay")
+    delay_set_time = models.DateTimeField(null=True, blank=True, help_text="When the delay was set")
+    
+    # Define properties to help with time calculations
+    @property
+    def is_past_appointment(self):
+        current_date = timezone.now().date()
+        current_time = timezone.now().time()
+        
+        if self.appointment_date < current_date:
+            return True
+        if self.appointment_date == current_date and self.appointment_time < current_time:
+            return True
+        return False
+    
+    @property
+    def expected_start_datetime(self):
+        # Combine date and time into a datetime
+        base_datetime = datetime.combine(self.appointment_date, self.appointment_time)
+        # Make aware with the server's timezone
+        irish_tz = pytz.timezone(settings.TIME_ZONE)
+        base_datetime = timezone.make_aware(base_datetime, irish_tz)
+        
+        # Add delay if any and normalize
+        if self.delay_minutes:
+            base_datetime = irish_tz.normalize(base_datetime + timedelta(minutes=self.delay_minutes))
+        
+        return base_datetime
+
+    @property
+    def time_until_appointment(self):
+        now = timezone.now()
+        
+        if timezone.is_naive(now):
+            irish_tz = pytz.timezone(settings.TIME_ZONE)
+            now = timezone.make_aware(now, irish_tz)
+        
+        # Calculate time difference
+        time_diff = (self.expected_start_datetime - now).total_seconds()
+        return max(0, time_diff)
+    
+    @property
+    def formatted_time_until(self):
+        seconds = self.time_until_appointment
+        
+        days = int(seconds // (24 * 3600))
+        seconds %= (24 * 3600)
+        hours = int(seconds // 3600)
+        seconds %= 3600
+        minutes = int(seconds // 60)
+        
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
 
     def __str__(self):
         return f"Appointment {self.order_id} - {self.user.name}"
@@ -221,19 +248,6 @@ class QueueSequence(models.Model):
     
     def __str__(self):
         return f"Queue Sequence for {self.user.name}"
-
-class QueueSequenceItem(models.Model):
-    queue_sequence = models.ForeignKey(QueueSequence, on_delete=models.CASCADE, related_name='items')
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    position = models.IntegerField()
-    completed = models.BooleanField(default=False)
-    queue = models.ForeignKey(Queue, on_delete=models.SET_NULL, null=True, blank=True)
-    
-    class Meta:
-        ordering = ['position']
-        
-    def __str__(self):
-        return f"Sequence Item {self.position}: {self.service.name}"
 
 class ServiceAdmin(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='admin_services')

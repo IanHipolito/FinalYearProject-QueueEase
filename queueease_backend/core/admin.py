@@ -4,7 +4,7 @@ from .models import User, Queue, QRCode, Service
 admin.site.register(User)
 
 class QueueAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'service', 'employee', 'status', 'date_created')
+    list_display = ('id', 'user', 'service', 'status', 'date_created')
     list_filter = ('status', 'is_active')
 
     def total_queues(self, request):

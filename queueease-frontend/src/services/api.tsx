@@ -448,6 +448,29 @@ export const API = {
             });
             return API.handleResponse(response);
         },
+        checkInAppointment: async (orderId: string) => {
+            const response = await fetch(`${API_BASE}/check-in-appointment/`, {
+                method: 'POST',
+                headers: getCommonHeaders(),
+                body: JSON.stringify({ order_id: orderId }),
+                credentials: 'include', 
+            });
+            return API.handleResponse(response);
+        },
+        setAppointmentDelay: async (orderId: string, delayMinutes: number, reason?: string) => {
+            const response = await fetch(`${API_BASE}/set-appointment-delay/`, {
+              method: 'POST',
+              headers: getCommonHeaders(),
+              body: JSON.stringify({
+                order_id: orderId,
+                delay_minutes: delayMinutes,
+                reason: reason,
+                propagate: true
+              }),
+              credentials: 'include',
+            });
+            return API.handleResponse(response);
+          },
     },
 
     // Feedback management

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Card, CardContent, CardActions, Typography, Box, Button, Divider
+  Card, CardContent, CardActions, Typography, Box, Button, Divider, Chip
 } from '@mui/material';
 import EventIcon from '@mui/icons-material/Event';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -8,10 +8,20 @@ import StorefrontIcon from '@mui/icons-material/Storefront';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { AppointmentCardProps } from 'types/appointmentTypes';
+import { APPOINTMENT_STATUS_COLORS, APPOINTMENT_STATUS_DISPLAY } from 'types/appointmentTypes';
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment, onView, onRemove, formatDate
 }) => {
+  const getStatusColor = (status: string) => {
+    const color = APPOINTMENT_STATUS_COLORS[status as keyof typeof APPOINTMENT_STATUS_COLORS];
+    return (color || 'default') as 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
+  };
+
+  const getStatusDisplay = (status: string) => {
+    return APPOINTMENT_STATUS_DISPLAY[status as keyof typeof APPOINTMENT_STATUS_DISPLAY] || status;
+  };
+
   return (
     <Card 
       sx={{
@@ -26,13 +36,26 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        <Typography 
-          variant="h5" 
-          fontWeight={600} 
-          sx={{ mb: 2, color: 'primary.main' }}
-        >
-          {appointment.appointment_title}
-        </Typography>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'flex-start',
+          mb: 2 
+        }}>
+          <Typography 
+            variant="h5" 
+            fontWeight={600} 
+            sx={{ color: 'primary.main' }}
+          >
+            {appointment.appointment_title}
+          </Typography>
+          <Chip 
+            label={getStatusDisplay(appointment.status)}
+            color={getStatusColor(appointment.status)}
+            size="small"
+            sx={{ ml: 1 }}
+          />
+        </Box>
         
         <Box sx={{ 
           display: 'flex', 
@@ -83,20 +106,22 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         >
           View Details
         </Button>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<DeleteIcon />}
-          onClick={() => onRemove(appointment.order_id)}
-          sx={{ 
-            borderRadius: 2, 
-            '&:hover': { 
-              bgcolor: 'rgba(211, 47, 47, 0.08)'
-            }
-          }}
-        >
-          Remove
-        </Button>
+        {appointment.status === 'scheduled' && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => onRemove(appointment.order_id)}
+            sx={{ 
+              borderRadius: 2, 
+              '&:hover': { 
+                bgcolor: 'rgba(211, 47, 47, 0.08)'
+              }
+            }}
+          >
+            Remove
+          </Button>
+        )}
       </CardActions>
     </Card>
   );

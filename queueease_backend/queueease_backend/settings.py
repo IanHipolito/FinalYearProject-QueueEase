@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 TIME_ZONE = 'Europe/Dublin'
-USE_TZ = True 
+USE_TZ = True
 
 # Format for displaying dates and times
 DATE_FORMAT = 'd F Y'

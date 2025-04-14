@@ -7,8 +7,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 import logging
-import traceback
-
 from ..models import Service, ServiceWaitTime, Queue, ServiceAdmin, AppointmentDetails
 from ..serializers import ServiceSerializer
 

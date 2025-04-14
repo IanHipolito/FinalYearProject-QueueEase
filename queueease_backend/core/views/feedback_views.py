@@ -1,9 +1,7 @@
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import logging
-
 from ..models import Feedback, User, Service, Queue
 from ..utils.nlp_sentiment import SentimentAnalyzer
 

@@ -4,13 +4,12 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
-import random
 import logging
 import traceback
 from django.utils import timezone
 from django.conf import settings
 import pytz
-
+from django.db import transaction
 from ..models import AppointmentDetails, User, Service, FCMToken
 from ..serializers import AppointmentDetailsSerializer
 from ..services.notifications import send_appointment_delay_notification
@@ -37,86 +36,81 @@ def user_appointments(request, user_id):
 def appointment_detail(request, order_id):
     try:
         appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
-
-        # Check if the appointment date has passed and update status if needed
-        current_date = timezone.now().date()
-        if appointment.status == 'pending' and appointment.appointment_date < current_date:
-            # Update the appointment status to completed
-            appointment.status = 'completed'
-            appointment.save()
-
-        # Only consider active pending appointments (exclude cancelled and completed)
-        same_day_appointments = AppointmentDetails.objects.filter(
-            appointment_date=appointment.appointment_date,
-            service=appointment.service,
-            status='pending',  # Only pending appointments
-            is_active=True,    # Only active appointments
-            queue_status__in=['not_started', 'in_queue']  # Exclude any with completed or cancelled queue status
-        ).exclude(
-            status='cancelled'  # Explicitly exclude cancelled appointments
-        ).order_by('appointment_time')
-
-        # Find the position of this appointment in the filtered list
-        position = 0
-        for idx, apt in enumerate(same_day_appointments):
-            if apt.id == appointment.id:
-                position = idx + 1
-                break
-
-        # If appointment is completed, cancelled, or not found in the pending list, it has no position
-        if appointment.status in ['completed', 'cancelled'] or position == 0:
-            if appointment.status == 'pending':
-                # Only assign a fallback position if it's still pending
-                position = 1
-            else:
-                position = None
-
-        # Calculate wait time based on position and average duration
-        average_duration = appointment.duration_minutes or 15
         
-        if position and position > 0:
-            if appointment.service.requires_prep_time:
-                minimal_prep = appointment.service.minimal_prep_time
-                estimated_waiting_time = max(minimal_prep, (position - 1) * average_duration)
-            else:
-                estimated_waiting_time = (position - 1) * average_duration
+        # Define Irish timezone explicitly
+        irish_tz = pytz.timezone('Europe/Dublin')
+        
+        # Get the current time localized to Irish time
+        now = timezone.localtime(timezone.now(), irish_tz)
+        
+        # Check if there are any prior appointments on the same day that are running late and could affect this appointment
+        estimated_delay = appointment.delay_minutes or 0
+        
+        # Update the delay_minutes in the database if calculated a greater delay
+        if estimated_delay > (appointment.delay_minutes or 0):
+            logger.info(f"Updating appointment {order_id} with new estimated delay of {estimated_delay} minutes")
+            appointment.delay_minutes = estimated_delay
+            appointment.save(update_fields=['delay_minutes'])
+        
+        # Combine the appointment date and time with the delay for time calculations
+        appointment_naive = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+        appointment_datetime = irish_tz.localize(appointment_naive)
+        
+        # Add the estimated delay
+        if estimated_delay > 0:
+            appointment_datetime += timedelta(minutes=estimated_delay)
+        
+        # Calculate seconds until the appointment based on Irish time
+        seconds_until = max(0, int((appointment_datetime - now).total_seconds()))
+        
+        # Format the time difference
+        days = seconds_until // 86400
+        remaining = seconds_until % 86400
+        hours = remaining // 3600
+        remaining %= 3600
+        minutes = remaining // 60
+        if days > 0:
+            time_until_formatted = f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            time_until_formatted = f"{hours}h {minutes}m"
         else:
-            estimated_waiting_time = 0
-
-        serializer = AppointmentDetailsSerializer(appointment)
-        data = serializer.data
-        data['queue_position'] = position
-        data['estimated_wait_time'] = estimated_waiting_time
-        data['service_name'] = appointment.service.name
-        data['appointment_title'] = f"{appointment.service.name} Appointment"
-
-        try:
-            # Create timezone-aware datetime for consistent handling
-            appointment_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
-            irish_tz = pytz.timezone(settings.TIME_ZONE)
-            appointment_start = timezone.make_aware(appointment_start, timezone=irish_tz)
-            expected_start_time = appointment_start + timedelta(minutes=estimated_waiting_time)
-
-            # Apply any recorded delays
-            if appointment.last_delay_minutes:
-                expected_start_time += timedelta(minutes=appointment.last_delay_minutes)
-                
-            # Return ISO format WITHOUT timezone designator that would force UTC
-            data['expected_start_time'] = expected_start_time.isoformat().replace('+00:00', '')
-        except Exception as e:
-            # Fallback if date handling fails
-            logger.error(f"Date processing error: {str(e)}")
-            current_time = timezone.now()
-            data['expected_start_time'] = (current_time + timedelta(minutes=estimated_waiting_time)).isoformat().replace('+00:00', '')
-
+            time_until_formatted = f"{minutes}m"
+        
+        # Prepare the response data
+        data = {
+            "order_id": appointment.order_id,
+            "appointment_date": appointment.appointment_date.strftime('%Y-%m-%d'),
+            "appointment_time": appointment.appointment_time.strftime('%H:%M'),
+            "service_name": appointment.service.name,
+            "status": appointment.status,
+            "appointment_title": f"{appointment.service.name} Appointment",
+            "expected_start_time": appointment_datetime.isoformat(),
+            "server_current_time": now.isoformat(),
+            "seconds_until_appointment": seconds_until,
+            "time_until_formatted": time_until_formatted,
+            "queue_position": getattr(appointment, 'queue_position', 0),
+            "actual_start_time": appointment.actual_start_time.isoformat() if appointment.actual_start_time else None,
+            "actual_end_time": appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
+            "delay_minutes": estimated_delay if estimated_delay > 0 else None,
+            "check_in_time": appointment.check_in_time.isoformat() if appointment.check_in_time else None,
+            "debug_info": {
+                "server_timezone": "Europe/Dublin",
+                "raw_appointment_time": appointment.appointment_time.strftime('%H:%M'),
+                "delay_minutes": estimated_delay
+            }
+        }
+        
         return Response(data)
+        
     except Exception as e:
-        logger.error(f"Error in appointment_detail: {str(e)}")
+        logger.error(f"Error in appointment detail: {str(e)}")
+        logger.error(traceback.format_exc())
         return Response({"error": "An error occurred processing this appointment"}, status=500)
     
 def generate_order_id(user_id):
+    from random import choices
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    random_str = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
+    random_str = ''.join(choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=4))
     return f"{user_id}-{timestamp}-{random_str}"
 
 @api_view(['DELETE'])
@@ -127,9 +121,6 @@ def delete_appointment(request, order_id):
 
 @api_view(['POST'])
 def create_appointment(request):
-    if request.method != 'POST':
-        return Response({"detail": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-    
     try:
         data = request.data
         user_id = data.get('user_id')
@@ -142,51 +133,53 @@ def create_appointment(request):
                 "error": "Missing required fields",
                 "required": ["user_id", "service_id", "appointment_date", "appointment_time"],
                 "received": data
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=400)
         
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
-            
-        try:
-            service = Service.objects.get(id=service_id)
-        except Service.DoesNotExist:
-            return Response({"error": f"Service with ID {service_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+        # Look up the user and service objects
+        user = get_object_or_404(User, id=user_id)
+        service = get_object_or_404(Service, id=service_id)
         
+        # Parse the time and date strings.
         try:
-            if ':' in appointment_time:
-                time_obj = datetime.strptime(appointment_time, '%H:%M').time()
-            else:
-                time_obj = datetime.strptime(appointment_time, '%H%M').time()
+            time_obj = datetime.strptime(appointment_time, '%H:%M').time()
         except ValueError:
             return Response({
                 "error": "Invalid time format",
                 "received": appointment_time,
                 "expected": "HH:MM (e.g., 14:30)"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=400)
 
         try:
-            # Parse the date string but ensure we're working with timezone-consistent date objects
             appointment_date_obj = datetime.strptime(appointment_date, '%Y-%m-%d').date()
         except ValueError:
             return Response({
                 "error": "Invalid date format",
                 "received": appointment_date,
                 "expected": "YYYY-MM-DD (e.g., 2023-12-31)"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=400)
+
+        # Enforce Irish timezone.
+        irish_tz = pytz.timezone('Europe/Dublin')
+        # Convert current server time (UTC) to Irish time.
+        today = timezone.localtime(timezone.now(), irish_tz).date()
+        if appointment_date_obj < today:
+            return Response({"error": "Cannot book appointments for past dates"}, status=400)
+        
+        if appointment_date_obj == today:
+            now_time = timezone.localtime(timezone.now(), irish_tz).time()
+            if time_obj < now_time:
+                return Response({"error": "Cannot book appointments for times that have already passed"}, status=400)
 
         order_id = generate_order_id(user_id)
-
-        # Create a timezone-aware datetime from the appointment date and time
-        appointment_datetime = datetime.combine(appointment_date_obj, time_obj)
-        # Make it timezone aware using the TIME_ZONE from settings
-        irish_tz = pytz.timezone(settings.TIME_ZONE)
-        appointment_datetime = timezone.make_aware(appointment_datetime, timezone=irish_tz)
-        # Extract date and time back for storage
+        
+        # Combine date and time and localize to Irish time.
+        appointment_naive = datetime.combine(appointment_date_obj, time_obj)
+        appointment_datetime = irish_tz.localize(appointment_naive)
+        # Optionally, reassign the localized date/time for storage
         appointment_date_obj = appointment_datetime.date()
         time_obj = appointment_datetime.time()
 
+        # Create the appointment
         appointment = AppointmentDetails.objects.create(
             order_id=order_id,
             user=user,
@@ -194,72 +187,21 @@ def create_appointment(request):
             appointment_date=appointment_date_obj,
             appointment_time=time_obj,
             duration_minutes=service.average_duration or 30,
-            status='pending',
-            queue_status='not_started',
-            is_active=True
+            status='scheduled',
+            is_active=True,
+            expected_duration=service.average_duration or 30
         )
         
         return Response({
             "message": "Appointment created successfully",
             "order_id": str(order_id)
-        }, status=status.HTTP_201_CREATED)
+        }, status=201)
         
     except Exception as e:
-        print(f"Error creating appointment: {str(e)}")
-        print(traceback.format_exc())
-        
         return Response({
             "error": "Failed to create appointment",
             "detail": str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-@api_view(['GET'])
-def check_and_update_appointments(request):
-    try:
-        current_date = timezone.now().date()
-        
-        # Find all pending appointments with dates in the past
-        outdated_appointments = AppointmentDetails.objects.filter(
-            status='pending',
-            appointment_date__lt=current_date
-        )
-        
-        # Update all these appointments to completed
-        count = outdated_appointments.count()
-        outdated_appointments.update(status='completed')
-        
-        return Response({
-            "message": f"Updated {count} appointments to completed status",
-            "count": count
-        })
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-    
-@api_view(['GET'])
-def check_appointment_status(request, order_id):
-    try:
-        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
-        
-        # Check if the appointment date has passed
-        current_date = timezone.now().date()
-        current_time = timezone.now().time()
-        
-        if appointment.status == 'pending':
-            if appointment.appointment_date < current_date:
-                # Past day
-                appointment.status = 'completed'
-                appointment.save()
-            elif appointment.appointment_date == current_date and appointment.appointment_time < current_time:
-                # Same day but time has passed
-                appointment.status = 'completed'
-                appointment.save()
-        
-        return Response({
-            "success": True,
-            "status": appointment.status
-        })
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        }, status=500)
     
 @api_view(['POST'])
 def cancel_appointment(request, order_id):
@@ -281,8 +223,8 @@ def cancel_appointment(request, order_id):
                 "error": "Cannot cancel appointments within 24 hours of the scheduled time"
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Ensure the appointment is still pending
-        if appointment.status != 'pending':
+        # Ensure the appointment is still scheduled
+        if appointment.status != 'scheduled':
             return Response({
                 "error": f"Cannot cancel appointment with status: {appointment.status}"
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -292,7 +234,7 @@ def cancel_appointment(request, order_id):
         same_day_appointments = AppointmentDetails.objects.filter(
             appointment_date=appointment.appointment_date,
             service=appointment.service,
-            status='pending',
+            status='scheduled',
             is_active=True
         ).order_by('appointment_time')
         
@@ -312,7 +254,7 @@ def cancel_appointment(request, order_id):
                 appointment_date=appointment.appointment_date,
                 service=appointment.service,
                 appointment_time__gt=appointment.appointment_time,
-                status='pending',
+                status='scheduled',
                 is_active=True
             ).order_by('appointment_time')
             
@@ -337,40 +279,34 @@ def start_appointment_service(request):
             
         appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
         
-        # Record actual start time in the server's configured timezone 
+        # Only allow starting appointments that are scheduled or checked in
+        if appointment.status not in ['scheduled', 'checked_in']:
+            return Response({"error": f"Cannot start appointment with status: {appointment.status}"}, status=400)
+            
+        # Record actual start time
         now = timezone.now()
         appointment.actual_start_time = now
-        appointment.queue_status = 'in_queue'
+        appointment.status = 'in_progress'
         
-        # Calculate delay compared to scheduled time
-        scheduled_time = datetime.combine(
-            appointment.appointment_date,
-            appointment.appointment_time
-        )
-        # Make it timezone aware using the Irish timezone
         irish_tz = pytz.timezone(settings.TIME_ZONE)
-        scheduled_time = timezone.make_aware(scheduled_time, irish_tz)
+        scheduled_datetime = datetime.combine(appointment.appointment_date, appointment.appointment_time)
         
-        delay_minutes = 0
-        if now > scheduled_time:
-            delay_seconds = (now - scheduled_time).total_seconds()
-            delay_minutes = int(delay_seconds / 60)
-            
-            # Record delay for tracking
-            appointment.last_delay_minutes = delay_minutes
+        # Make it timezone-aware
+        if timezone.is_naive(scheduled_datetime):
+            scheduled_datetime = timezone.make_aware(scheduled_datetime, irish_tz)
+        
+        logger.info(f"Appointment {order_id} scheduled for: {scheduled_datetime}, starting at: {now}")
         
         appointment.save()
-        
-        # Trigger delay propagation if needed
-        if delay_minutes > 0:
-            propagate_appointment_delays(appointment)
+        propagate_appointment_delays(appointment)
             
         return Response({
             "success": True,
             "appointment": {
                 "order_id": appointment.order_id,
-                "actual_start_time": appointment.actual_start_time.isoformat().replace('+00:00', ''),
-                "delay_minutes": delay_minutes
+                "status": appointment.status,
+                "actual_start_time": appointment.actual_start_time.isoformat() if appointment.actual_start_time else None,
+                "delay_minutes": appointment.delay_minutes
             }
         })
             
@@ -388,42 +324,25 @@ def complete_appointment_service(request):
             
         appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
         
-        # Verify appointment was started
-        if not appointment.actual_start_time:
-            return Response({"error": "Appointment hasn't been started yet"}, status=400)
+        # Verify appointment is in progress
+        if appointment.status != 'in_progress':
+            return Response({"error": f"Cannot complete appointment with status: {appointment.status}"}, status=400)
             
         # Record actual end time
         now = timezone.now()
         appointment.actual_end_time = now
         appointment.status = 'completed'
-        appointment.queue_status = 'completed'
-        
-        # Calculate if service took longer than expected
-        actual_duration_seconds = (now - appointment.actual_start_time).total_seconds()
-        actual_duration_minutes = int(actual_duration_seconds / 60)
-        
-        duration_delay = max(0, actual_duration_minutes - appointment.expected_duration)
-        
-        # Record delay for tracking
-        if duration_delay > 0:
-            appointment.last_delay_minutes = duration_delay
-            
+    
         appointment.save()
         
-        # Update queue positions for subsequent appointments on the same day
-        update_subsequent_appointments_positions(appointment)
-        
-        # Trigger delay propagation if service ran long
-        if duration_delay > 0:
-            propagate_appointment_delays(appointment)
+        propagate_appointment_delays(appointment)
             
         return Response({
             "success": True,
             "appointment": {
                 "order_id": appointment.order_id,
-                "actual_end_time": appointment.actual_end_time.isoformat().replace('+00:00', ''),
-                "actual_duration_minutes": actual_duration_minutes,
-                "duration_delay": duration_delay
+                "status": appointment.status,
+                "actual_end_time": appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
             }
         })
             
@@ -431,95 +350,220 @@ def complete_appointment_service(request):
         logger.error(f"Error completing appointment service: {str(e)}")
         logger.error(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
-    
-def update_subsequent_appointments_positions(completed_appointment):
-    """
-    Update queue positions for all appointments that come after the completed one.
-    This ensures that when an appointment is completed, subsequent appointments' 
-    positions are updated correctly.
-    """
-    try:
-        # Find all pending appointments for the same service and date with later times
-        subsequent_appointments = AppointmentDetails.objects.filter(
-            service=completed_appointment.service,
-            appointment_date=completed_appointment.appointment_date,
-            appointment_time__gt=completed_appointment.appointment_time,
-            status='pending'
-        ).order_by('appointment_time')
-        
-        logger.info(f"Found {subsequent_appointments.count()} subsequent appointments to update positions for")
-        
-        # Update their queue positions (decrement by 1)
-        for next_appointment in subsequent_appointments:
-            # If the appointment has a queue position, decrement it
-            if hasattr(next_appointment, 'queue_position') and next_appointment.queue_position > 1:
-                logger.info(f"Updating position for appointment {next_appointment.order_id} from {next_appointment.queue_position} to {next_appointment.queue_position - 1}")
-                next_appointment.queue_position -= 1
-                next_appointment.save(update_fields=['queue_position'])
-                
-    except Exception as e:
-        logger.error(f"Error updating subsequent appointment positions: {str(e)}")
-        logger.error(traceback.format_exc())
 
 def propagate_appointment_delays(appointment):
-    """
-    Update expected start times for all subsequent appointments on the same day.
-    Trigger notifications for affected appointments.
-    """
     try:
-        # Get all subsequent appointments for the day
+        logger.info(f"Propagating manual delay of {appointment.delay_minutes} minutes from appointment {appointment.order_id}")
+        
+        # Skip if there's no delay to propagate
+        if not appointment.delay_minutes or appointment.delay_minutes <= 0:
+            logger.info(f"No delay to propagate from appointment {appointment.order_id}")
+            return
+            
+        # Get all subsequent appointments for the same day
         subsequent_appointments = AppointmentDetails.objects.filter(
             service=appointment.service,
             appointment_date=appointment.appointment_date,
             appointment_time__gt=appointment.appointment_time,
-            status='pending'
+            status__in=['scheduled', 'checked_in']  # Only propagate to future appointments
         ).order_by('appointment_time')
         
+        now = timezone.now()
+        
         if not subsequent_appointments:
+            logger.info(f"No subsequent appointments found for {appointment.order_id}")
             return
             
-        delay_minutes = appointment.last_delay_minutes or 0
-        if delay_minutes <= 0:
-            return
-            
+        logger.info(f"Found {subsequent_appointments.count()} subsequent appointments to propagate delays to")
+        
+        # Process each subsequent appointment
         for next_appointment in subsequent_appointments:
-            # Update the expected start time based on delay
-            scheduled_time = datetime.combine(
-                next_appointment.appointment_date,
-                next_appointment.appointment_time
-            )
-            irish_tz = pytz.timezone(settings.TIME_ZONE)
-            scheduled_time = timezone.make_aware(scheduled_time, irish_tz)
-            
-            # If this appointment has an expected start time already, update it
-            new_expected_time = scheduled_time + timedelta(minutes=delay_minutes)
-            
-            # Send notification if delay is significant (5+ minutes) and hasn't been notified
-            if delay_minutes >= 5 and not next_appointment.delay_notified:
-                # Update appointment with delay info before sending notification
-                next_appointment.delay_notified = True
-                next_appointment.last_delay_minutes = delay_minutes
-                next_appointment.save()
+            try:
+                existing_delay = next_appointment.delay_minutes or 0
                 
-                # Send notification about the delay
-                try:
-                    fcm_token = FCMToken.objects.filter(
-                        user=next_appointment.user,
-                        is_active=True
-                    ).latest('updated_at')
+                # Only update if delay is greater than the existing one
+                if appointment.delay_minutes > existing_delay:
+                    logger.info(f"Updating appointment {next_appointment.order_id} delay from {existing_delay} to {appointment.delay_minutes} minutes")
                     
-                    send_appointment_delay_notification(
-                        token=fcm_token.token,
-                        appointment_id=next_appointment.order_id,
-                        service_name=next_appointment.service.name,
-                        delay_minutes=delay_minutes,
-                        new_time=new_expected_time
-                    )
-                except FCMToken.DoesNotExist:
-                    logger.warning(f"No FCM token found for user {next_appointment.user.id}")
-                except Exception as e:
-                    logger.error(f"Error sending delay notification: {str(e)}")
-            
+                    with transaction.atomic():
+                        next_appointment.delay_minutes = appointment.delay_minutes
+                        next_appointment.delay_reason = "Earlier appointment delay"
+                        next_appointment.delay_set_time = now
+                        next_appointment.save()
+                    
+                    # Sending notifications to affected users
+                    if not next_appointment.delay_notified:
+                        fcm_tokens = FCMToken.objects.filter(
+                            user=next_appointment.user,
+                            is_active=True
+                        )
+                        
+                        if fcm_tokens.exists():
+                            fcm_token = fcm_tokens.latest('updated_at')
+                            
+                            # Calculate new expected time
+                            scheduled_start = datetime.combine(next_appointment.appointment_date, next_appointment.appointment_time)
+                            if timezone.is_naive(scheduled_start):
+                                scheduled_start = timezone.make_aware(scheduled_start)
+                                
+                            new_start_time = scheduled_start + timedelta(minutes=appointment.delay_minutes)
+                            formatted_time = new_start_time.strftime('%I:%M %p')
+                            
+                            # Send notification
+                            send_appointment_delay_notification(
+                                token=fcm_token.token,
+                                appointment_id=next_appointment.order_id,
+                                service_name=next_appointment.service.name,
+                                delay_minutes=appointment.delay_minutes,
+                                new_time=new_start_time
+                            )
+                            
+                            next_appointment.delay_notified = True
+                            next_appointment.save(update_fields=['delay_notified'])
+                            logger.info(f"Sent delay notification to user for appointment {next_appointment.order_id}")
+            except Exception as e:
+                logger.error(f"Error processing subsequent appointment {next_appointment.order_id}: {str(e)}")
+                continue
     except Exception as e:
         logger.error(f"Error propagating appointment delays: {str(e)}")
         logger.error(traceback.format_exc())
+
+@api_view(['POST'])
+def set_appointment_delay(request):
+    try:
+        order_id = request.data.get('order_id')
+        delay_minutes = request.data.get('delay_minutes')
+        delay_reason = request.data.get('reason', '')
+        propagate = request.data.get('propagate', True)
+        
+        if not order_id:
+            return Response({"error": "Order ID is required"}, status=400)
+            
+        try:
+            delay_minutes = int(delay_minutes)
+            if delay_minutes < 0:
+                return Response({"error": "Delay minutes must be a positive integer"}, status=400)
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid delay minutes value"}, status=400)
+        
+        # Get the appointment
+        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+        
+        # Update the delay
+        previous_delay = appointment.delay_minutes or 0
+        appointment.delay_minutes = delay_minutes
+        
+        # Track when and why delay was set
+        now = timezone.now()
+        appointment.delay_set_time = now
+        if delay_reason:
+            appointment.delay_reason = delay_reason
+            
+        # If admin user is authenticated record who set the delay
+        if request.user.is_authenticated and hasattr(request.user, 'is_staff') and request.user.is_staff:
+            appointment.delay_set_by = request.user
+            
+        appointment.save()
+        
+        logger.info(f"Manually set delay for appointment {order_id} from {previous_delay} to {delay_minutes} minutes")
+        
+        # Only send notification if the delay has increased
+        if delay_minutes > previous_delay:
+            # Get user's FCM token if available
+            fcm_tokens = FCMToken.objects.filter(
+                user=appointment.user,
+                is_active=True
+            )
+            
+            if fcm_tokens.exists():
+                # Send notification to the user about the delay
+                fcm_token = fcm_tokens.latest('updated_at')
+                
+                # Calculate the new expected start time
+                scheduled_start = datetime.combine(appointment.appointment_date, appointment.appointment_time)
+                if timezone.is_naive(scheduled_start):
+                    scheduled_start = timezone.make_aware(scheduled_start)
+                    
+                new_start_time = scheduled_start + timedelta(minutes=delay_minutes)
+                formatted_time = new_start_time.strftime('%I:%M %p')
+                
+                message_body = f"Your appointment scheduled for {appointment.appointment_time.strftime('%I:%M %p')} has been delayed by {delay_minutes} minutes. New expected time: {formatted_time}"
+                if delay_reason:
+                    message_body += f" Reason: {delay_reason}"
+                
+                # Send the notification
+                send_appointment_delay_notification(
+                    token=fcm_token.token,
+                    appointment_id=appointment.order_id,
+                    service_name=appointment.service.name,
+                    delay_minutes=delay_minutes,
+                    new_time=new_start_time
+                )
+                
+                # Mark as notified
+                appointment.delay_notified = True
+                appointment.save(update_fields=['delay_notified'])
+                
+                logger.info(f"Sent delay notification to user for appointment {order_id}")
+            else:
+                logger.info(f"No FCM token found for user, couldn't send delay notification")
+        
+        # Propagate delay to subsequent appointments if requested
+        if propagate:
+            propagate_appointment_delays(appointment)
+        
+        return Response({
+            "success": True,
+            "message": f"Set {delay_minutes} minute delay for appointment {order_id}",
+            "appointment": {
+                "order_id": appointment.order_id,
+                "delay_minutes": appointment.delay_minutes,
+                "status": appointment.status
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error setting appointment delay: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+def check_in_appointment(request):
+    try:
+        order_id = request.data.get('order_id')
+        if not order_id:
+            return Response({"error": "Order ID is required"}, status=400)
+            
+        appointment = get_object_or_404(AppointmentDetails, order_id=order_id)
+        
+        # Only allow check-in on the appointment day
+        current_date = timezone.now().date()
+        if appointment.appointment_date != current_date:
+            return Response({"error": "Can only check in on the appointment day"}, status=400)
+            
+        # Only allow check-in for scheduled appointments
+        if appointment.status != 'scheduled':
+            return Response({"error": f"Cannot check in appointment with status: {appointment.status}"}, status=400)
+        
+        # Record check-in time
+        now = timezone.now()
+        appointment.check_in_time = now
+        appointment.status = 'checked_in'
+        
+        # Save the appointment changes
+        appointment.save()
+        
+        return Response({
+            "success": True,
+            "appointment": {
+                "order_id": appointment.order_id,
+                "status": appointment.status,
+                "check_in_time": appointment.check_in_time.isoformat() if appointment.check_in_time else None,
+                "delay_minutes": appointment.delay_minutes
+            }
+        })
+            
+    except Exception as e:
+        logger.error(f"Error checking in appointment: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)

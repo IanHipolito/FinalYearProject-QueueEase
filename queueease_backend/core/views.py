@@ -16,8 +16,8 @@ from .views.service_views import (
 from .views.appointment_views import (
     user_appointments, appointment_detail,
     delete_appointment, create_appointment, cancel_appointment,
-    check_and_update_appointments, check_appointment_status, start_appointment_service,
-    complete_appointment_service, propagate_appointment_delays
+    start_appointment_service, complete_appointment_service, 
+    check_in_appointment, set_appointment_delay
 )
 
 from .views.admin_views import (
