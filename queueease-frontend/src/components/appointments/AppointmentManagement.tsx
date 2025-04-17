@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Box, Typography, Paper, Grid, Button, 
+  Box, Typography, Paper, Button, 
   Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, Chip, CircularProgress,
   Dialog, DialogTitle, DialogContent,
@@ -22,25 +22,29 @@ import { ManageAppointment, AppointmentManagementProps, APPOINTMENT_STATUS_COLOR
 
 const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId, onRefresh }) => {
   const { enqueueSnackbar } = useSnackbar();
+  
+  // State for appointments data and UI
   const [appointments, setAppointments] = useState<ManageAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(formatToISODate(new Date()));
   const [processingAppointment, setProcessingAppointment] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tabValue, setTabValue] = useState(0);
+  
+  // Dialog states
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     type: 'check_in' | 'start' | 'complete',
     appointmentId: string
   } | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [tabValue, setTabValue] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [delayDialogOpen, setDelayDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null);
   const [delayMinutes, setDelayMinutes] = useState<string>('');
   const [delayReason, setDelayReason] = useState<string>('');
 
+  // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
@@ -51,14 +55,10 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
       setLoading(true);
       setError(null);
       
-      // Assuming you have an API endpoint to get appointments for a specific service and date
       const response = await API.admin.getTodaysAppointments(serviceId, selectedDate);
       
-      if (Array.isArray(response)) {
-        setAppointments(response);
-      } else {
-        setAppointments([]);
-      }
+      // Handle API response ensure we always have an array
+      setAppointments(Array.isArray(response) ? response : []);
     } catch (err) {
       console.error('Error fetching appointments:', err);
       setError(err instanceof Error ? err.message : 'Failed to load appointments');
@@ -68,6 +68,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
     }
   };
 
+  // Initial data load and when date/service changes
   useEffect(() => {
     if (serviceId) {
       fetchAppointments();
@@ -79,6 +80,44 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
     setSelectedDate(stripTimezoneDesignator(date));
   };
 
+  // Update appointment status in local state
+  const updateAppointmentStatus = (
+    orderId: string, 
+    status: string, 
+    updates: Partial<ManageAppointment>
+  ) => {
+    setAppointments(appointments.map(appointment => 
+      appointment.order_id === orderId 
+        ? { ...appointment, status, ...updates } 
+        : appointment
+    ));
+  };
+
+  // Common error handler for appointment actions
+  const handleActionError = (
+    err: unknown, 
+    actionName: string
+  ) => {
+    console.error(`Error ${actionName}:`, err);
+    setError(err instanceof Error ? err.message : `Failed to ${actionName}`);
+    return false;
+  };
+
+  // Common success handler for appointment actions
+  const handleActionSuccess = (
+    orderId: string, 
+    actionName: string
+  ) => {
+    setActionSuccess(`Appointment ${orderId} ${actionName} successfully`);
+    
+    // Refresh parent component data if needed
+    if (onRefresh) {
+      onRefresh();
+    }
+    
+    return true;
+  };
+
   // Handle check-in appointment
   const handleCheckInAppointment = async (orderId: string) => {
     try {
@@ -88,28 +127,15 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
       const result = await API.appointments.checkInAppointment(orderId);
       
       if (result && result.success) {
-        // Update the local state to reflect the change
-        setAppointments(appointments.map(appointment => 
-          appointment.order_id === orderId 
-            ? { 
-                ...appointment, 
-                status: 'in_progress',
-                actual_start_time: stripTimezoneDesignator(result.appointment.actual_start_time),
-                delay_minutes: result.appointment.delay_minutes || appointment.delay_minutes
-              } 
-            : appointment
-        ));
+        updateAppointmentStatus(orderId, 'checked_in', {
+          check_in_time: stripTimezoneDesignator(result.appointment.check_in_time),
+          delay_minutes: result.appointment.delay_minutes
+        });
         
-        setActionSuccess(`Appointment ${orderId} checked in successfully`);
-        
-        // Refresh parent component data if needed
-        if (onRefresh) {
-          onRefresh();
-        }
+        return handleActionSuccess(orderId, 'checked in');
       }
     } catch (err) {
-      console.error('Error checking in appointment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to check in appointment');
+      return handleActionError(err, 'checking in appointment');
     } finally {
       setProcessingAppointment(null);
       setConfirmDialogOpen(false);
@@ -126,28 +152,15 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
       const result = await API.appointments.startAppointmentService(orderId);
       
       if (result && result.success) {
-        // Update the local state to reflect the change
-        setAppointments(appointments.map(appointment => 
-          appointment.order_id === orderId 
-            ? { 
-                ...appointment, 
-                status: 'in_progress',
-                actual_start_time: stripTimezoneDesignator(result.appointment.actual_start_time),
-                delay_minutes: result.appointment.delay_minutes || appointment.delay_minutes
-              } 
-            : appointment
-        ));
+        updateAppointmentStatus(orderId, 'in_progress', {
+          actual_start_time: stripTimezoneDesignator(result.appointment.actual_start_time),
+          delay_minutes: result.appointment.delay_minutes
+        });
         
-        setActionSuccess(`Appointment ${orderId} started successfully`);
-        
-        // Refresh parent component data
-        if (onRefresh) {
-          onRefresh();
-        }
+        return handleActionSuccess(orderId, 'started');
       }
     } catch (err) {
-      console.error('Error starting appointment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to start appointment');
+      return handleActionError(err, 'starting appointment');
     } finally {
       setProcessingAppointment(null);
       setConfirmDialogOpen(false);
@@ -164,32 +177,19 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
       const result = await API.appointments.completeAppointmentService(orderId);
       
       if (result && result.success) {
-        // Update the local state to reflect the change
-        setAppointments(appointments.map(appointment => 
-          appointment.order_id === orderId 
-            ? { 
-                ...appointment, 
-                status: 'completed',
-                actual_end_time: stripTimezoneDesignator(result.appointment.actual_end_time),
-                // Preserve delay information even after completion
-                delay_minutes: result.appointment.delay_minutes || appointment.delay_minutes
-              } 
-            : appointment
-        ));
+        updateAppointmentStatus(orderId, 'completed', {
+          actual_end_time: stripTimezoneDesignator(result.appointment.actual_end_time),
+          delay_minutes: result.appointment.delay_minutes
+        });
         
-        setActionSuccess(`Appointment ${orderId} completed successfully`);
-        
-        // Refresh parent component data if needed
-        if (onRefresh) {
-          onRefresh();
-        }
+        handleActionSuccess(orderId, 'completed');
         
         // Refresh appointment list to get updated positions and propagated delays
         fetchAppointments();
+        return true;
       }
     } catch (err) {
-      console.error('Error completing appointment:', err);
-      setError(err instanceof Error ? err.message : 'Failed to complete appointment');
+      return handleActionError(err, 'completing appointment');
     } finally {
       setProcessingAppointment(null);
       setConfirmDialogOpen(false);
@@ -221,7 +221,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
       );
       
       if (result && result.success) {
-        // Update the local state to reflect the change
+        // Update appointments with delay value
         setAppointments(appointments.map(appointment => 
           appointment.order_id === selectedAppointment 
             ? { ...appointment, delay_minutes: delayValue } 
@@ -242,10 +242,10 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
         throw new Error(result.error || 'Failed to set delay');
       }
     } catch (err) {
-      console.error('Error setting appointment delay:', err);
-      setError(err instanceof Error ? err.message : 'Failed to set appointment delay');
+      handleActionError(err, 'setting appointment delay');
       enqueueSnackbar('Failed to set delay', { variant: 'error' });
     } finally {
+      // Reset delay dialog state
       setProcessingAppointment(null);
       setDelayDialogOpen(false);
       setSelectedAppointment(null);
@@ -268,120 +268,163 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
     setDelayDialogOpen(true);
   };
 
-  // Get status color
-  const getStatusColor = (status: string) => {
-    return APPOINTMENT_STATUS_COLORS[status as keyof typeof APPOINTMENT_STATUS_COLORS] || 'primary';
-  };
+  // Get status color from constants
+  const getStatusColor = (status: string) => 
+    APPOINTMENT_STATUS_COLORS[status as keyof typeof APPOINTMENT_STATUS_COLORS] || 'primary';
 
-  // Get status display
-  const getStatusDisplay = (status: string) => {
-    return APPOINTMENT_STATUS_DISPLAY[status as keyof typeof APPOINTMENT_STATUS_DISPLAY] || status;
-  };
+  // Get status display from constants
+  const getStatusDisplay = (status: string) => 
+    APPOINTMENT_STATUS_DISPLAY[status as keyof typeof APPOINTMENT_STATUS_DISPLAY] || status;
 
-  // Format time with Irish locale
-  const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    
-    const cleanTimeString = stripTimezoneDesignator(timeString);
-    
-    // For time-only strings (HH:MM)
-    if (cleanTimeString.length <= 5) {
-      return formatTimeString(cleanTimeString);
-    }
-    
-    // For full datetime ISO strings
-    try {
-      const date = new Date(cleanTimeString);
-      return date.toLocaleTimeString('en-IE', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: true 
-      });
-    } catch (e) {
-      console.error('Error formatting time:', e);
-      return timeString;
-    }
-  };
-
+  // Display delay info with proper formatting
   const formatDelayInfo = (appointment: ManageAppointment) => {
-    // Always show delay for appointments with delay_minutes value
-    if (appointment.delay_minutes && appointment.delay_minutes > 0) {
-      return (
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          color: 'error.main'
-        }}>
-          <AccessTimeIcon fontSize="small" sx={{ mr: 0.5 }} />
-          {`${appointment.delay_minutes} min delay`}
-        </Box>
-      );
-    }
+    // Display a delay warning when applicable
+    const hasDelay = appointment.delay_minutes && appointment.delay_minutes > 0;
     
-    // Default "on time" display
     return (
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'center',
-        color: 'success.main'
+        color: hasDelay ? 'error.main' : 'success.main'
       }}>
         <AccessTimeIcon fontSize="small" sx={{ mr: 0.5 }} />
-        On time
+        {hasDelay ? `${appointment.delay_minutes} min delay` : 'On time'}
       </Box>
     );
   };
 
   // Check if an appointment can be checked in
-  const canCheckInAppointment = (appointment: ManageAppointment) => {
-    return appointment.status === 'scheduled' && !appointment.check_in_time;
-  };
+  const canCheckInAppointment = (appointment: ManageAppointment) => 
+    appointment.status === 'scheduled' && !appointment.check_in_time;
 
   // Check if an appointment can be started
-  const canStartAppointment = (appointment: ManageAppointment) => {
-    // Allow starting appointments that are scheduled or checked in and don't have an actual start time
-    return (appointment.status === 'scheduled' || appointment.status === 'checked_in') && 
-           !appointment.actual_start_time;
-  };
+  const canStartAppointment = (appointment: ManageAppointment) => 
+    (appointment.status === 'scheduled' || appointment.status === 'checked_in') && 
+    !appointment.actual_start_time;
 
   // Check if an appointment can be completed
-  const canCompleteAppointment = (appointment: ManageAppointment) => {
-    return appointment.status === 'in_progress' && appointment.actual_start_time && !appointment.actual_end_time;
-  };
+  const canCompleteAppointment = (appointment: ManageAppointment) => 
+    appointment.status === 'in_progress' && 
+    appointment.actual_start_time && 
+    !appointment.actual_end_time;
 
   // Check if delay can be set
-  const canSetDelay = (appointment: ManageAppointment) => {
-    // Only allow setting delays for future appointments
-    return ['scheduled', 'checked_in', 'in_progress'].includes(appointment.status);
-  };
+  const canSetDelay = (appointment: ManageAppointment) => 
+    ['scheduled', 'checked_in', 'in_progress'].includes(appointment.status);
 
   // Filter appointments based on search term and tab
   const filteredAppointments = appointments.filter(appt => {
-    const matchesSearch = appt.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appt.order_id.toLowerCase().includes(searchTerm.toLowerCase());
+    // First apply search filter
+    const matchesSearch = 
+      appt.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      appt.order_id.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (!matchesSearch) return false;
     
-    if (tabValue === 0) {
-      return true;
-    } else if (tabValue === 1) {
-      return ['scheduled', 'checked_in'].includes(appt.status);
-    } else if (tabValue === 2) {
-      return appt.status === 'in_progress';
-    } else if (tabValue === 3) {
-      return appt.status === 'completed';
+    // Apply tab filter
+    switch (tabValue) {
+      case 0:
+        return true;
+      case 1:
+        return ['scheduled', 'checked_in'].includes(appt.status);
+      case 2:
+        return appt.status === 'in_progress';
+      case 3:
+        return appt.status === 'completed';
+      default:
+        return true;
     }
-    
-    return true;
   });
+
+  // Action button component
+  const ActionButton = ({ 
+    condition, 
+    color, 
+    icon, 
+    label, 
+    onClick, 
+    margin = { mr: 1 }
+  }: { 
+    condition: boolean, 
+    color: 'primary' | 'secondary' | 'success' | 'error' | 'info' | 'warning',
+    icon: React.ReactNode, 
+    label: string, 
+    onClick: () => void,
+    margin?: Record<string, number>
+  }) => {
+    if (!condition) return null;
+    
+    return (
+      <Button
+        variant="contained"
+        size="small"
+        color={color}
+        startIcon={icon}
+        disabled={processingAppointment === selectedAppointment}
+        onClick={onClick}
+        sx={margin}
+      >
+        {label}
+      </Button>
+    );
+  };
+
+  // Determine dialog title based on action type
+  const getDialogTitle = () => {
+    if (!confirmAction) return '';
+    
+    switch (confirmAction.type) {
+      case 'check_in': return 'Check In Appointment';
+      case 'start': return 'Start Appointment';
+      case 'complete': return 'Complete Appointment';
+      default: return 'Confirm Action';
+    }
+  };
+
+  // Get dialog message based on action type
+  const getDialogMessage = () => {
+    if (!confirmAction) return '';
+    
+    switch (confirmAction.type) {
+      case 'check_in': 
+        return 'Are you sure you want to check in this appointment? This will mark the customer as present.';
+      case 'start': 
+        return 'Are you sure you want to start this appointment? This will mark the service as in-progress.';
+      case 'complete': 
+        return 'Are you sure you want to complete this appointment?';
+      default: 
+        return 'Are you sure you want to proceed with this action?';
+    }
+  };
+
+  // Handle confirmation action
+  const handleConfirmAction = () => {
+    if (!confirmAction) return;
+    
+    switch (confirmAction.type) {
+      case 'check_in':
+        handleCheckInAppointment(confirmAction.appointmentId);
+        break;
+      case 'start':
+        handleStartAppointment(confirmAction.appointmentId);
+        break;
+      case 'complete':
+        handleCompleteAppointment(confirmAction.appointmentId);
+        break;
+    }
+  };
 
   return (
     <Box>
+      {/* Main content card */}
       <Paper sx={{ p: 3, borderRadius: 2, mb: 3 }}>
+        {/* Header section with controls */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
           <Typography variant="h6">Appointments Management</Typography>
           
           {/* Control Panel - Search & Date Selection */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Search field */}
             <TextField
               size="small"
               placeholder="Search appointments..."
@@ -397,6 +440,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
               sx={{ minWidth: 200 }}
             />
             
+            {/* Date picker */}
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <CalendarTodayIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
               <input
@@ -412,17 +456,18 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
               />
             </Box>
             
+            {/* Refresh button */}
             <Button 
               variant="outlined" 
               size="small"
-              onClick={() => fetchAppointments()}
+              onClick={fetchAppointments}
             >
               Refresh
             </Button>
           </Box>
         </Box>
 
-        {/* Tabs for filtering */}
+        {/* Filtering tabs */}
         <Tabs 
           value={tabValue} 
           onChange={handleTabChange}
@@ -438,7 +483,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
           <Tab label="Completed" />
         </Tabs>
 
-        {/* Success message */}
+        {/* Notification alerts */}
         {actionSuccess && (
           <Alert 
             severity="success" 
@@ -449,7 +494,6 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
           </Alert>
         )}
         
-        {/* Error message */}
         {error && (
           <Alert 
             severity="error" 
@@ -460,7 +504,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
           </Alert>
         )}
 
-        {/* Appointments table */}
+        {/* Appointments table content */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
@@ -480,6 +524,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
               <TableBody>
                 {filteredAppointments.map((appointment) => (
                   <TableRow key={appointment.order_id}>
+                    {/* Time cell */}
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                         <Typography variant="body2">
@@ -490,7 +535,11 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                         </Typography>
                       </Box>
                     </TableCell>
+                    
+                    {/* Customer name */}
                     <TableCell>{appointment.user_name}</TableCell>
+                    
+                    {/* Status chip */}
                     <TableCell>
                       <Chip 
                         label={getStatusDisplay(appointment.status)}
@@ -498,10 +547,15 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                         size="small"
                       />
                     </TableCell>
+                    
+                    {/* Delay information */}
                     <TableCell>
                       {formatDelayInfo(appointment)}
                     </TableCell>
+                    
+                    {/* Action buttons */}
                     <TableCell align="right">
+                      {/* Check-in button */}
                       {canCheckInAppointment(appointment) && (
                         <Button
                           variant="contained"
@@ -516,6 +570,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                         </Button>
                       )}
                       
+                      {/* Start button */}
                       {canStartAppointment(appointment) && (
                         <Button
                           variant="contained"
@@ -530,6 +585,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                         </Button>
                       )}
                       
+                      {/* Complete button */}
                       {canCompleteAppointment(appointment) && (
                         <Button
                           variant="contained"
@@ -543,6 +599,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                         </Button>
                       )}
 
+                      {/* Set delay button */}
                       {canSetDelay(appointment) && (
                         <Button
                           variant="contained"
@@ -556,6 +613,8 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
                           Set Delay
                         </Button>
                       )}
+                      
+                      {/* Loading indicator while action is processing */}
                       {processingAppointment === appointment.order_id && (
                         <CircularProgress size={24} sx={{ ml: 1 }} />
                       )}
@@ -566,6 +625,7 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
             </Table>
           </TableContainer>
         ) : (
+          // Empty state
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
               No appointments found for the selected filters
@@ -579,42 +639,18 @@ const AppointmentManagement: React.FC<AppointmentManagementProps> = ({ serviceId
         open={confirmDialogOpen}
         onClose={() => setConfirmDialogOpen(false)}
       >
-        <DialogTitle>
-          {confirmAction?.type === 'check_in' 
-            ? 'Check In Appointment' 
-            : confirmAction?.type === 'start' 
-              ? 'Start Appointment' 
-              : 'Complete Appointment'}
-        </DialogTitle>
+        <DialogTitle>{getDialogTitle()}</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            {confirmAction?.type === 'check_in' 
-              ? 'Are you sure you want to check in this appointment? This will mark the customer as present.'
-              : confirmAction?.type === 'start' 
-                ? 'Are you sure you want to start this appointment? This will mark the service as in-progress.'
-                : 'Are you sure you want to complete this appointment?'}
-          </DialogContentText>
+          <DialogContentText>{getDialogMessage()}</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
           <Button 
-            onClick={() => {
-              if (!confirmAction) return;
-              
-              if (confirmAction.type === 'check_in') {
-                handleCheckInAppointment(confirmAction.appointmentId);
-              } else if (confirmAction.type === 'start') {
-                handleStartAppointment(confirmAction.appointmentId);
-              } else {
-                handleCompleteAppointment(confirmAction.appointmentId);
-              }
-            }}
+            onClick={handleConfirmAction}
             color={
-              confirmAction?.type === 'check_in' 
-                ? 'info' 
-                : confirmAction?.type === 'start' 
-                  ? 'primary' 
-                  : 'success'
+              confirmAction?.type === 'check_in' ? 'info' : 
+              confirmAction?.type === 'start' ? 'primary' : 
+              'success'
             }
             variant="contained"
             autoFocus

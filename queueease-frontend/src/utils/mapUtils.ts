@@ -275,7 +275,7 @@ export const getCategoryIcon = (category: string, size: 'small' | 'medium' | 'la
   
   let icon: React.ReactElement | undefined;
   
-  // Regular function approach instead of JSX
+  // Regular function approach
   switch (lowerCategory) {
     case 'restaurant':
       icon = React.createElement(RestaurantIcon, iconProps);

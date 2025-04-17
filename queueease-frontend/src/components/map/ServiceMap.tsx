@@ -1,15 +1,22 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Box, Button, CircularProgress, Alert, Snackbar, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { 
+  Box, Button, CircularProgress, Alert, Snackbar, Dialog, 
+  DialogTitle, DialogContent, DialogContentText, DialogActions 
+} from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import { Service, ServiceMapProps } from 'types/serviceTypes';
-import { geoJSONGenerator, getServicePointLayer, getServiceSymbolLayer, addMapStyles, DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN, removeMapStyles } from 'utils/mapUtils';
+import { 
+  geoJSONGenerator, getServicePointLayer, getServiceSymbolLayer, 
+  addMapStyles, DUBLIN_CENTER, DUBLIN_BOUNDS, MAPBOX_TOKEN, removeMapStyles 
+} from 'utils/mapUtils';
 import * as turf from '@turf/turf';
 import throttle from 'lodash/throttle';
 import debounce from 'lodash/debounce';
 import { geolocationHelper } from '../../utils/geolocationHelper';
 
+// Constants for layer IDs
 const USER_LAYER_ID = 'user-location';
 const USER_RADIUS_LAYER_ID = 'user-radius';
 const USER_RADIUS_OUTLINE_ID = 'user-radius-outline';
@@ -25,6 +32,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   userLocation,
   onUserLocationChange
 }) => {
+  // Refs for map and state management
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const serviceMapRef = useRef<Map<number, Service>>(new Map());
@@ -35,12 +43,13 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
   const animationFrameRef = useRef<number | null>(null);
   const pendingUpdatesRef = useRef<(() => void)[]>([]);
   
+  // Component state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationPermissionRequested, setLocationPermissionRequested] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   
-  // Recreate service map when services change
+  // Update service map reference when services change
   useEffect(() => {
     try {
       const serviceMap = new Map<number, Service>();
@@ -54,7 +63,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, [services]);
   
-  // Calculate distance between two points (haversine formula)
+  // Calculate distance between two points using haversine formula
   const calculateDistance = useCallback((
     lat1: number, 
     lon1: number, 
@@ -76,15 +85,16 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       return R * c; // in meters
     } catch (err) {
       console.error('Error calculating distance:', err);
-      return Infinity; // Return Infinity to ensure the service is filtered out
+      return Infinity;
     }
   }, []);
   
-  // Memoized data transform with distance filtering
+  // Filter services by distance and prepare GeoJSON data
   const serviceData = useMemo(() => {
     try {
       let filteredServices = services;
       
+      // Filter by distance if user location is available
       if (userLocation && maxDistance > 0) {
         filteredServices = services.filter(service => {
           try {
@@ -102,6 +112,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         });
       }
       
+      // Convert to GeoJSON format
       return geoJSONGenerator.prepareGeoJSON(filteredServices, selectedService?.id);
     } catch (err) {
       console.error('Error preparing service data:', err);
@@ -110,7 +121,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, [services, selectedService?.id, userLocation, maxDistance, calculateDistance]);
   
-  // Helper function to ensure map is ready for operations
+  // Ensures map is ready before performing operations
   const ensureMapIsReady = useCallback((callback: () => void) => {
     if (!map.current) {
       pendingUpdatesRef.current.push(callback);
@@ -129,7 +140,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, []);
   
-  // Process all pending updates
+  // Process all pending map updates
   const processPendingUpdates = useCallback(() => {
     const updates = [...pendingUpdatesRef.current];
     pendingUpdatesRef.current = [];
@@ -144,7 +155,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, []);
   
-  // Update map data with debounce
+  // Update map data with debounce to prevent excessive updates
   const updateMapData = useMemo(() => 
     debounce(() => {
       if (!map.current || !mapStyleLoadedRef.current) return;
@@ -157,6 +168,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         // Batch update - only one repaint
         source.setData(serviceData);
 
+        // Update selected service highlight
         if (map.current.getLayer('service-points')) {
           map.current.setPaintProperty(
             'service-points',
@@ -184,7 +196,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     if (!map.current || !mapStyleLoadedRef.current) return;
     
     try {
-      // Create user location marker
+      // Create user location point
       const userLocationData = {
         type: 'Feature',
         geometry: {
@@ -195,11 +207,10 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       };
       
       // Create radius circle with turf.js
-      const radiusInKm = radiusKm;
       const options = { steps: 64, units: 'kilometers' as const };
-      const circle = turf.circle([longitude, latitude], radiusInKm, options);
+      const circle = turf.circle([longitude, latitude], radiusKm, options);
       
-      // Add or update user location source
+      // Update or create user location marker
       if (map.current.getSource(USER_LAYER_ID)) {
         // Update existing source 
         const source = map.current.getSource(USER_LAYER_ID) as mapboxgl.GeoJSONSource;
@@ -242,7 +253,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         });
         
-        // Set up pulse animation using RAF
+        // Animate pulse effect
         const animatePulse = () => {
           if (!map.current || !mapStyleLoadedRef.current) return;
           
@@ -259,7 +270,6 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
             }
           } catch (err) {
             console.error('Error animating pulse:', err);
-            setError(err instanceof Error ? err.message : 'Failed to animate pulse');
           }
           
           animationFrameRef.current = requestAnimationFrame(animatePulse);
@@ -283,10 +293,10 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           data: circle as any
         });
         
-        // Add radius layer first checking if service-points exists
+        // Get appropriate layer order
         const beforeLayerId = map.current.getLayer('service-points') ? 'service-points' : undefined;
         
-        // Add radius layer
+        // Add radius fill layer
         map.current.addLayer({
           id: USER_RADIUS_LAYER_ID,
           source: USER_RADIUS_LAYER_ID,
@@ -298,7 +308,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         }, beforeLayerId);
         
-        // Add radius outline with more visible styling
+        // Add radius outline with dashed styling
         map.current.addLayer({
           id: USER_RADIUS_OUTLINE_ID,
           source: USER_RADIUS_LAYER_ID,
@@ -320,9 +330,9 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, []);
   
-  // Replace the current getUserLocation function with this
+  // Get user's current location and update the map
   const getUserLocation = useCallback(() => {
-    // If we haven't asked for permission yet, show dialog
+    // Show permission dialog if not already requested
     if (!locationPermissionRequested) {
       setShowPermissionDialog(true);
       return;
@@ -331,11 +341,11 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     setIsLoading(true);
     setError(null);
     
-    // First attempt to directly update user location without geolocation API
+    // Use existing location if available
     if (userLocation) {
       try {
         if (map.current) {
-          // Update user location on map directly
+          // Update user location on map
           ensureMapIsReady(() => {
             updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
             
@@ -359,12 +369,13 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       }
     }
     
-    // Create a Dublin center fallback
+    // Dublin center fallback
     const dublinFallback = { 
       latitude: DUBLIN_CENTER[1], 
       longitude: DUBLIN_CENTER[0] 
     };
     
+    // Request user location
     geolocationHelper.getCurrentPosition(dublinFallback)
       .then(result => {
         if (result.location) {
@@ -391,6 +402,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         }
         
+        // Handle any errors
         if (result.error) {
           setError(result.error);
         } else {
@@ -402,19 +414,18 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       });
   }, [maxDistance, onUserLocationChange, updateUserLocationOnMap, updateMapData, userLocation, ensureMapIsReady, locationPermissionRequested]);
   
-  // Add this function to handle permission consent
+  // Handle user location permission response
   const handleLocationPermission = (granted: boolean) => {
     setLocationPermissionRequested(true);
     setShowPermissionDialog(false);
     
     if (granted) {
-      // Now proceed with getting location
+      // Get location if permission granted
       getUserLocation();
     } else {
-      // Handle rejection - use Dublin center
+      // Use Dublin center as fallback
       setError("Location access denied. Using Dublin city center instead.");
       
-      // Use Dublin center as fallback
       const dublinFallback = { 
         latitude: DUBLIN_CENTER[1], 
         longitude: DUBLIN_CENTER[0] 
@@ -434,12 +445,12 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   };
 
-  // Initialize map layers
+  // Initialise map layers and sources
   const initializeMapLayers = useCallback(() => {
     if (!map.current || !mapStyleLoadedRef.current || layersInitializedRef.current) return;
     
     try {
-      // Add source for services with optimized params
+      // Add optimised GeoJSON source with clustering
       map.current.addSource('services', {
         type: 'geojson',
         data: serviceData,
@@ -452,7 +463,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         tolerance: 0.5
       });
 
-      // Add clustering layers
+      // Add cluster circle layer
       map.current.addLayer({
         id: 'clusters',
         type: 'circle',
@@ -481,6 +492,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         }
       });
 
+      // Add cluster count labels
       map.current.addLayer({
         id: 'cluster-count',
         type: 'symbol',
@@ -497,14 +509,14 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         }
       });
 
-      // Add individual service layers
+      // Add individual service points layer
       const servicePointLayer = getServicePointLayer(selectedService);
       
       if (!servicePointLayer.paint) {
         servicePointLayer.paint = {};
       }
       
-      // Optimize radius rendering based on zoom level
+      // Optimise point size based on zoom level
       servicePointLayer.paint['circle-radius'] = [
         'interpolate',
         ['linear'],
@@ -516,7 +528,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       
       servicePointLayer.paint['circle-opacity'] = 0.85;
       
-      // Service points layer
+      // Add service points and labels
       map.current.addLayer(servicePointLayer);
       map.current.addLayer(getServiceSymbolLayer());
 
@@ -525,26 +537,26 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
       }
       
-      // Set up event listeners for interactions with the map
+      // Set up interaction handlers
       setupMapEventListeners();
       
-      // Mark layers as initialized
+      // Mark layers as initialsed
       layersInitializedRef.current = true;
       
-      // Clear any errors if successful
+      // Clear any errors
       setError(null);
     } catch (err) {
-      console.error('Error initializing map layers:', err);
-      setError(err instanceof Error ? err.message : 'Failed to initialize map layers');
+      console.error('Error initialising map layers:', err);
+      setError(err instanceof Error ? err.message : 'Failed to initialise map layers');
     }
   }, [serviceData, maxDistance, selectedService, userLocation, updateUserLocationOnMap]);
 
-  // Create a separate function for event listeners
+  // Set up map event listeners for interactions
   const setupMapEventListeners = useCallback(() => {
     if (!map.current) return;
     
     try {
-      // Handle clicks on clusters with throttle
+      // Handle cluster clicks - expand clusters
       map.current.on('click', 'clusters', throttle((e) => {
         if (!map.current || !e.features || e.features.length === 0) return;
 
@@ -566,11 +578,10 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           });
         } catch (err) {
           console.error('Error handling cluster click:', err);
-          setError(err instanceof Error ? err.message : 'Failed to handle cluster click');
         }
       }, 200));
 
-      // Handle clicks on individual points
+      // Handle service point clicks - select service
       map.current.on('click', 'service-points', throttle((e) => {
         if (!e.features || e.features.length === 0) return;
 
@@ -588,7 +599,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         }
       }, 200));
 
-      // Change cursor on hover
+      // Change cursor on hover for better UX
       map.current.on('mouseenter', 'service-points', () => {
         if (map.current) map.current.getCanvas().style.cursor = 'pointer';
       });
@@ -610,7 +621,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     }
   }, [onServiceClick]);
 
-  // Initialize map
+  // Initialise the map on component mount
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -618,6 +629,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
       try {
         mapboxgl.accessToken = MAPBOX_TOKEN;
 
+        // Create map with optimised settings
         const newMap = new mapboxgl.Map({
           container: mapContainer.current!,
           style: 'mapbox://styles/mapbox/light-v11',
@@ -642,7 +654,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         });
         map.current = newMap;
         
-        // Controls minimized for less clutter
+        // Add minimal controls
         newMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
         newMap.addControl(
           new mapboxgl.NavigationControl({
@@ -652,7 +664,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           'bottom-right'
         );
         
-        // Setup event handlers with throttling/debouncing
+        // Handle map movement with performance optimisations
         const throttledMapUpdate = throttle(() => {
           isMapMovingRef.current = true;
         }, 100);
@@ -665,11 +677,10 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         newMap.on('movestart', throttledMapUpdate);
         newMap.on('moveend', debouncedMapEnded);
 
-        // Optimize zoom level handling
+        // Adjust radius opacity based on zoom level
         newMap.on('zoom', throttle(() => {
           if (map.current && userLocation && map.current.getLayer(USER_RADIUS_LAYER_ID)) {
             try {
-              // Opacity of the circle based on zoom level for better visibility
               const currentZoom = map.current.getZoom();
               const opacity = Math.max(0.03, Math.min(0.12, 0.12 - (currentZoom - 12) * 0.01));
               
@@ -684,46 +695,38 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
           }
         }, 100));
 
+        // Initialise layers when style loads
         newMap.on('style.load', () => {
           console.log('Map style loaded successfully');
           mapStyleLoadedRef.current = true;
           addMapStyles();
           
-          // Initialize map layers once style is loaded
           initializeMapLayers();
-          
-          // Process any pending updates
           processPendingUpdates();
           
-          // If user location is already set, update it on the map
+          // Handle user location
           if (userLocation) {
             updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
           } else {
-            // Try to get user's location after map loads
             getUserLocation();
           }
         });
         
-        // Check if style is already loaded
+        // Handle case where style is already loaded
         if (newMap.isStyleLoaded()) {
           console.log('Map style already loaded');
           mapStyleLoadedRef.current = true;
           addMapStyles();
           initializeMapLayers();
-          
-          // Process any pending updates
           processPendingUpdates();
           
-          // If user location is already set, update it on the map
           if (userLocation) {
             updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
           } else {
-            // Try to get user's location after map loads
             getUserLocation();
           }
         }
         
-        // Clear any errors if successful
         setError(null);
       } catch (err) {
         console.error('Error initializing map:', err);
@@ -733,6 +736,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
 
     initMap();
 
+    // Cleanup function
     return () => {
       // Cancel animation frame
       if (animationFrameRef.current !== null) {
@@ -740,10 +744,10 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
         animationFrameRef.current = null;
       }
       
-      // Clear all debounced/throttled functions
+      // Cancel pending operations
       updateMapData.cancel();
       
-      // Remove map
+      // Remove map instance
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -766,8 +770,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
 
   // Update map when radius or user location changes
   useEffect(() => {
-    if (!userLocation) return;
-    if (!map.current) return;
+    if (!userLocation || !map.current) return;
     
     ensureMapIsReady(() => {
       updateUserLocationOnMap(userLocation.latitude, userLocation.longitude, maxDistance);
@@ -775,7 +778,7 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     });
   }, [maxDistance, userLocation, updateUserLocationOnMap, updateMapData, ensureMapIsReady]);
 
-  // Update map when selected service changes
+  //  Update map when selected service changes
   useEffect(() => {
     if (!map.current || !selectedService) return;
     
@@ -794,9 +797,9 @@ const ServiceMap: React.FC<ServiceMapProps> = ({
     });
   }, [selectedService, updateMapData, ensureMapIsReady]);
 
+  // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      // Perform cleanup on unmount
       removeMapStyles();
       geoJSONGenerator.clearCaches();
     };

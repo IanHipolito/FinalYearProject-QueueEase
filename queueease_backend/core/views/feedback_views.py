@@ -50,7 +50,6 @@ def submit_feedback(request):
         }, status=201)
     
     except Exception as e:
-        print(f"Error in submit_feedback: {str(e)}")
         return Response({'error': str(e)}, status=500)
 
 @api_view(['GET'])
@@ -93,7 +92,6 @@ def get_user_feedback_history(request, user_id):
         return Response(result)
     
     except Exception as e:
-        print(f"Error in get_user_feedback_history: {str(e)}")
         return Response({'error': str(e)}, status=500)
     
 @api_view(['GET'])
@@ -123,5 +121,4 @@ def get_eligible_services(request, user_id):
         return Response(result)
     
     except Exception as e:
-        print(f"Error in get_eligible_services: {str(e)}")
         return Response({'error': str(e)}, status=500)

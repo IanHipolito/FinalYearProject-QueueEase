@@ -236,7 +236,7 @@ class AppointmentDetails(models.Model):
 class ServiceWaitTime(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
     wait_time = models.IntegerField()
-    date_recorded = models.DateTimeField(auto_now_add=True)
+    date_recorded = models.DateTimeField()
 
     def __str__(self):
         return f"{self.service.name} - {self.wait_time} minutes"

@@ -18,7 +18,6 @@ import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const CustomersPage: React.FC = () => {
   const { authenticated, loading: authLoading } = useAuthGuard({});
-  
   const { currentService } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);

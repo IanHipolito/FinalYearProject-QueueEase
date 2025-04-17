@@ -1,6 +1,4 @@
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.db import models
 from django.utils import timezone
 from rest_framework.decorators import api_view
@@ -11,9 +9,8 @@ import logging
 import traceback
 from django.contrib.auth.hashers import check_password, make_password
 import json
-from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, FCMToken, AppointmentDetails, QueueSequence, NotificationSettings
+from ..models import User, Service, Queue, ServiceAdmin, ServiceWaitTime, Feedback, AppointmentDetails, NotificationSettings
 from ..utils.nlp_sentiment import KeywordExtractor, SentimentAnalyzer
-from ..services.notifications import send_push_notification, send_queue_update_notification, send_appointment_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +22,8 @@ def admin_dashboard_data(request):
         
         if not service_id:
             return Response({'error': 'Service ID is required'}, status=400)
-            
-        try:
-            service = Service.objects.get(id=service_id)
-        except Service.DoesNotExist:
-            return Response({'error': 'Service not found'}, status=404)
+        
+        service = get_object_or_404(Service, id=service_id)
         
         # Timezone-aware queries for accuracy
         now = timezone.now()
@@ -56,11 +50,8 @@ def admin_dashboard_data(request):
                 service=service
             ).select_related('user').order_by('-date_created')[:5]
             
-            logger.debug(f"Found {latest_queue_entries.count()} latest queue entries")
-            
             for queue in latest_queue_entries:
                 try:
-                    # Ensure we're handling timezone correctly
                     formatted_date = timezone.localtime(queue.date_created).strftime('%Y-%m-%d') if queue.date_created else 'N/A'
                     formatted_time = timezone.localtime(queue.date_created).strftime('%H:%M') if queue.date_created else 'N/A'
                     
@@ -164,14 +155,13 @@ def admin_dashboard_data(request):
             'service_type': service.service_type
         }
         
-        logger.debug(f"Response data: {response_data}")
         return Response(response_data)
         
     except Exception as e:
         logger.error(f"Dashboard data error: {str(e)}")
         logger.error(traceback.format_exc())
         
-        # Return an error response instead of fake data
+        # Return an error response
         return Response({
             'error': 'An unexpected error occurred while retrieving dashboard data',
             'details': str(e)
@@ -189,16 +179,16 @@ def admin_customers(request):
         except Service.DoesNotExist:
             return Response({'error': 'Service not found'}, status=404)
             
-        # Get unique user IDs who have used this service
+        # Get unique user IDs who have used a specific service
         user_ids = Queue.objects.filter(service=service).values_list('user', flat=True).distinct()
         users = User.objects.filter(id__in=user_ids)
         
         customers_data = []
         for user in users:
-            # Count orders placed by this customer for this service
+            # Count orders placed by this customer for a specific service
             order_count = Queue.objects.filter(user=user, service=service).count()
             
-            # Get the user's last visit date for this service
+            # Get the user's last visit date for a specific service
             last_visit = Queue.objects.filter(user=user, service=service).order_by('-date_created').first()
             
             is_active = False
@@ -219,119 +209,10 @@ def admin_customers(request):
             
         return Response(customers_data)
     except Exception as e:
-        print(f"Error in admin_customers: {str(e)}")
-        print(traceback.format_exc())
         return Response({
             'error': str(e),
             'message': 'An error occurred while fetching customer data'
         }, status=500)
-    
-@api_view(['POST'])
-def admin_create_customer(request):
-    try:
-        data = request.data
-        service_id = data.get('service_id')
-        name = data.get('name')
-        email = data.get('email')
-        phone = data.get('phone')
-        
-        if not all([service_id, name, email]):
-            return Response({'error': 'Service ID, name, and email are required'}, status=400)
-            
-        try:
-            service = Service.objects.get(id=service_id)
-        except Service.DoesNotExist:
-            return Response({'error': 'Service not found'}, status=404)
-            
-        if User.objects.filter(email=email).exists():
-            return Response({'error': 'Email already exists'}, status=400)
-            
-        user = User.objects.create(
-            name=name,
-            email=email,
-            mobile_number=phone,
-            user_type='customer',
-            signup_type='regular'
-        )
-        
-        Queue.objects.create(
-            user=user,
-            service=service,
-            sequence_number=0,
-            status='completed'
-        )
-        
-        return Response({
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.mobile_number,
-            'is_active': True
-        }, status=201)
-    except Exception as e:
-        return Response({'error': str(e)}, status=500)
-    
-@csrf_exempt
-@api_view(['POST'])
-def test_notification(request):
-    try:
-        user_id = request.data.get('user_id')
-        title = request.data.get('title', 'QueueEase Notification')
-        body = request.data.get('body', 'This is a test notification')
-        notification_type = request.data.get('notification_type', 'custom')
-        data = request.data.get('data', {})
-        
-        if not user_id:
-            return Response({"error": "User ID is required"}, status=400)
-        
-        # Get FCM token for the user
-        try:
-            token_obj = FCMToken.objects.filter(user_id=user_id, is_active=True).latest('updated_at')
-            token = token_obj.token
-        except FCMToken.DoesNotExist:
-            return Response({
-                "error": "FCM token not found for this user"
-            }, status=400)
-        
-        # Send different types of notifications based on the type
-        if notification_type == 'queue_update':
-            queue_id = data.get('queue_id', '1')
-            position = 3 
-            wait_time = 15
-            service_name = "Test Service"
-            
-            result = send_queue_update_notification(
-                token=token,
-                queue_id=queue_id,
-                position=position,
-                wait_time=wait_time,
-                service_name=service_name
-            )
-        else:
-            # Generic notification
-            result = send_push_notification(
-                token=token,
-                title=title,
-                body=body,
-                data=data
-            )
-        
-        if result.get('success'):
-            return Response({
-                "success": True,
-                "message": "Notification sent successfully",
-                "details": result
-            })
-        else:
-            return Response({
-                "success": False,
-                "error": "Failed to send notification",
-                "details": result
-            }, status=500)
-    
-    except Exception as e:
-        logger.error(f"Error sending test notification: {str(e)}")
-        return Response({"error": str(e)}, status=500)
     
 @api_view(['GET'])
 def admin_get_analytics(request):
@@ -358,8 +239,7 @@ def admin_get_analytics(request):
         
         total_feedbacks = feedbacks.count()
         
-        # Build the Feedback Distribution Array
-        # Instead of returning an object, we now aggregate feedback by category (or "Overall" if no category provided)
+        # Build the feedback distribution array aggregate feedback by category
         category_distribution = {}
         for fb in feedbacks:
             categories = fb.categories if fb.categories else ["Overall"]
@@ -377,7 +257,7 @@ def admin_get_analytics(request):
         distribution_array = []
         idx = 1
         for cat, counts in category_distribution.items():
-            total = counts['total'] if counts['total'] > 0 else 1  # Avoid division by zero
+            total = counts['total'] if counts['total'] > 0 else 1
             distribution_array.append({
                 'id': idx,
                 'category': cat,
@@ -387,7 +267,7 @@ def admin_get_analytics(request):
             })
             idx += 1
 
-        # Calculate Overall Rating Percentages as Fallback
+        # Calculate overall rating rercentages as fallback
         if total_feedbacks > 0:
             satisfied_count = feedbacks.filter(rating__gte=4).count()
             neutral_count = feedbacks.filter(rating=3).count()
@@ -413,13 +293,12 @@ def admin_get_analytics(request):
                 'queue': queue_name,
                 'rating': fb.rating,
                 'comment': fb.comment,
-                'sentiment': fb.sentiment  # stored sentiment
+                'sentiment': fb.sentiment
             }
             comments.append(comment_data)
             if fb.comment:
                 comment_texts.append(fb.comment)
                 norm_comment = fb.comment.strip().lower()
-                # Re-run analysis using the new SentimentAnalyzer (ensemble method)
                 comment_sentiments[norm_comment] = sentiment_analyzer.analyze(fb.comment, method="ensemble")["sentiment"]
         
         # Extract Feedback Keywords Using KeywordExtractor
@@ -647,7 +526,6 @@ def admin_company_info(request, user_id):
 @api_view(['POST'])
 def admin_update_company_info(request):
     try:
-        # Get data from request body instead of POST
         data = request.data
         user_id = data.get('user_id')
         
@@ -714,7 +592,7 @@ def admin_update_company_info(request):
                 "address": service.details.get('address', ''),
                 "latitude": float(service.latitude) if service.latitude else 0.0,
                 "longitude": float(service.longitude) if service.longitude else 0.0,
-                "logo_base64": service.details.get('logo_base64', '')  # Return the Base64 data
+                "logo_base64": service.details.get('logo_base64', '')
             }
         }
         
@@ -762,7 +640,6 @@ def admin_todays_appointments(request):
         if not service_id or not date_param:
             return Response({"error": "service_id and date are required"}, status=400)
         
-        # Parse the date
         try:
             selected_date = datetime.strptime(date_param, '%Y-%m-%d').date()
         except ValueError:
@@ -783,11 +660,9 @@ def admin_todays_appointments(request):
         # Process each appointment to check for delays
         appointments_data = []
         for appointment in appointments:
-            # Calculate if the appointment should be marked as delayed
-            is_delayed = False
             delay_minutes = 0
             
-            # For appointments that haven't started yet and scheduled for today and time has passed
+            # For appointments that have not started yet and scheduled for today and time has passed
             if (appointment.status in ['scheduled', 'checked_in'] and 
                 appointment.appointment_date == today and 
                 appointment.appointment_time < current_time):
@@ -800,7 +675,6 @@ def admin_todays_appointments(request):
                 # Only update delay if calculated delay is greater than existing delay
                 existing_delay = appointment.delay_minutes or 0
                 if calculated_delay_minutes > existing_delay:
-                    is_delayed = True
                     delay_minutes = calculated_delay_minutes
                     
                     # Update the appointment with the new delay
@@ -829,3 +703,4 @@ def admin_todays_appointments(request):
         logger.error(f"Error fetching today's appointments: {str(e)}")
         logger.error(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
+    

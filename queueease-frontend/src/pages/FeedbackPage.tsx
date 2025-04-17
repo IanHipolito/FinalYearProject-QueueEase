@@ -235,10 +235,10 @@ const FeedbackPage: React.FC = () => {
     }
     
     setFilteredServices(availableServices);
-    setServicePage(1); // Reset to first page when filters change
+    setServicePage(1);
   }, [services, serviceSearchQuery, serviceStartDate, serviceEndDate]);
 
-  // Update pagination for services tab
+  // Pagination for services tab
   useEffect(() => {
     const calculatedTotalPages = Math.ceil(filteredServices.length / servicesPerPage);
     setServicesTotalPages(calculatedTotalPages || 1); // Ensure at least 1 page

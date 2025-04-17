@@ -148,18 +148,6 @@ export const API = {
             });
             return API.handleResponse(response);
         },
-        createCustomer: async (serviceId: number, data: any) => {
-            const response = await fetch(`${API_BASE}/admin/customers/create/`, {
-                method: 'POST',
-                headers: getCommonHeaders(),
-                body: JSON.stringify({
-                    service_id: serviceId,
-                    ...data
-                }),
-                credentials: 'include', 
-            });
-            return API.handleResponse(response);
-        },
         getNotificationSettings: async (serviceId: number) => {
             const response = await fetch(`${API_BASE}/admin/notification-settings/?service_id=${serviceId}`, {
                 headers: getCommonHeaders(),
@@ -458,7 +446,7 @@ export const API = {
             return API.handleResponse(response);
         },
         setAppointmentDelay: async (orderId: string, delayMinutes: number, reason?: string) => {
-            const response = await fetch(`${API_BASE}/set-appointment-delay/`, {
+            const response = await fetch(`${API_BASE}/admin/set-appointment-delay/`, {
               method: 'POST',
               headers: getCommonHeaders(),
               body: JSON.stringify({

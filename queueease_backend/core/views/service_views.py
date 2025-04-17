@@ -1,16 +1,11 @@
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.db import models
-from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
-import logging
 from ..models import Service, ServiceWaitTime, Queue, ServiceAdmin, AppointmentDetails
 from ..serializers import ServiceSerializer
-
-logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 def api_overview(request):
@@ -49,12 +44,10 @@ def list_services(request):
                 }
                 service_data.append(service_dict)
             except Exception as service_error:
-                print(f"Error processing service {service.name}: {str(service_error)}")
                 continue
         
         return Response(service_data)
     except Exception as e:
-        print(f"Error in list_services: {str(e)}")
         return Response(
             {"error": "An unexpected error occurred"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -131,4 +124,3 @@ def list_services_with_status(request):
         return Response(result)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
-    

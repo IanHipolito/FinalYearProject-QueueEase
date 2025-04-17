@@ -18,10 +18,9 @@ from .views import (
     complete_appointment_service, set_appointment_delay,
     
     # Admin views
-    admin_dashboard_data, admin_customers, admin_create_customer,
-    test_notification, admin_get_analytics, notification_settings,
+    admin_dashboard_data, admin_customers,
+    admin_get_analytics, notification_settings, admin_todays_appointments,
     admin_company_info, admin_update_company_info, admin_change_password,
-    admin_todays_appointments,
     
     # Feedback views
     submit_feedback, get_feedback_categories, get_user_feedback_history,
@@ -77,15 +76,13 @@ urlpatterns = [
     # Admin endpoints
     path('admin/dashboard-data/', admin_dashboard_data, name='admin-dashboard-data'),
     path('admin/customers/', admin_customers, name='admin-customers'),
-    path('admin/customers/create/', admin_create_customer, name='admin-create-customer'),
-    path('test-notification/', test_notification, name='test-notification'),
     path('admin-get-analytics/', admin_get_analytics, name='admin-get-analytics'),
     path('admin/notification-settings/', notification_settings, name='notification-settings'),
     path('admin/company-info/<int:user_id>/', admin_company_info, name='admin-company-info'),
     path('admin/update-company-info/', admin_update_company_info, name='admin-update-company-info'),
     path('admin/change-password/', admin_change_password, name='admin-change-password'),
     path('admin/todays-appointments/', admin_todays_appointments, name='admin-todays-appointments'),
-    path('set-appointment-delay/', set_appointment_delay, name='set-appointment-delay'),
+    path('admin/set-appointment-delay/', set_appointment_delay, name='set-appointment-delay'),
     
     # Feedback endpoints
     path('feedback/submit/', submit_feedback, name='submit_feedback'),

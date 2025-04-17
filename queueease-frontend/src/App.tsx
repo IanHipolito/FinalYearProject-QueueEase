@@ -26,7 +26,7 @@ import UserAnalyticsPage from './pages/UserAnalyticsPage';
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      {/* Include FCM component so notifications are initialized */}
+      {/* Include FCM component so notifications are initialised */}
       <FBCloudMessaging />
       <IOSInstallGuide />
       <Router>

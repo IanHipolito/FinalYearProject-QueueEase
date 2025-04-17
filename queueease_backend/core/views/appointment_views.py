@@ -1,4 +1,3 @@
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -13,7 +12,6 @@ from django.db import transaction
 from ..models import AppointmentDetails, User, Service, FCMToken
 from ..serializers import AppointmentDetailsSerializer
 from ..services.notifications import send_appointment_delay_notification
-
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +91,6 @@ def appointment_detail(request, order_id):
             "actual_end_time": appointment.actual_end_time.isoformat() if appointment.actual_end_time else None,
             "delay_minutes": estimated_delay if estimated_delay > 0 else None,
             "check_in_time": appointment.check_in_time.isoformat() if appointment.check_in_time else None,
-            "debug_info": {
-                "server_timezone": "Europe/Dublin",
-                "raw_appointment_time": appointment.appointment_time.strftime('%H:%M'),
-                "delay_minutes": estimated_delay
-            }
         }
         
         return Response(data)
@@ -194,7 +187,10 @@ def create_appointment(request):
         
         return Response({
             "message": "Appointment created successfully",
-            "order_id": str(order_id)
+            "order_id": str(order_id),
+            "appointment_date": appointment.appointment_date.strftime('%Y-%m-%d'),
+            "appointment_time": appointment.appointment_time.strftime('%H:%M'),
+            "service_name": service.name
         }, status=201)
         
     except Exception as e:
@@ -229,36 +225,24 @@ def cancel_appointment(request, order_id):
                 "error": f"Cannot cancel appointment with status: {appointment.status}"
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Store the current position for updating subsequent appointments
-        current_position = None
-        same_day_appointments = AppointmentDetails.objects.filter(
-            appointment_date=appointment.appointment_date,
-            service=appointment.service,
-            status='scheduled',
-            is_active=True
-        ).order_by('appointment_time')
-        
-        for idx, apt in enumerate(same_day_appointments):
-            if apt.id == appointment.id:
-                current_position = idx + 1
-                break
-        
         # Update appointment status
         appointment.status = 'cancelled'
         appointment.queue_status = 'cancelled'
         appointment.save()
-        
+
         # Update positions for subsequent appointments
-        if current_position:
-            subsequent_appointments = AppointmentDetails.objects.filter(
-                appointment_date=appointment.appointment_date,
-                service=appointment.service,
-                appointment_time__gt=appointment.appointment_time,
-                status='scheduled',
-                is_active=True
-            ).order_by('appointment_time')
-            
-            logger.info(f"Updating positions for {subsequent_appointments.count()} appointments after cancellation")
+        subsequent_appointments = AppointmentDetails.objects.filter(
+            appointment_date=appointment.appointment_date,
+            service=appointment.service,
+            appointment_time__gt=appointment.appointment_time,
+            status='scheduled',
+            is_active=True
+        ).order_by('appointment_time')
+
+        # Recalculate positions
+        for idx, apt in enumerate(subsequent_appointments):
+            apt.queue_position = idx + 1
+            apt.save(update_fields=['queue_position'])
         
         return Response({
             "message": "Appointment cancelled successfully",
@@ -365,7 +349,7 @@ def propagate_appointment_delays(appointment):
             service=appointment.service,
             appointment_date=appointment.appointment_date,
             appointment_time__gt=appointment.appointment_time,
-            status__in=['scheduled', 'checked_in']  # Only propagate to future appointments
+            status__in=['scheduled', 'checked_in']
         ).order_by('appointment_time')
         
         now = timezone.now()
@@ -485,11 +469,6 @@ def set_appointment_delay(request):
                     scheduled_start = timezone.make_aware(scheduled_start)
                     
                 new_start_time = scheduled_start + timedelta(minutes=delay_minutes)
-                formatted_time = new_start_time.strftime('%I:%M %p')
-                
-                message_body = f"Your appointment scheduled for {appointment.appointment_time.strftime('%I:%M %p')} has been delayed by {delay_minutes} minutes. New expected time: {formatted_time}"
-                if delay_reason:
-                    message_body += f" Reason: {delay_reason}"
                 
                 # Send the notification
                 send_appointment_delay_notification(

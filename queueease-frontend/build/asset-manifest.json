@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/static/css/main.4c26c18b.css",
-    "main.js": "/static/js/main.8f1839a6.js",
+    "main.js": "/static/js/main.515c57b9.js",
     "static/js/206.c9b0c028.chunk.js": "/static/js/206.c9b0c028.chunk.js",
     "static/media/QueueEaseLogoWhite.png": "/static/media/QueueEaseLogoWhite.1c6d771f76905b05677d.png",
     "index.html": "/index.html"
   },
   "entrypoints": [
     "static/css/main.4c26c18b.css",
-    "static/js/main.8f1839a6.js"
+    "static/js/main.515c57b9.js"
   ]
 }

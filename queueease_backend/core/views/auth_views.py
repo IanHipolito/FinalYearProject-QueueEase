@@ -4,16 +4,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import json
 import logging
-import traceback
 from django.contrib.auth.hashers import make_password, check_password
 from ..models import User, ServiceAdmin, Service, FCMToken
-from rest_framework import status
 
 logger = logging.getLogger(__name__)
 
-@csrf_exempt
+@api_view(['POST'])
 def login_view(request):
-    if request.method == 'POST':
         try:
             data = json.loads(request.body)
             email = data.get('email', '').strip()
@@ -59,7 +56,6 @@ def login_view(request):
 
 @api_view(['POST'])
 def signup_view(request):
-    print("Request received:", request.body)
     try:
         data = request.data
         name = data.get('name')

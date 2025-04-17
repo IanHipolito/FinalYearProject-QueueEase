@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box, Button, Card, CardContent, Typography,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -11,13 +11,31 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CategoryIcon from '@mui/icons-material/Category';
-import { ServiceAdmin, ServiceSelectorProps } from 'types/serviceTypes';
+import { ServiceSelectorProps } from 'types/serviceTypes';
+
+// Helper component to generate a service attribute chip
+const ServiceAttributeChip = ({ 
+  label, 
+  icon, 
+  marginRight = false 
+}: { 
+  label: string; 
+  icon: React.ReactElement;
+  marginRight?: boolean;
+}) => (
+  <Chip 
+    size="small" 
+    label={label} 
+    variant="outlined"
+    icon={icon}
+    sx={{ mb: 0.5, ...(marginRight ? { mr: 0.5 } : {}) }}
+  />
+);
 
 const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   selectedService,
   onSelectService,
   loading,
-  services,
   visibleServices,
   filteredServices,
   searchQuery,
@@ -28,16 +46,8 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   viewServiceDetails,
   submitting
 }) => {
-  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
-
-  const openServiceDialog = () => {
-    setServiceDialogOpen(true);
-  };
-
-  const handleServiceSelect = (service: ServiceAdmin | null) => {
-    onSelectService(service);
-  };
-
+  const [serviceDialogOpen, setServiceDialogOpen] = React.useState(false);
+  
   return (
     <>
       <Box sx={{ mt: 3, mb: 1 }}>
@@ -75,7 +85,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                   size="small"
                   variant="outlined"
                   color="error"
-                  onClick={() => handleServiceSelect(null)}
+                  onClick={() => onSelectService(null)}
                   sx={{ mr: 1 }}
                 >
                   Change
@@ -87,7 +97,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           <Button
             fullWidth
             variant="outlined"
-            onClick={openServiceDialog}
+            onClick={() => setServiceDialogOpen(true)}
             disabled={submitting || loading}
             sx={{ my: 1, py: 1.5, borderStyle: 'dashed' }}
           >
@@ -138,7 +148,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                 <React.Fragment key={service.id}>
                   <ListItemButton
                     onClick={() => {
-                      handleServiceSelect(service);
+                      onSelectService(service);
                       setServiceDialogOpen(false);
                     }}
                   >
@@ -150,21 +160,16 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
                       secondary={
                         <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
                           {service.category && (
-                            <Chip 
-                              size="small" 
-                              label={service.category} 
-                              variant="outlined"
+                            <ServiceAttributeChip 
+                              label={service.category}
                               icon={<CategoryIcon fontSize="small" />}
-                              sx={{ mr: 0.5, mb: 0.5 }}
+                              marginRight={true}
                             />
                           )}
                           {service.location && (
-                            <Chip 
-                              size="small" 
-                              label={service.location} 
-                              variant="outlined"
+                            <ServiceAttributeChip 
+                              label={service.location}
                               icon={<LocationOnIcon fontSize="small" />}
-                              sx={{ mb: 0.5 }}
                             />
                           )}
                         </Stack>

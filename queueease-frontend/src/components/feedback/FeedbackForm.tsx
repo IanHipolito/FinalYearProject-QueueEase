@@ -21,9 +21,12 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
   availableCategories,
   isLoading
 }) => {
+  // Form state
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  
+  // UI state
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -41,12 +44,16 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
   // Calculate form completion progress
   useEffect(() => {
     let progress = 0;
+    // Rating is 40% of the form weight
     if (rating !== null) progress += 40;
+    // Categories are 40% of the form weight
     if (selectedCategories.length > 0) progress += 40;
+    // Comment is 20% of the form weight
     if (comment.trim().length > 0) progress += 20;
     setFormProgress(progress);
   }, [rating, selectedCategories, comment]);
 
+  // Toggle category selection
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories(prev => 
       prev.includes(categoryId)
@@ -55,13 +62,16 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     );
   };
 
+  // Get appropriate icon based on rating value
   const getRatingIcon = (value: number) => {
     if (value >= 4) return <SentimentSatisfiedAltIcon />;
     if (value <= 2) return <SentimentVeryDissatisfiedIcon />;
     return <SentimentNeutralIcon />;
   };
 
+  // Handle form submission
   const handleSubmit = async () => {
+    // Form validation
     if (rating === null) {
       setError('Please provide a rating');
       return;
@@ -72,6 +82,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
       return;
     }
 
+    // Prepare feedback data
     const feedbackData: FeedbackData = {
       service_id: serviceId,
       rating,
@@ -85,17 +96,21 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setError('');
 
     try {
+      // Submit feedback to API
       await API.feedback.submitFeedback(feedbackData);
       
+      // Reset form and show success message
       setSuccess(true);
       setComment('');
       setRating(null);
       setSelectedCategories([]);
       
+      // Callback to parent component
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
       
+      // Auto-hide success message after 3 seconds
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
@@ -107,6 +122,30 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
     }
   };
 
+  // Reusable style for step number bubble
+  const stepNumberStyle = {
+    mr: 1, 
+    bgcolor: '#6f42c1', 
+    color: 'white', 
+    borderRadius: '50%',
+    width: 24,
+    height: 24,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.875rem',
+    fontWeight: 'bold'
+  };
+
+  // Get colour based on rating
+  const getRatingColor = (value: number | null) => {
+    if (!value) return '#6f42c1';
+    if (value > 3) return '#4caf50';
+    if (value < 3) return '#f44336';
+    return '#ff9800';
+  };
+
+  // Show loading state
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -117,6 +156,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
 
   return (
     <Box>
+      {/* Success message */}
       <Fade in={success}>
         <Alert 
           severity="success" 
@@ -131,6 +171,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         </Alert>
       </Fade>
       
+      {/* Error message */}
       {error && (
         <Alert 
           severity="error" 
@@ -153,6 +194,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         />
       </Box>
 
+      {/* Form header with service info */}
       <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 3, bgcolor: '#fafafa' }}>
         <Typography variant="h5" fontWeight="500" gutterBottom>
           Rate your experience with {serviceName}
@@ -163,24 +205,11 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         </Typography>
       </Paper>
       
+      {/* Rating */}
       <Grow in={true}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ 
-              mr: 1, 
-              bgcolor: '#6f42c1', 
-              color: 'white', 
-              borderRadius: '50%',
-              width: 24,
-              height: 24,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.875rem',
-              fontWeight: 'bold'
-            }}>
-              1
-            </Box>
+            <Box sx={stepNumberStyle}>1</Box>
             How was your experience?
           </Typography>
           <Paper 
@@ -191,9 +220,11 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
               flexDirection: 'column', 
               alignItems: 'center',
               borderRadius: 3,
+              // Background colour based on rating
               bgcolor: rating ? (rating > 3 ? '#f0f7f0' : rating < 3 ? '#fdf0f0' : '#f5f5f5') : '#f5f5f5',
               transition: 'background-color 0.3s ease',
               border: '1px solid',
+              // Border colour based on rating
               borderColor: rating ? (rating > 3 ? 'rgba(76, 175, 80, 0.2)' : rating < 3 ? 'rgba(244, 67, 54, 0.2)' : 'rgba(255, 152, 0, 0.2)') : 'transparent'
             }}
           >
@@ -208,12 +239,13 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
               sx={{ 
                 fontSize: '2.5rem',
                 '& .MuiRating-iconFilled': {
-                  color: rating ? (rating > 3 ? '#4caf50' : rating < 3 ? '#f44336' : '#ff9800') : '#6f42c1',
+                  color: getRatingColor(rating),
                 }
               }}
               icon={rating ? getRatingIcon(rating) : undefined}
             />
             
+            {/* Show rating label when a rating is selected */}
             {rating !== null && (
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
                 {getRatingIcon(rating)}
@@ -221,7 +253,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
                   variant="body1" 
                   sx={{ 
                     fontWeight: '500',
-                    color: rating > 3 ? '#4caf50' : rating < 3 ? '#f44336' : '#ff9800'
+                    color: getRatingColor(rating)
                   }}
                 >
                   {labels[rating]}
@@ -232,23 +264,10 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         </Box>
       </Grow>
       
+      {/* Categories */}
       <FormControl fullWidth sx={{ mb: 4 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ 
-            mr: 1, 
-            bgcolor: '#6f42c1', 
-            color: 'white', 
-            borderRadius: '50%',
-            width: 24,
-            height: 24,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.875rem',
-            fontWeight: 'bold'
-          }}>
-            2
-          </Box>
+          <Box sx={stepNumberStyle}>2</Box>
           Which aspects would you like to rate?
         </Typography>
         <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: '#f5f5f5', mb: 1 }}>
@@ -277,33 +296,20 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
             ))}
           </Box>
         </Paper>
-        {selectedCategories.length === 0 && (
+        {/* Helper text based on selection state */}
+        {selectedCategories.length === 0 ? (
           <FormHelperText error>Please select at least one category</FormHelperText>
-        )}
-        {selectedCategories.length > 0 && (
+        ) : (
           <FormHelperText sx={{ color: '#4caf50' }}>
             {selectedCategories.length} {selectedCategories.length === 1 ? 'category' : 'categories'} selected
           </FormHelperText>
         )}
       </FormControl>
       
+      {/* Comments */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ 
-            mr: 1, 
-            bgcolor: '#6f42c1', 
-            color: 'white', 
-            borderRadius: '50%',
-            width: 24,
-            height: 24,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.875rem',
-            fontWeight: 'bold'
-          }}>
-            3
-          </Box>
+          <Box sx={stepNumberStyle}>3</Box>
           Additional Comments
         </Typography>
         <TextField
@@ -327,11 +333,15 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
             }
           }}
         />
+        {/* Character count or helper text */}
         <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary', fontSize: '0.75rem' }}>
-          {comment.length > 0 ? `${comment.length} characters` : 'Add a comment to provide more details (optional)'}
+          {comment.length > 0 
+            ? `${comment.length} characters` 
+            : 'Add a comment to provide more details (optional)'}
         </Typography>
       </Box>
       
+      {/* Form footer with completion percentage and submit button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Form completion: {formProgress}%

@@ -31,26 +31,20 @@ def compute_expected_ready_time(service, position, historical_data=None):
         parallel_capacity = service.parallel_capacity or 8
         default_avg_duration = service.average_duration or 15
         minimal_prep = service.minimal_prep_time or 5
-        
-        print(f"Service: {service.name}, Position: {position}, Type: {service.service_type}")
-        print(f"Parameters: min_prep={minimal_prep}, parallel_capacity={parallel_capacity}, avg_duration={default_avg_duration}")
-        
+
         # Process historical data first if available
         historical_avg = None
         if historical_data and len(historical_data) > 0:
-            print(f"Historical data available: {len(historical_data)} records")
             try:
                 # Convert to numpy array for more efficient calculations
                 historical_array = np.array(historical_data)
                 
-                # Remove outliers if we have enough data
+                # Remove outliers if there is enough data
                 if len(historical_array) >= 5:
                     lower_bound = np.percentile(historical_array, 15)
                     upper_bound = np.percentile(historical_array, 85)
                     filtered_data = historical_array[(historical_array >= lower_bound) & 
                                                 (historical_array <= upper_bound)]
-                    print(f"Filtered data: {len(filtered_data)} records (removed {len(historical_array) - len(filtered_data)} outliers)")
-                    print(f"Bounds: {lower_bound} to {upper_bound}")
                     
                     if len(filtered_data) > 0:
                         historical_avg = np.mean(filtered_data)
@@ -59,9 +53,7 @@ def compute_expected_ready_time(service, position, historical_data=None):
                 else:
                     historical_avg = np.mean(historical_array)
                 
-                print(f"Historical average wait time: {historical_avg:.2f} minutes")
             except Exception as e:
-                print(f"Error processing historical data: {str(e)}")
                 historical_avg = None
         
         if service.service_type == 'immediate':
@@ -69,50 +61,43 @@ def compute_expected_ready_time(service, position, historical_data=None):
             if position == 1:
                 # First position is always minimal prep time
                 position_wait = minimal_prep
-                print(f"Position 1: Using minimal prep time: {position_wait}")
             else:
                 # For positions beyond 1, use a diminishing returns model for wait time growth
                 # Formula: base + (position-1)^0.6 * factor
                 base_time = minimal_prep
-                time_factor = 0.5  # Additional time per position, with diminishing returns
+                time_factor = 0.5  # Additional time per position
                 position_factor = (position - 1) ** 0.6  # Sublinear growth
                 
                 position_wait = base_time + (position_factor * time_factor)
-                print(f"Position {position}: Base={base_time}, Factor={position_factor:.2f}, Additional={position_factor * time_factor:.2f}")
                 
-                # Apply a reasonable cap for higher positions
-                max_wait = 20  # Maximum wait time for any position in immediate service
+                # Maximum wait time for any position in immediate service
+                max_wait = 20
                 position_wait = min(position_wait, max_wait)
             
-            # Apply historical influence for improved accuracy, but with very limited impact
+            # Apply historical influence for improved accuracy but with very limited impact
             final_wait = position_wait
             if historical_avg is not None:
-                # Use a small weight that increases slightly with position but stays minimal
-                # First position gets almost no historical influence
+                # Small weight that increases slightly with position but stays minimal
                 if position == 1:
-                    historical_weight = 0.05  # 5% influence for position 1
+                    historical_weight = 0.05
                 else:
-                    # Gradual increase in weight for higher positions, but never exceeding 15%
+                    # Gradual increase in weight for higher positions but never exceeding 15%
                     historical_weight = min(0.15, 0.05 + (position * 0.02))
                 
                 # Blend calculated time with historical data
                 weighted_historical = historical_avg * historical_weight
                 weighted_position = position_wait * (1 - historical_weight)
                 final_wait = weighted_position + weighted_historical
-                
-                print(f"Historical weight: {historical_weight:.2f}, Adding {weighted_historical:.2f} minutes of historical influence")
-                print(f"Final wait after historical adjustment: {final_wait:.2f} minutes")
-            
-            # Apply sensible cap and rounding
-            final_wait = min(final_wait, 25)  # Hard cap at 25 minutes
-            final_wait = round(final_wait)  # Round to nearest minute
+
+            # Apply cap and rounding
+            final_wait = min(final_wait, 25)
+            final_wait = round(final_wait)
             
             now = timezone.now()
             expected_time = now + timedelta(minutes=final_wait)
-            print(f"Final wait time: {final_wait} minutes, expected time: {expected_time}")
             return expected_time
         
-        # APPOINTMENT-BASED SERVICE HANDLING
+        # NO LONGER IN USE (REDUNDANT)
         else:
             # Calculate wave number and base wait time
             wave_number = (position - 1) // parallel_capacity
@@ -121,9 +106,7 @@ def compute_expected_ready_time(service, position, historical_data=None):
             # Apply minimal prep time for first wave
             if service.requires_prep_time and wave_number == 0:
                 base_wait = max(base_wait, minimal_prep)
-            
-            print(f"Appointment service base wait: {base_wait} minutes (wave {wave_number})")
-            
+                        
             # For appointment services, historical data can have more influence
             final_wait = base_wait
             if historical_avg is not None:
@@ -133,31 +116,23 @@ def compute_expected_ready_time(service, position, historical_data=None):
                 weighted_historical = historical_avg * historical_weight
                 weighted_base = base_wait * (1 - historical_weight)
                 final_wait = weighted_base + weighted_historical
-                
-                print(f"Historical weight: {historical_weight:.2f}, Adding {weighted_historical:.2f} minutes of historical influence")
-                print(f"Final wait after historical adjustment: {final_wait:.2f} minutes")
             
             # Round to nearest minute
             final_wait = round(final_wait)
             
             now = timezone.now()
             expected_time = now + timedelta(minutes=final_wait)
-            print(f"Final wait time: {final_wait} minutes, expected time: {expected_time}")
             return expected_time
             
     except Exception as e:
-        print(f"Error calculating wait time: {str(e)}")
         traceback.print_exc()
-        # Fallback to a reasonable default if there's an error
         now = timezone.now()
         return now + timedelta(minutes=10)
     
 def fetch_historical_data(service_id):
     now = timezone.now()
     current_hour = now.hour
-    is_weekend = now.weekday() >= 5  # Weekend is Saturday (5) or Sunday (6)
-    
-    # For time, consider a 2-hour window around current time
+    is_weekend = now.weekday() >= 5
     time_window_start = (current_hour - 1) % 24
     time_window_end = (current_hour + 1) % 24
     
@@ -165,7 +140,7 @@ def fetch_historical_data(service_id):
     two_weeks_ago = now - timedelta(days=14)
     
     if time_window_start < time_window_end:
-        # Normal case, e.g., 10-12
+        # Normal case
         time_specific_data = ServiceWaitTime.objects.filter(
             service_id=service_id,
             date_recorded__gte=two_weeks_ago,
@@ -173,7 +148,7 @@ def fetch_historical_data(service_id):
             date_recorded__hour__lte=time_window_end
         )
     else:
-        # Wrapped case, e.g., 23-1
+        # Wrapped case
         time_specific_data = ServiceWaitTime.objects.filter(
             service_id=service_id,
             date_recorded__gte=two_weeks_ago
@@ -182,7 +157,7 @@ def fetch_historical_data(service_id):
             models.Q(date_recorded__hour__lte=time_window_end)
         )
     
-    # If on weekend, prioritize weekend data; if weekday, prioritize weekday data
+    # If on weekend, prioritise weekend data, if weekday, prioritise weekday data
     if is_weekend:
         weekend_data = time_specific_data.filter(
             date_recorded__week_day__in=[1, 7]
@@ -207,13 +182,6 @@ def fetch_historical_data(service_id):
     
     # Extract wait times and return as list
     wait_times = list(selected_data.values_list('wait_time', flat=True))
-    
-    print(f"Historical data query for service {service_id}:")
-    print(f"Current time: {now.strftime('%A %H:%M')}")
-    print(f"Retrieved {len(wait_times)} relevant historical records")
-    
-    if wait_times:
-        print(f"Min: {min(wait_times)}, Max: {max(wait_times)}, Avg: {sum(wait_times)/len(wait_times):.2f}")
     
     return wait_times
 
@@ -249,7 +217,7 @@ def create_queue(request):
             is_active=True
         ).order_by('date_created')
 
-        # Calculate position (number of people ahead + 1)
+        # Calculate position
         position = pending_queues.count() + 1
         
         # Increment the member count on the service queue
@@ -321,7 +289,7 @@ def queue_detail(request, queue_id):
                 "time_created": queue_item.date_created.isoformat()
             })
     
-    # Auto-complete check: If pending and expected time has passed, mark as completed
+    # If pending and expected time has passed mark as completed
     if queue_item.status == 'pending' and queue_item.expected_ready_time and queue_item.expected_ready_time <= timezone.now():
         queue_item.status = 'completed'
         queue_item.save()
@@ -348,24 +316,23 @@ def queue_detail(request, queue_id):
         is_active=True
     ).order_by('date_created')
 
-    # Find the position of our queue item
+    # Find the position of queue item
     position = 0
     for i, queue in enumerate(pending_queues):
         if queue.id == queue_item.id:
             position = i + 1
             break
     
-    # If position is still 0, fallback to the filter method
+    # If position is still 0
     if position == 0:
         position = pending_queues.filter(date_created__lt=queue_item.date_created).count() + 1
 
-    # If this is an immediate service and position is 1, we might need to update the expected ready time
+    # Immediate service and position is 1
     if queue_item.service.service_type == 'immediate' and position == 1:
         current_time = timezone.now()
         time_in_queue = (current_time - queue_item.date_created).total_seconds() / 60
         
-        # If they've been waiting longer than expected but less than the minimal prep time,
-        # update their expected ready time
+        # Waiting longer than expected but less than the minimal prep time update their expected ready time
         minimal_prep = queue_item.service.minimal_prep_time or 5
         if time_in_queue < minimal_prep:
             # Update expected ready time to use minimal prep time from now
@@ -510,7 +477,6 @@ def validate_qr(request):
     
 @api_view(['POST'])
 def update_queue_position(request, queue_id):
-    """Update queue position and notify user or toggle active status"""
     try:
         queue = Queue.objects.get(id=queue_id)
         is_active = request.data.get('is_active')
@@ -546,8 +512,7 @@ def update_queue_position(request, queue_id):
                 "status": queue.status
             })
             
-        # Original behavior for position updates
-        # Calculate current position
+        # Position updates and calculate current position
         position = Queue.objects.filter(
             service=queue.service,
             status='pending',
@@ -555,7 +520,7 @@ def update_queue_position(request, queue_id):
             date_created__lt=queue.date_created
         ).count() + 1
         
-        # Only notify if position changed significantly (e.g., every 2 positions)
+        # Only notify if position changed significantly
         if hasattr(queue, '_prev_position') and abs(queue._prev_position - position) < 2:
             return Response({"success": True, "notification": "skipped"})
             
@@ -568,7 +533,7 @@ def update_queue_position(request, queue_id):
             token = fcm_token.token
             
             # Calculate estimated wait time
-            wait_time = 5  # Default
+            wait_time = 5
             if queue.expected_ready_time:
                 now = timezone.timezone.now(queue.expected_ready_time.tzinfo)
                 wait_time = max(0, int((queue.expected_ready_time - now).total_seconds() / 60))
@@ -614,7 +579,7 @@ def update_service_queue_status(service_queue_id):
         # Update member count
         service_queue.current_member_count = active_members
         
-        # If no active members, set queue to inactive
+        # If no active members set queue to inactive
         if active_members == 0:
             service_queue.is_active = False
         
@@ -633,7 +598,7 @@ def leave_queue(request, queue_id):
         if queue.status != 'pending' or not queue.is_active:
             return Response({"error": "This queue has already been completed or is inactive"}, status=400)
         
-        # Check if it's within the time window (1 minute)
+        # Check if it's within the time window
         time_window = timedelta(minutes=1)
         if timezone.now() - queue.date_created > time_window:
             return Response(
@@ -666,17 +631,20 @@ def leave_queue(request, queue_id):
 @api_view(['GET'])
 def queue_history(request, user_id):
     try:
+        # Check if user exists
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"error": f"User with ID {user_id} not found"}, status=404)
         
+        # Get all queue items for this user
         queue_items = Queue.objects.filter(user_id=user_id).order_by('-date_created')
         
         if not queue_items.exists():
             return Response([])
         
         serialized_data = []
+        # Loop through each queue item and serialize the data
         for queue in queue_items:
             try:
                 queue_data = {
@@ -703,15 +671,11 @@ def queue_history(request, user_id):
                 
                 serialized_data.append(queue_data)
             except Exception as e:
-                print(f"Error serializing queue {queue.id}: {str(e)}")
-                print(traceback.format_exc())
                 continue
         
         return Response(serialized_data)
         
     except Exception as e:
-        print(f"Error in queue_history: {str(e)}")
-        print(traceback.format_exc())
         return Response({"error": str(e)}, status=500)
     
 @api_view(['GET'])
@@ -731,7 +695,7 @@ def service_queues(request, service_id):
                 'description': service.description,
                 'is_active': sq.is_active,
                 'current_customers': sq.current_member_count,
-                'max_capacity': 50  # Default
+                'max_capacity': 50
             })
         
         # If no active service queues but there are individual queue members,
@@ -774,7 +738,7 @@ def user_analytics(request, user_id):
         elif time_range == 'year':
             start_date = now - timedelta(days=365)
         else:
-            start_date = now - timedelta(days=30)  # Default to month
+            start_date = now - timedelta(days=30)
         
         # Get queue history for the user within the date range
         queue_history = Queue.objects.filter(

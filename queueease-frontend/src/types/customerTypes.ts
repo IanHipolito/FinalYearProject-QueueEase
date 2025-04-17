@@ -34,16 +34,6 @@ export interface CustomerComment {
   avatar?: string;
 }
 
-export interface CreateCustomerDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: () => void;
-  formData: CustomerFormData;
-  setFormData: React.Dispatch<React.SetStateAction<CustomerFormData>>;
-  formError: string;
-  formLoading: boolean;
-}
-
 export interface CustomerDetailsDialogProps {
   open: boolean;
   onClose: () => void;
@@ -55,7 +45,6 @@ export interface CustomerFiltersProps {
   setSearchTerm: (term: string) => void;
   filterStatus: string;
   setFilterStatus: (status: string) => void;
-  onCreateCustomer: () => void;
 }
 
 export interface CustomerStatsCardProps {

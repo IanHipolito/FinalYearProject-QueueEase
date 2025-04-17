@@ -48,69 +48,64 @@ const ServiceDetailDialog: React.FC<ServiceDetailDialogProps> = ({
         )}
         
         <Typography variant="body1" paragraph>
-          {service.description || "No description available."} 
-          {service.location && !service.description?.includes(service.location) && (
-            <> This service is available at <strong>{service.location}</strong>.</>
-          )}
+          {service.description || "No description available."}
         </Typography>
         
-        <Typography variant="subtitle2" sx={{ mb: 1, mt: 2, fontWeight: 'medium' }}>
-          Service Details
-        </Typography>
-        <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-          {service.category && (
-            <ListItemButton>
-              <ListItemIcon>
-                <CategoryIcon color="primary" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Category"
-                secondary={service.category}
-              />
-            </ListItemButton>
-          )}
-          
-          {service.location && (
-            <ListItemButton>
-              <ListItemIcon>
-                <LocationOnIcon color="primary" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Location"
-                primaryTypographyProps={{ fontWeight: 'medium' }}
-                secondary={
-                  <Typography variant="body2" component="span">
-                    {service.location}
-                  </Typography>
-                }
-              />
-            </ListItemButton>
-          )}
-          
-          {service.business_hours && (
-            <ListItemButton>
-              <ListItemIcon>
-                <BusinessIcon color="primary" />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Business Hours"
-                secondary={service.business_hours}
-              />
-            </ListItemButton>
-          )}
-        </List>
-        
-        {service.location && (
-          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Typography variant="caption" color="text.secondary" align="center">
-              *You'll be able to manage this service's queue system for customers at this location
+        {(service.category || service.location || service.business_hours) && (
+          <>
+            <Typography variant="subtitle2" sx={{ mb: 1, mt: 2, fontWeight: 'medium' }}>
+              Service Details
             </Typography>
-          </Box>
+            <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+              {service.category && (
+                <ListItemButton>
+                  <ListItemIcon>
+                    <CategoryIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Category"
+                    secondary={service.category}
+                  />
+                </ListItemButton>
+              )}
+              
+              {service.location && (
+                <ListItemButton>
+                  <ListItemIcon>
+                    <LocationOnIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Location"
+                    secondary={service.location}
+                  />
+                </ListItemButton>
+              )}
+              
+              {service.business_hours && (
+                <ListItemButton>
+                  <ListItemIcon>
+                    <BusinessIcon color="primary" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Business Hours"
+                    secondary={service.business_hours}
+                  />
+                </ListItemButton>
+              )}
+            </List>
+          </>
         )}
+        
+        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="caption" color="text.secondary" align="center">
+            *You'll be able to manage this service's queue system for customers
+            {service.location && ` at ${service.location}`}
+          </Typography>
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        {service && !service.has_admin && onSelect && (
+        {!service.has_admin && onSelect && (
           <Button 
             variant="contained"
             onClick={() => {

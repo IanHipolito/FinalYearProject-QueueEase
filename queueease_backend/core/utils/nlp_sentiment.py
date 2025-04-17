@@ -15,31 +15,21 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class NLPProcessor:
-    """
-    Uses spaCy for efficient tokenization, lemmatization,
-    and noun-chunk extraction.
-    """
     def __init__(self):
         self.nlp = spacy.load("en_core_web_sm")
     
     def preprocess(self, text: str):
-        """Preprocess text: normalize, tokenize, filter stopwords, and lemmatize."""
         text = text.strip().lower()
         doc = self.nlp(text)
         tokens = [token.lemma_ for token in doc if token.is_alpha and not token.is_stop and len(token.text) > 2]
         return tokens
     
     def extract_noun_chunks(self, text: str):
-        """Extract noun chunks (phrases) from the text."""
         text = text.strip().lower()
         doc = self.nlp(text)
         return [chunk.text for chunk in doc.noun_chunks]
 
 class KeywordExtractor:
-    """
-    Extracts keywords from a list of feedback comments.
-    Aggregates overall frequency and sentiment breakdown for each token.
-    """
     def __init__(self, nlp_processor=None):
         self.processor = nlp_processor if nlp_processor is not None else NLPProcessor()
 
@@ -79,10 +69,6 @@ class KeywordExtractor:
         return keywords_list
 
 class TransformerSentimentAnalyzer:
-    """
-    Uses Hugging Face Transformers to perform sentiment analysis.
-    Caches the pipeline so that it is initialized only once.
-    """
     _pipeline = None  # Class variable to cache the pipeline
 
     def __init__(self):
@@ -119,13 +105,6 @@ class TransformerSentimentAnalyzer:
         }
 
 class SentimentAnalyzer:
-    """
-    A comprehensive sentiment analyzer using an ensemble of methods:
-      - TextBlob
-      - VADER
-      - Lexicon-based analysis (custom lexicon)
-      - Optionally, Transformer-based analysis
-    """
     def __init__(self):
         for resource in ['corpora/wordnet', 'corpora/stopwords', 'sentiment/vader_lexicon']:
             try:

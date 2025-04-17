@@ -7,10 +7,8 @@ class Command(BaseCommand):
     help = 'Populate services from GeoJSON file'
 
     def handle(self, *args, **kwargs):
-        # Go up five levels to reach the project root:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
         filepath = os.path.join(base_dir, 'queueease-frontend', 'src', 'data', 'Other_Services.geojson')
-        print(f"Using file path: {filepath}")  # For verification
         services = parse_geojson(filepath)
         categorized_services = categorize_services(services)
         

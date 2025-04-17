@@ -15,7 +15,6 @@ import PeopleIcon from '@mui/icons-material/People';
 import SentimentSatisfiedAltIcon from '@mui/icons-material/SentimentSatisfiedAlt';
 import WarningIcon from '@mui/icons-material/Warning';
 import InfoIcon from '@mui/icons-material/Info';
-import EventBusyIcon from '@mui/icons-material/EventBusy';
 import SpeedIcon from '@mui/icons-material/Speed';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
@@ -29,12 +28,137 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
 }) => {
   const theme = useTheme();
 
+  // Helper function to get color based on severity
+  const getSeverityColor = (severity: string) => {
+    switch(severity) {
+      case 'positive':
+        return theme.palette.success.main;
+      case 'negative':
+        return theme.palette.error.main;
+      case 'warning':
+        return theme.palette.warning.main;
+      default:
+        return theme.palette.info.main;
+    }
+  };
+
+  // Reusable card component for insights
+  const renderInsightCard = (insight: InsightItem) => {
+    const color = getSeverityColor(insight.severity);
+    
+    return (
+      <Card 
+        key={insight.id}
+        sx={{ 
+          mb: 3, 
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+          border: '1px solid',
+          borderColor: alpha(color, 0.3),
+          '&:hover': {
+            transform: 'translateY(-5px)',
+            boxShadow: '0 8px 25px rgba(0,0,0,0.12)'
+          }
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Box 
+              sx={{ 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: alpha(color, 0.1),
+                color: color,
+                p: 1,
+                borderRadius: 2,
+                mr: 2
+              }}
+            >
+              {insight.icon || (
+                insight.severity === 'positive' ? <CheckCircleIcon /> :
+                insight.severity === 'negative' ? <ErrorOutlineIcon /> :
+                insight.severity === 'warning' ? <WarningIcon /> :
+                <RecommendIcon />
+              )}
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                {insight.title}
+              </Typography>
+              {insight.metric && (
+                <Chip 
+                  label={insight.metric} 
+                  size="small"
+                  sx={{ 
+                    bgcolor: alpha(color, 0.1),
+                    color: color,
+                    fontWeight: 'medium',
+                    mt: 0.5
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
+          
+          <Typography variant="body1" paragraph>
+            {insight.description}
+          </Typography>
+          
+          {insight.recommendations && insight.recommendations.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" fontWeight="600" gutterBottom>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <AssignmentTurnedInIcon sx={{ fontSize: 20, mr: 1 }} />
+                  Recommended Actions:
+                </Box>
+              </Typography>
+              <List disablePadding dense>
+                {insight.recommendations.map((rec, idx) => (
+                  <ListItem key={idx} sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 28 }}>
+                      <Box 
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          bgcolor: alpha(color, 0.1),
+                          color: color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        {idx + 1}
+                      </Box>
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={rec} 
+                      primaryTypographyProps={{ 
+                        variant: 'body2', 
+                        sx: { fontWeight: '400' } 
+                      }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Generate insights based on analytics data
   const insights = useMemo(() => {
     const result: InsightItem[] = [];
-
     if (!analyticsData) return result;
     
+    // Extract analytics data
     const {
       satisfied_pct,
       neutral_pct,
@@ -66,9 +190,9 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
       return result;
     }
 
-    // Customer Satisfaction Trend Analysis
+    // INSIGHT GROUP 1: Customer Satisfaction Trend Analysis
     if (satisfaction_trend && satisfaction_trend.length > 1) {
-      // Comprehensive trend analysis
+      // Get metrics for analysis
       const trendLength = satisfaction_trend.length;
       const currentSatisfaction = satisfaction_trend[trendLength - 1];
       const previousSatisfaction = satisfaction_trend[trendLength - 2];
@@ -76,17 +200,17 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
       // Calculate period-to-period change
       const difference = currentSatisfaction - previousSatisfaction;
       
-      // Calculate overall trend
+      // Calculate overall trend from first to latest data point
       const firstSatisfaction = satisfaction_trend[0];
       const overallDifference = currentSatisfaction - firstSatisfaction;
       
-      // Calculate volatility (standard deviation)
+      // Calculate volatility using standard deviation
       const average = satisfaction_trend.reduce((sum, val) => sum + val, 0) / trendLength;
       const squaredDiffs = satisfaction_trend.map(val => Math.pow(val - average, 2));
       const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / trendLength;
       const volatility = Math.sqrt(variance);
       
-      // Detect momentum using last three periods (if available)
+      // Detect momentum using last three periods
       let momentum = 'neutral';
       if (trendLength >= 3) {
         const period3 = satisfaction_trend[trendLength - 1];
@@ -96,6 +220,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         const change2to3 = period3 - period2;
         const change1to2 = period2 - period1;
         
+        // Determine momentum direction based on changes between periods
         if (change2to3 > 0 && change1to2 > 0) {
           momentum = 'accelerating_positive';
         } else if (change2to3 > 0 && change1to2 <= 0) {
@@ -109,7 +234,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         }
       }
       
-      // Add insight based on period-to-period change if significant
+      // Add insight for significant period-to-period change (>=5%)
       if (Math.abs(difference) >= 5) {
         const isPositive = difference > 0;
         result.push({
@@ -136,8 +261,9 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
                 'Hold a team meeting to discuss potential causes and solutions'
               ]
         });
-      } else if (Math.abs(difference) < 2 && trendLength > 2) {
-        // Insight for stable satisfaction
+      } 
+      // Add insight for stable satisfaction
+      else if (Math.abs(difference) < 2 && trendLength > 2) {
         result.push({
           id: 'satisfaction-trend-stable',
           title: 'Satisfaction Remains Stable',
@@ -159,8 +285,9 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         });
       }
       
-      // Insight based on momentum if there's a clear pattern
+      // Add insight based on momentum if there's a clear pattern
       if (momentum !== 'neutral' && trendLength >= 3) {
+        // Different insights based on momentum type
         if (momentum === 'accelerating_positive') {
           result.push({
             id: 'satisfaction-momentum-positive',
@@ -220,7 +347,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         }
       }
       
-      // Insight based on overall trend if significant
+      // Add insight for significant overall trend (>=10% change)
       if (Math.abs(overallDifference) >= 10 && trendLength >= 3) {
         result.push({
           id: 'satisfaction-trend-overall',
@@ -246,7 +373,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         });
       }
       
-      // Add insight on satisfaction volatility if high
+      // Add insight for high volatility
       if (volatility > 8 && trendLength >= 4) {
         result.push({
           id: 'satisfaction-volatility',
@@ -265,16 +392,17 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
       }
     }
 
-    // Comprehensive Wait Time Analysis
+    // INSIGHT GROUP 2: Wait Time Analysis
     if (average_wait_time !== undefined) {
-      // Define wait time thresholds based on industry standards
-      const criticalWaitThreshold = 25; // minutes
-      const highWaitThreshold = 15; // minutes
-      const optimalWaitThreshold = 10; // minutes
-      const lowWaitThreshold = 5; // minutes
+      // Define wait time thresholds for analysis in minutes
+      const criticalWaitThreshold = 25;
+      const highWaitThreshold = 15;
+      const optimalWaitThreshold = 10;
+      const lowWaitThreshold = 5;
       
-      // Critical wait time scenario
+      // Generate insights based on wait time thresholds
       if (average_wait_time >= criticalWaitThreshold) {
+        // Critical wait times
         result.push({
           id: 'wait-time-critical',
           title: 'Critical Wait Time Issues',
@@ -287,14 +415,11 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Conduct a full service workflow analysis to identify bottlenecks',
             'Implement an "all hands" approach during peak times',
             'Review and potentially revise staffing levels and scheduling',
-            'Consider implementing a triage system for service prioritisation',
-            'Enhance customer communication about delays with regular updates',
-            'Offer compensations/incentives to customers experiencing long waits'
+            'Consider implementing a triage system for service prioritisation'
           ]
         });
-      } 
-      // High wait time scenario
-      else if (average_wait_time >= highWaitThreshold && average_wait_time < criticalWaitThreshold) {
+      } else if (average_wait_time >= highWaitThreshold && average_wait_time < criticalWaitThreshold) {
+        // High wait times
         result.push({
           id: 'wait-time-high',
           title: 'High Wait Times Detected',
@@ -307,13 +432,11 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Review service delivery procedures for efficiency opportunities',
             'Optimise the queuing system algorithm and parameters',
             'Improve communication with waiting customers to manage expectations',
-            'Consider implementing a notification system so customers don\'t need to wait in person',
-            'Train staff on expedited service procedures during busy periods'
+            'Consider implementing a notification system so customers don\'t need to wait in person'
           ]
         });
-      } 
-      // Moderate wait time scenario
-      else if (average_wait_time >= optimalWaitThreshold && average_wait_time < highWaitThreshold) {
+      } else if (average_wait_time >= optimalWaitThreshold && average_wait_time < highWaitThreshold) {
+        // Moderate wait times
         result.push({
           id: 'wait-time-moderate',
           title: 'Acceptable but Improvable Wait Times',
@@ -325,13 +448,11 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Fine-tune service delivery to shave 1-2 minutes off average processing time',
             'Analyse whether wait times differ significantly by time of day or day of week',
             'Implement small process improvements that don\'t require major changes',
-            'Consider training staff on efficient service techniques',
-            'Review appointment scheduling intervals if applicable'
+            'Consider training staff on efficient service techniques'
           ]
         });
-      } 
-      // Low/optimal wait time scenario
-      else if (average_wait_time >= lowWaitThreshold && average_wait_time < optimalWaitThreshold) {
+      } else if (average_wait_time >= lowWaitThreshold && average_wait_time < optimalWaitThreshold) {
+        // Optimal wait times
         result.push({
           id: 'wait-time-optimal',
           title: 'Optimal Wait Times',
@@ -346,9 +467,8 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Periodically check staff-to-customer ratios to ensure continued efficiency'
           ]
         });
-      } 
-      // Very low wait time scenario
-      else if (average_wait_time < lowWaitThreshold) {
+      } else if (average_wait_time < lowWaitThreshold) {
+        // Very low wait times
         result.push({
           id: 'wait-time-very-low',
           title: 'Exceptionally Low Wait Times',
@@ -360,13 +480,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Consider this a competitive advantage in your marketing',
             'Evaluate whether current staffing levels are cost-efficient',
             'Consider whether some staff could be reallocated to other service areas',
-            'Monitor customer satisfaction to ensure quality isn\'t being sacrificed for speed',
-            'Analyse whether the quick service is sustainable during peak periods'
+            'Monitor customer satisfaction to ensure quality isn\'t being sacrificed for speed'
           ]
         });
       }
       
-      // Analyse wait time trends if data is available
+      // Analyse wait time trends if data available
       if (wait_time_trend && wait_time_trend.length > 2) {
         const latestWaitTime = wait_time_trend[wait_time_trend.length - 1];
         const previousWaitTime = wait_time_trend[wait_time_trend.length - 2];
@@ -385,8 +504,7 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
               'Investigate what operational changes coincide with this increase',
               'Check if the increase correlates with higher customer volume',
               'Review recent staffing changes or absences',
-              'Proactively address the trend before it impacts customer satisfaction',
-              'Consider temporary additional staffing until the trend reverses'
+              'Proactively address the trend before it impacts customer satisfaction'
             ]
           });
         } 
@@ -403,17 +521,16 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
               'Identify what operational changes led to this improvement',
               'Document successful processes for consistent implementation',
               'Acknowledge staff members who contributed to the improvement',
-              'Continue monitoring to ensure the positive trend is maintained',
-              'Consider implementing similar improvements in other service areas'
+              'Continue monitoring to ensure the positive trend is maintained'
             ]
           });
         }
       }
     }
 
-    // Comprehensive Feedback Distribution Analysis
+    // INSIGHT GROUP 3: Feedback Category Analysis
     if (feedback_distribution && feedback_distribution.length > 0) {
-      // Sort categories by total feedback volume for context
+      // Sort categories by volume for context
       const totalFeedbackByCategory = [...feedback_distribution]
         .sort((a, b) => (b.satisfied + b.neutral + b.dissatisfied) - (a.satisfied + a.neutral + a.dissatisfied));
       
@@ -427,44 +544,38 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
       const avgSatisfaction = totalFeedbackByCategory.reduce((sum, cat) => 
         sum + cat.satisfied, 0) / totalFeedbackByCategory.length;
         
-      // Find categories with critical dissatisfaction (over 40%)
+      // Find categories with different satisfaction levels
       const criticalCategories = feedback_distribution
         .filter(item => item.dissatisfied >= 40)
         .sort((a, b) => b.dissatisfied - a.dissatisfied);
       
-      // Find categories with high dissatisfaction (30-40%)
       const highProblemCategories = feedback_distribution
         .filter(item => item.dissatisfied >= 30 && item.dissatisfied < 40)
         .sort((a, b) => b.dissatisfied - a.dissatisfied);
       
-      // Find categories with moderate but concerning dissatisfaction (20-30%)
       const moderateProblemCategories = feedback_distribution
         .filter(item => item.dissatisfied >= 20 && item.dissatisfied < 30)
         .sort((a, b) => b.dissatisfied - a.dissatisfied);
       
-      // Find categories with exceptional satisfaction (>80%)
       const exceptionalCategories = feedback_distribution
         .filter(item => item.satisfied >= 80)
         .sort((a, b) => b.satisfied - a.satisfied);
       
-      // Find categories with very good satisfaction (70-80%)
       const veryGoodCategories = feedback_distribution
         .filter(item => item.satisfied >= 70 && item.satisfied < 80)
         .sort((a, b) => b.satisfied - a.satisfied);
       
-      // Find categories with unusually high neutrality (>40%)
       const highNeutralCategories = feedback_distribution
         .filter(item => item.neutral >= 40)
         .sort((a, b) => b.neutral - a.neutral);
         
-      // Find categories with the most polarised feedback (high satisfied and high dissatisfied)
       const polarisedCategories = feedback_distribution
         .filter(item => item.satisfied >= 40 && item.dissatisfied >= 20)
-        .sort((a, b) => 
-          (b.satisfied + b.dissatisfied) - (a.satisfied + a.dissatisfied)
-        );
+        .sort((a, b) => (b.satisfied + b.dissatisfied) - (a.satisfied + a.dissatisfied));
       
-      // 1. Critical Problem Categories
+      // Add insights based on category analysis
+      
+      // Critical problem categories
       if (criticalCategories.length > 0) {
         const categoryNames = criticalCategories.map(cat => `"${cat.category}"`).join(', ');
         const worstCategory = criticalCategories[0];
@@ -480,15 +591,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             `Conduct an urgent review of ${criticalCategories.length === 1 ? 'this category' : 'these categories'}`,
             'Implement immediate staff training to address identified issues',
             'Consider temporary procedural changes until improvements take effect',
-            'Schedule focused meetings with team leaders responsible for these areas',
-            'Create a 30-day improvement plan with specific measurable goals',
-            'Consider direct outreach to dissatisfied customers for recovery opportunities',
-            'Review team composition and potentially restructure teams if necessary'
+            'Schedule focused meetings with team leaders responsible for these areas'
           ]
         });
       }
       
-      // High Problem Categories
+      // High problem categories
       if (highProblemCategories.length > 0) {
         const categoryNames = highProblemCategories.map(cat => `"${cat.category}"`).join(', ');
         
@@ -503,14 +611,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             `Schedule targeted training sessions for staff handling ${categoryNames}`,
             'Collect more detailed feedback about these specific areas',
             'Implement interim service improvements while developing long-term solutions',
-            'Monitor these metrics weekly to track improvement progress',
-            'Consider adjusting service delivery processes in these areas',
-            'Develop specific action plans for each category'
+            'Monitor these metrics weekly to track improvement progress'
           ]
         });
       }
       
-      // Moderate Problem Categories
+      // Moderate problem categories
       if (moderateProblemCategories.length > 0 && criticalCategories.length === 0 && highProblemCategories.length === 0) {
         const categoryNames = moderateProblemCategories.map(cat => `"${cat.category}"`).join(', ');
         
@@ -524,13 +630,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Implement targeted improvements in these areas before issues escalate',
             'Gather more detailed customer feedback to understand specific pain points',
             'Provide refresher training for staff handling these categories',
-            'Consider subtle adjustments to service procedures',
-            'Monitor these areas closely over the next review period'
+            'Consider subtle adjustments to service procedures'
           ]
         });
       }
       
-      // Exceptional Categories
+      // Exceptional categories
       if (exceptionalCategories.length > 0) {
         const categoryNames = exceptionalCategories.map(cat => `"${cat.category}"`).join(', ');
         const bestCategory = exceptionalCategories[0];
@@ -546,14 +651,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             `Recognise and reward staff involved in ${categoryNames}`,
             'Document specific practices in these areas for training materials',
             'Consider featuring these service strengths in marketing materials',
-            'Create case studies of successful approaches for wider implementation',
-            'Have top-performing staff mentor others in these areas',
-            'Analyse what specific factors contribute to high satisfaction in these categories'
+            'Create case studies of successful approaches for wider implementation'
           ]
         });
       }
       
-      // Very Good Categories
+      // Very good categories
       if (veryGoodCategories.length > 0 && exceptionalCategories.length === 0) {
         const categoryNames = veryGoodCategories.map(cat => `"${cat.category}"`).join(', ');
         
@@ -567,13 +670,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Maintain the current high standards in these areas',
             'Identify specific elements that could push these categories to exceptional ratings',
             'Use these categories as examples of good service delivery',
-            'Consider small refinements to service approaches in these areas',
-            'Recognise staff contributions to these positive results'
+            'Consider small refinements to service approaches in these areas'
           ]
         });
       }
       
-      // High Neutrality Categories
+      // High neutrality categories
       if (highNeutralCategories.length > 0) {
         const categoryNames = highNeutralCategories.map(cat => `"${cat.category}"`).join(', ');
         const highestNeutralCategory = highNeutralCategories[0];
@@ -588,14 +690,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Conduct targeted surveys to better understand neutral responses',
             'Look for ways to make the service experience more distinctly positive',
             'Review service delivery in these areas for inconsistencies',
-            'Consider service innovations that might elevate customer perception',
-            'Train staff to ask for specific feedback in these areas',
-            'Analyse if neutral ratings correlate with specific staff members or time periods'
+            'Consider service innovations that might elevate customer perception'
           ]
         });
       }
       
-      // Polarised Categories
+      // Polarised categories
       if (polarisedCategories.length > 0) {
         const categoryNames = polarisedCategories.map(cat => `"${cat.category}"`).join(', ');
         
@@ -609,15 +709,12 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
             'Investigate the cause of inconsistent experiences in these areas',
             'Check if polarisation correlates with specific staff members or shifts',
             'Standardise service procedures to ensure consistent delivery',
-            'Implement quality control measures',
-            'Consider additional training to reduce service variability',
-            'Analyse if there are customer segments with differing expectations',
-            'Implement more detailed service standards and protocols'
+            'Implement quality control measures'
           ]
         });
       }
       
-      // 8. Overall Distribution Profile (if no specific issues found)
+      // Overall distribution profile
       if (criticalCategories.length === 0 && 
           highProblemCategories.length === 0 && 
           exceptionalCategories.length === 0 && 
@@ -627,617 +724,365 @@ const InsightsSection: React.FC<InsightsSectionProps> = ({
         
         // Determine overall distribution profile
         if (avgSatisfaction >= 60 && avgDissatisfaction <= 20) {
-            result.push({
-              id: 'overall-distribution-positive',
-              title: 'Balanced Positive Feedback Distribution',
-              description: 'Feedback across categories shows a healthy distribution with good satisfaction levels and no critical problem areas.',
-              severity: 'positive',
-              icon: <CheckCircleIcon />,
-              recommendations: [
-                'Maintain current service standards across all categories',
-                'Consider incremental improvements to elevate good ratings to excellent',
-                'Continue monitoring for any emerging trends or shifts',
-                'Ensure staff training maintains consistent service quality',
-                'Look for opportunities to turn satisfied customers into advocates'
-              ]
-            });
-          } else if (avgSatisfaction >= 40 && avgSatisfaction < 60 && avgDissatisfaction < 30) {
-            result.push({
-              id: 'overall-distribution-neutral',
-              title: 'Balanced Neutral Feedback Distribution',
-              description: 'Feedback across categories shows a moderate satisfaction level with room for improvement.',
-              severity: 'neutral',
-              icon: <InfoIcon />,
-              recommendations: [
-                'Focus on moving neutral customers to satisfied through service enhancements',
-                'Identify common themes that might be keeping satisfaction from reaching higher levels',
-                'Consider refreshing service approaches across categories',
-                'Implement small but noticeable service improvements',
-                'Gather more detailed feedback to identify specific improvement opportunities'
-              ]
-            });
-          } else if (avgDissatisfaction >= 30) {
-            result.push({
-              id: 'overall-distribution-concerning',
-              title: 'Generally Concerning Feedback Distribution',
-              description: 'Feedback shows moderately high dissatisfaction across multiple categories without any single critical area.',
-              severity: 'warning',
-              icon: <WarningIcon />,
-              recommendations: [
-                'Conduct a broad service quality review across all categories',
-                'Implement a comprehensive staff training refresh',
-                'Consider revising service standards and expectations',
-                'Develop an improvement plan with specific targets for each category',
-                'Increase management oversight until metrics improve',
-                'Consider mystery shopping to identify specific service issues'
-              ]
-            });
-          }
-        }
-      }
-  
-      // Comprehensive Customer Comment Analysis
-      if (customer_comments && customer_comments.length > 0) {
-        // Calculate sentiment distribution
-        const positiveComments = customer_comments.filter(c => c.rating >= 4).length;
-        const negativeComments = customer_comments.filter(c => c.rating <= 2).length;
-        const neutralComments = customer_comments.filter(c => c.rating === 3).length;
-        const totalComments = customer_comments.length;
-        
-        const positiveRatio = positiveComments / totalComments;
-        const negativeRatio = negativeComments / totalComments;
-        const neutralRatio = neutralComments / totalComments;
-        
-        // Get comments with actual text content
-        const commentsWithText = customer_comments.filter(c => c.comment && c.comment.trim().length > 0);
-        const commentsWithTextRatio = commentsWithText.length / totalComments;
-        
-        // Calculate average comment length
-        const avgCommentLength = commentsWithText.length > 0
-          ? commentsWithText.reduce((sum, c) => sum + c.comment.length, 0) / commentsWithText.length
-          : 0;
-        
-        // Check for recency of comments
-        const recentComments = customer_comments.filter(c => {
-          const commentDate = new Date(c.date);
-          const now = new Date();
-          const daysAgo = Math.floor((now.getTime() - commentDate.getTime()) / (1000 * 60 * 60 * 24));
-          return daysAgo <= 7; // Within last week
-        });
-        
-        const recentCommentsRatio = recentComments.length / totalComments;
-        
-        // Check pattern of comments over time (trend)
-        let commentTrend = 'stable';
-        if (recentComments.length >= 3) {
-          const recentPositiveRatio = recentComments.filter(c => c.rating >= 4).length / recentComments.length;
-          const olderComments = customer_comments.filter(c => !recentComments.includes(c));
-          const olderPositiveRatio = olderComments.length > 0
-            ? olderComments.filter(c => c.rating >= 4).length / olderComments.length
-            : 0;
-            
-          if (recentPositiveRatio > olderPositiveRatio + 0.15) {
-            commentTrend = 'improving';
-          } else if (recentPositiveRatio < olderPositiveRatio - 0.15) {
-            commentTrend = 'declining';
-          }
-        }
-        
-        // Check for empty comments (ratings with no text)
-        const emptyCommentRatio = 1 - commentsWithTextRatio;
-        
-        // 1. High volume of negative feedback
-        if (negativeRatio >= 0.3) {
           result.push({
-            id: 'negative-comments-high',
-            title: 'High Volume of Negative Feedback',
-            description: `${(negativeRatio * 100).toFixed(0)}% of recent customer comments are negative, indicating widespread service issues.`,
-            severity: 'negative',
-            metric: `${negativeComments} of ${totalComments}`,
-            icon: <PeopleIcon />,
-            recommendations: [
-              'Conduct a detailed review of all negative comments to identify recurring themes',
-              'Implement a service recovery program to address dissatisfied customers',
-              'Increase manager presence during service hours for immediate issue resolution',
-              'Follow up with dissatisfied customers to demonstrate commitment to improvement',
-              'Consider an emergency team meeting to address service quality concerns',
-              'Temporarily increase staff levels in problematic areas',
-              'Review staff training procedures and consider retraining in key areas'
-            ]
-          });
-        } 
-        // 2. Moderate negative feedback
-        else if (negativeRatio >= 0.2 && negativeRatio < 0.3) {
-          result.push({
-            id: 'negative-comments-moderate',
-            title: 'Concerning Level of Negative Feedback',
-            description: `${(negativeRatio * 100).toFixed(0)}% of customer comments are negative, higher than the acceptable threshold.`,
-            severity: 'warning',
-            metric: `${negativeComments} of ${totalComments}`,
-            icon: <WarningIcon />,
-            recommendations: [
-              'Analyse negative comments for specific pain points that could be addressed',
-              'Implement targeted improvements in the most mentioned problem areas',
-              'Provide staff with additional training on handling challenging situations',
-              'Consider reaching out to customers who left negative feedback',
-              'Set a target to reduce negative feedback by 5% in the next review period',
-              'Create an action plan addressing common complaints'
-            ]
-          });
-        }
-        
-        // 3. Strongly positive feedback
-        if (positiveRatio >= 0.7) {
-          result.push({
-            id: 'positive-comments-high',
-            title: 'Strong Customer Sentiment',
-            description: `${(positiveRatio * 100).toFixed(0)}% of customer comments are positive, indicating excellent service quality.`,
+            id: 'overall-distribution-positive',
+            title: 'Balanced Positive Feedback Distribution',
+            description: 'Feedback across categories shows a healthy distribution with good satisfaction levels and no critical problem areas.',
             severity: 'positive',
-            metric: `${positiveComments} of ${totalComments}`,
-            icon: <SentimentSatisfiedAltIcon />,
+            icon: <CheckCircleIcon />,
             recommendations: [
-              'Share positive feedback with the team to boost morale and reinforce good practices',
-              'Analyse positive comments for specific aspects that customers appreciate most',
-              'Create a recognition program for staff mentioned in positive feedback',
-              'Incorporate successful approaches into training materials',
-              'Consider implementing a customer testimonial program',
-              'Use these positive experiences in marketing materials'
+              'Maintain current service standards across all categories',
+              'Consider incremental improvements to elevate good ratings to excellent',
+              'Continue monitoring for any emerging trends or shifts',
+              'Ensure staff training maintains consistent service quality'
             ]
           });
-        } 
-        // 4. Moderately positive feedback
-        else if (positiveRatio >= 0.5 && positiveRatio < 0.7) {
+        } else if (avgSatisfaction >= 40 && avgSatisfaction < 60 && avgDissatisfaction < 30) {
           result.push({
-            id: 'positive-comments-moderate',
-            title: 'Good Customer Sentiment',
-            description: `${(positiveRatio * 100).toFixed(0)}% of customer comments are positive, showing good but improvable service quality.`,
-            severity: 'positive',
-            metric: `${positiveComments} of ${totalComments}`,
-            icon: <SentimentSatisfiedAltIcon />,
-            recommendations: [
-              'Share positive feedback with the team while highlighting areas for improvement',
-              'Identify what distinguishes the very positive from the neutral experiences',
-              'Set a target to increase positive feedback to 70%+',
-              'Implement small service enhancements to elevate customer experience',
-              'Study what competitors might be doing better in similar service areas'
-            ]
-          });
-        }
-        
-        // 5. High neutrality in feedback
-        if (neutralRatio >= 0.4) {
-          result.push({
-            id: 'neutral-comments-high',
-            title: 'High Level of Neutral Feedback',
-            description: `${(neutralRatio * 100).toFixed(0)}% of customer comments are neutral, indicating service that fails to impress or disappoint.`,
+            id: 'overall-distribution-neutral',
+            title: 'Balanced Neutral Feedback Distribution',
+            description: 'Feedback across categories shows a moderate satisfaction level with room for improvement.',
             severity: 'neutral',
             icon: <InfoIcon />,
             recommendations: [
-              'Focus on turning neutral experiences into memorably positive ones',
-              'Identify what might be causing customers to feel indifferent about their experience',
-              'Consider service innovations or "surprise and delight" moments',
-              'Train staff to go beyond the basic service requirements',
-              'Review competitor experiences to identify differentiation opportunities',
-              'Consider asking neutral customers what would have made their experience better'
+              'Focus on moving neutral customers to satisfied through service enhancements',
+              'Identify common themes that might be keeping satisfaction from reaching higher levels',
+              'Consider refreshing service approaches across categories',
+              'Implement small but noticeable service improvements'
             ]
           });
-        }
-        
-        // 6. Comment quality/completeness issues
-        if (emptyCommentRatio >= 0.7) {
+        } else if (avgDissatisfaction >= 30) {
           result.push({
-            id: 'empty-comments-high',
-            title: 'Low Comment Completion Rate',
-            description: `${(emptyCommentRatio * 100).toFixed(0)}% of feedback submissions have ratings but no written comments, limiting valuable qualitative insights.`,
-            severity: 'neutral',
-            icon: <EventBusyIcon />,
-            recommendations: [
-              'Simplify the feedback form to encourage written comments',
-              'Offer small incentives for providing detailed feedback',
-              'Use prompt questions to guide customers on what to comment about',
-              'Ensure feedback can be easily submitted on mobile devices',
-              'Test different feedback collection methods to improve response quality',
-              'Consider implementing automated follow-up requests for detailed feedback'
-            ]
-          });
-        }
-        
-        // 7. Comment trend insights
-        if (commentTrend === 'improving' && recentCommentsRatio >= 0.25) {
-          result.push({
-            id: 'comment-trend-improving',
-            title: 'Improving Customer Sentiment Trend',
-            description: 'Recent comments show a significant positive trend compared to earlier feedback.',
-            severity: 'positive',
-            icon: <TrendingUpIcon />,
-            recommendations: [
-              'Identify what recent changes might be responsible for the improvement',
-              'Reinforce the practices that are driving this positive trend',
-              'Acknowledge staff for their contributions to improved customer experiences',
-              'Document the successful approaches for long-term implementation',
-              'Set new targets to maintain this positive momentum'
-            ]
-          });
-        } else if (commentTrend === 'declining' && recentCommentsRatio >= 0.25) {
-          result.push({
-            id: 'comment-trend-declining',
-            title: 'Declining Customer Sentiment Trend',
-            description: 'Recent comments show a negative trend compared to earlier feedback.',
+            id: 'overall-distribution-concerning',
+            title: 'Generally Concerning Feedback Distribution',
+            description: 'Feedback shows moderately high dissatisfaction across multiple categories without any single critical area.',
             severity: 'warning',
-            icon: <TrendingDownIcon />,
-            recommendations: [
-              'Urgently identify what recent changes might be causing the decline',
-              'Conduct focused interviews with frontline staff about recent challenges',
-              'Consider reverting any recent procedural or staffing changes',
-              'Implement short-term measures to address immediate concerns',
-              'Increase monitoring and management oversight until the trend reverses'
-            ]
-          });
-        }
-        
-        // 8. Detailed feedback analysis
-        if (avgCommentLength > 100 && commentsWithTextRatio >= 0.5) {
-          result.push({
-            id: 'detailed-comments',
-            title: 'High-Quality Customer Feedback',
-            description: 'Customers are providing detailed comments (avg. length: '+ avgCommentLength.toFixed(0) +' characters), offering valuable insights for service improvement.',
-            severity: 'positive',
-            icon: <CheckCircleIcon />,
-            recommendations: [
-              'Perform in-depth qualitative analysis of these detailed comments',
-              'Look for specific suggestions that could be implemented',
-              'Consider categorising comments by themes for targeted improvements',
-              'Use verbatim quotes in training materials (with permission)',
-              'Thank customers for providing detailed feedback',
-              'Use natural language processing tools to extract additional insights if volume permits'
-            ]
-          });
-        }
-      }
-  
-      // Overall Satisfaction Analysis
-      if (satisfied_pct !== undefined) {
-        const dissatisfied_pct_value = dissatisfied_pct || (100 - satisfied_pct - (neutral_pct || 0));
-        
-        // Critical satisfaction issue
-        if (satisfied_pct < 40) {
-          result.push({
-            id: 'overall-satisfaction-critical',
-            title: 'Critical Customer Satisfaction Issues',
-            description: `Overall satisfaction rate of ${satisfied_pct}% indicates serious service quality concerns requiring immediate attention.`,
-            severity: 'negative',
-            metric: `${satisfied_pct}%`,
-            icon: <ErrorOutlineIcon />,
-            recommendations: [
-              'Treat this as a business-critical issue requiring immediate leadership attention',
-              'Implement a comprehensive service quality improvement program',
-              'Consider bringing in external consultants to evaluate service processes',
-              'Conduct in-depth customer satisfaction research to identify root causes',
-              'Develop a 90-day turnaround plan with clear milestones and accountability',
-              'Increase manager presence and oversight in all customer-facing areas',
-              'Consider temporary service changes until improvements take effect'
-            ]
-          });
-        }
-        // Low satisfaction
-        else if (satisfied_pct >= 40 && satisfied_pct < 60) {
-          result.push({
-            id: 'overall-satisfaction-low',
-            title: 'Overall Satisfaction Needs Significant Improvement',
-            description: `Overall satisfaction rate of ${satisfied_pct}% indicates substantial room for improvement in service quality.`,
-            severity: 'negative',
-            metric: `${satisfied_pct}%`,
-            icon: <ErrorOutlineIcon />,
-            recommendations: [
-              'Develop a comprehensive service quality improvement plan',
-              'Conduct detailed analysis of feedback in all categories',
-              'Implement structured staff training focused on key satisfaction drivers',
-              'Review service standards and procedures across all touchpoints',
-              'Set specific targets for improvement with regular monitoring',
-              'Consider mystery shopping to identify specific improvement opportunities'
-            ]
-          });
-        }
-        // Moderate satisfaction
-        else if (satisfied_pct >= 60 && satisfied_pct < 75) {
-          result.push({
-            id: 'overall-satisfaction-moderate',
-            title: 'Good but Improvable Satisfaction Levels',
-            description: `Overall satisfaction rate of ${satisfied_pct}% indicates reasonably good service with clear opportunities for enhancement.`,
-            severity: 'neutral',
-            metric: `${satisfied_pct}%`,
-            icon: <InfoIcon />,
-            recommendations: [
-              'Focus on specific service aspects that could elevate satisfaction to excellent levels',
-              'Implement targeted improvements in categories with lower satisfaction scores',
-              'Provide focused staff training in areas showing the most opportunity',
-              'Consider service innovations to differentiate from competitors',
-              'Set a target to reach 80%+ satisfaction within six months'
-            ]
-          });
-        }
-        // High satisfaction
-        else if (satisfied_pct >= 75 && satisfied_pct < 90) {
-          result.push({
-            id: 'overall-satisfaction-high',
-            title: 'Strong Overall Satisfaction',
-            description: `Overall satisfaction rate of ${satisfied_pct}% indicates very good service quality across most categories.`,
-            severity: 'positive',
-            metric: `${satisfied_pct}%`,
-            icon: <CheckCircleIcon />,
-            recommendations: [
-              'Maintain current service standards while looking for refinement opportunities',
-              'Focus on consistency to ensure all customers receive the same high-quality experience',
-              'Look for opportunities to turn satisfied customers into advocates',
-              'Document successful service approaches for training and onboarding',
-              'Consider implementing a customer loyalty program to leverage high satisfaction'
-            ]
-          });
-        }
-        // Excellent satisfaction
-        else if (satisfied_pct >= 90) {
-          result.push({
-            id: 'overall-satisfaction-excellent',
-            title: 'Exceptional Customer Satisfaction',
-            description: `Overall satisfaction rate of ${satisfied_pct}% indicates industry-leading service quality.`,
-            severity: 'positive',
-            metric: `${satisfied_pct}%`,
-            icon: <CheckCircleIcon />,
-            recommendations: [
-              'Document the service formula that has led to this exceptional result',
-              'Consider developing case studies of your service excellence',
-              'Leverage this exceptional rating in marketing and promotional materials',
-              'Look for ways to maintain this high standard while optimising operations',
-              'Consider implementing a customer referral program',
-              'Ensure all new staff are thoroughly trained on your service excellence model'
-            ]
-          });
-        }
-        
-        // High dissatisfaction insight
-        if (dissatisfied_pct_value >= 25) {
-          result.push({
-            id: 'high-dissatisfaction',
-            title: 'Concerning Level of Customer Dissatisfaction',
-            description: `${dissatisfied_pct_value}% of customers report being dissatisfied with their experience, indicating significant service issues.`,
-            severity: 'negative',
-            metric: `${dissatisfied_pct_value}% dissatisfied`,
             icon: <WarningIcon />,
             recommendations: [
-              'Analyse patterns in negative feedback to identify root causes',
-              'Implement a service recovery program focused on addressing common complaints',
-              'Consider reaching out to dissatisfied customers for more detailed feedback',
-              'Develop specific action plans for the most common sources of dissatisfaction',
-              'Set explicit targets for reducing dissatisfaction rates',
-              'Consider temporary operational changes until improvements take effect'
+              'Conduct a broad service quality review across all categories',
+              'Implement a comprehensive staff training refresh',
+              'Consider revising service standards and expectations',
+              'Develop an improvement plan with specific targets for each category'
             ]
           });
         }
       }
-  
-      // Return the collected insights
-      return result;
-    }, [analyticsData, timeRange]);
-  
-    // Separate insights by severity for better presentation
-    const positiveInsights = insights.filter(i => i.severity === 'positive');
-    const warningInsights = insights.filter(i => i.severity === 'warning');
-    const negativeInsights = insights.filter(i => i.severity === 'negative');
-    const neutralInsights = insights.filter(i => i.severity === 'neutral');
-  
-    const timeRangeText = timeRange === 'week' ? 'the past week' : 
-                          timeRange === 'month' ? 'the past month' : 
-                          'the past year';
-  
-    const getSeverityColor = (severity: string) => {
-      switch(severity) {
-        case 'positive':
-          return theme.palette.success.main;
-        case 'negative':
-          return theme.palette.error.main;
-        case 'warning':
-          return theme.palette.warning.main;
-        default:
-          return theme.palette.info.main;
-      }
-    };
-  
-    const renderInsightCard = (insight: InsightItem) => {
-      const color = getSeverityColor(insight.severity);
+    }
+
+    // INSIGHT GROUP 4: Comment Analysis
+    if (customer_comments && customer_comments.length > 0) {
+      // Calculate sentiment distribution
+      const positiveComments = customer_comments.filter(c => c.rating >= 4).length;
+      const negativeComments = customer_comments.filter(c => c.rating <= 2).length;
+      const neutralComments = customer_comments.filter(c => c.rating === 3).length;
+      const totalComments = customer_comments.length;
       
-      return (
-        <Card 
-          key={insight.id}
-          sx={{ 
-            mb: 3, 
-            borderRadius: 3,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-            transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
-            border: '1px solid',
-            borderColor: alpha(color, 0.3),
-            '&:hover': {
-              transform: 'translateY(-5px)',
-              boxShadow: '0 8px 25px rgba(0,0,0,0.12)'
-            }
-          }}
-        >
-          <CardContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Box 
-                sx={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: alpha(color, 0.1),
-                  color: color,
-                  p: 1,
-                  borderRadius: 2,
-                  mr: 2
-                }}
-              >
-                {insight.icon || (
-                  insight.severity === 'positive' ? <CheckCircleIcon /> :
-                  insight.severity === 'negative' ? <ErrorOutlineIcon /> :
-                  insight.severity === 'warning' ? <WarningIcon /> :
-                  <RecommendIcon />
-                )}
-              </Box>
-              <Box>
-                <Typography variant="h6" fontWeight="600">
-                  {insight.title}
-                </Typography>
-                {insight.metric && (
-                  <Chip 
-                    label={insight.metric} 
-                    size="small"
-                    sx={{ 
-                      bgcolor: alpha(color, 0.1),
-                      color: color,
-                      fontWeight: 'medium',
-                      mt: 0.5
-                    }}
-                  />
-                )}
-              </Box>
-            </Box>
-            
-            <Typography variant="body1" paragraph>
-              {insight.description}
-            </Typography>
-            
-            {insight.recommendations && insight.recommendations.length > 0 && (
-              <>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" fontWeight="600" gutterBottom>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <AssignmentTurnedInIcon sx={{ fontSize: 20, mr: 1 }} />
-                    Recommended Actions:
-                  </Box>
-                </Typography>
-                <List disablePadding dense>
-                  {insight.recommendations.map((rec, idx) => (
-                    <ListItem key={idx} sx={{ py: 0.5 }}>
-                      <ListItemIcon sx={{ minWidth: 28 }}>
-                        <Box 
-                          sx={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            bgcolor: alpha(color, 0.1),
-                            color: color,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          {idx + 1}
-                        </Box>
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={rec} 
-                        primaryTypographyProps={{ 
-                          variant: 'body2', 
-                          sx: { fontWeight: '400' } 
-                        }}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      );
-    };
+      // Calculate ratios
+      const positiveRatio = positiveComments / totalComments;
+      const negativeRatio = negativeComments / totalComments;
+      const neutralRatio = neutralComments / totalComments;
+      
+      // Analysis of comment quality and patterns
+      const commentsWithText = customer_comments.filter(c => c.comment && c.comment.trim().length > 0);
+      const commentsWithTextRatio = commentsWithText.length / totalComments;
+      
+      const avgCommentLength = commentsWithText.length > 0
+        ? commentsWithText.reduce((sum, c) => sum + c.comment.length, 0) / commentsWithText.length
+        : 0;
+      
+      // Check for recent comments (within 7 days)
+      const recentComments = customer_comments.filter(c => {
+        const commentDate = new Date(c.date);
+        const now = new Date();
+        const daysAgo = Math.floor((now.getTime() - commentDate.getTime()) / (1000 * 60 * 60 * 24));
+        return daysAgo <= 7;
+      });
+      
+      const recentCommentsRatio = recentComments.length / totalComments;
+      
+      // Determine comment trend
+      let commentTrend = 'stable';
+      if (recentComments.length >= 3) {
+        const recentPositiveRatio = recentComments.filter(c => c.rating >= 4).length / recentComments.length;
+        const olderComments = customer_comments.filter(c => !recentComments.includes(c));
+        const olderPositiveRatio = olderComments.length > 0
+          ? olderComments.filter(c => c.rating >= 4).length / olderComments.length
+          : 0;
+          
+        if (recentPositiveRatio > olderPositiveRatio + 0.15) {
+          commentTrend = 'improving';
+        } else if (recentPositiveRatio < olderPositiveRatio - 0.15) {
+          commentTrend = 'declining';
+        }
+      }
+      
+      // Calculate empty comment ratio
+      const emptyCommentRatio = 1 - commentsWithTextRatio;
+      
+      // Add insights based on comment analysis
+      
+      // High negative feedback
+      if (negativeRatio >= 0.3) {
+        result.push({
+          id: 'negative-comments-high',
+          title: 'High Volume of Negative Feedback',
+          description: `${(negativeRatio * 100).toFixed(0)}% of recent customer comments are negative, indicating widespread service issues.`,
+          severity: 'negative',
+          metric: `${negativeComments} of ${totalComments}`,
+          icon: <PeopleIcon />,
+          recommendations: [
+            'Conduct a detailed review of all negative comments to identify recurring themes',
+            'Implement a service recovery program to address dissatisfied customers',
+            'Increase manager presence during service hours for immediate issue resolution',
+            'Follow up with dissatisfied customers to demonstrate commitment to improvement'
+          ]
+        });
+      } 
+      // Moderate negative feedback
+      else if (negativeRatio >= 0.2 && negativeRatio < 0.3) {
+        result.push({
+          id: 'negative-comments-moderate',
+          title: 'Concerning Level of Negative Feedback',
+          description: `${(negativeRatio * 100).toFixed(0)}% of customer comments are negative, higher than the acceptable threshold.`,
+          severity: 'warning',
+          metric: `${negativeComments} of ${totalComments}`,
+          icon: <WarningIcon />,
+          recommendations: [
+            'Analyse negative comments for specific pain points that could be addressed',
+            'Implement targeted improvements in the most mentioned problem areas',
+            'Provide staff with additional training on handling challenging situations',
+            'Consider reaching out to customers who left negative feedback'
+          ]
+        });
+      }
+      
+      // Strongly positive feedback
+      if (positiveRatio >= 0.7) {
+        result.push({
+          id: 'positive-comments-high',
+          title: 'Strong Customer Sentiment',
+          description: `${(positiveRatio * 100).toFixed(0)}% of customer comments are positive, indicating excellent service quality.`,
+          severity: 'positive',
+          metric: `${positiveComments} of ${totalComments}`,
+          icon: <SentimentSatisfiedAltIcon />,
+          recommendations: [
+            'Share positive feedback with the team to boost morale and reinforce good practices',
+            'Analyse positive comments for specific aspects that customers appreciate most',
+            'Create a recognition program for staff mentioned in positive feedback',
+            'Incorporate successful approaches into training materials'
+          ]
+        });
+      } 
+      // Moderately positive feedback
+      else if (positiveRatio >= 0.5 && positiveRatio < 0.7) {
+        result.push({
+          id: 'positive-comments-moderate',
+          title: 'Good Customer Sentiment',
+          description: `${(positiveRatio * 100).toFixed(0)}% of customer comments are positive, showing good but improvable service quality.`,
+          severity: 'positive',
+          metric: `${positiveComments} of ${totalComments}`,
+          icon: <SentimentSatisfiedAltIcon />,
+          recommendations: [
+            'Share positive feedback with the team while highlighting areas for improvement',
+            'Identify what distinguishes the very positive from the neutral experiences',
+            'Set a target to increase positive feedback to 70%+',
+            'Implement small service enhancements to elevate customer experience'
+          ]
+        });
+      }
+    }
+
+    // INSIGHT GROUP 5: Overall Satisfaction Analysis
+    if (satisfied_pct !== undefined) {
+      const dissatisfied_pct_value = dissatisfied_pct || (100 - satisfied_pct - (neutral_pct || 0));
+      
+      // Add insights based on overall satisfaction levels
+      if (satisfied_pct < 40) {
+        // Critical satisfaction issue
+        result.push({
+          id: 'overall-satisfaction-critical',
+          title: 'Critical Customer Satisfaction Issues',
+          description: `Overall satisfaction rate of ${satisfied_pct}% indicates serious service quality concerns requiring immediate attention.`,
+          severity: 'negative',
+          metric: `${satisfied_pct}%`,
+          icon: <ErrorOutlineIcon />,
+          recommendations: [
+            'Treat this as a business-critical issue requiring immediate leadership attention',
+            'Implement a comprehensive service quality improvement program',
+            'Consider bringing in external consultants to evaluate service processes',
+            'Conduct in-depth customer satisfaction research to identify root causes'
+          ]
+        });
+      } else if (satisfied_pct >= 40 && satisfied_pct < 60) {
+        // Low satisfaction
+        result.push({
+          id: 'overall-satisfaction-low',
+          title: 'Overall Satisfaction Needs Significant Improvement',
+          description: `Overall satisfaction rate of ${satisfied_pct}% indicates substantial room for improvement in service quality.`,
+          severity: 'negative',
+          metric: `${satisfied_pct}%`,
+          icon: <ErrorOutlineIcon />,
+          recommendations: [
+            'Develop a comprehensive service quality improvement plan',
+            'Conduct detailed analysis of feedback in all categories',
+            'Implement structured staff training focused on key satisfaction drivers',
+            'Review service standards and procedures across all touchpoints'
+          ]
+        });
+      } else if (satisfied_pct >= 60 && satisfied_pct < 75) {
+        // Moderate satisfaction
+        result.push({
+          id: 'overall-satisfaction-moderate',
+          title: 'Good but Improvable Satisfaction Levels',
+          description: `Overall satisfaction rate of ${satisfied_pct}% indicates reasonably good service with clear opportunities for enhancement.`,
+          severity: 'neutral',
+          metric: `${satisfied_pct}%`,
+          icon: <InfoIcon />,
+          recommendations: [
+            'Focus on specific service aspects that could elevate satisfaction to excellent levels',
+            'Implement targeted improvements in categories with lower satisfaction scores',
+            'Provide focused staff training in areas showing the most opportunity',
+            'Consider service innovations to differentiate from competitors'
+          ]
+        });
+      } else if (satisfied_pct >= 75 && satisfied_pct < 90) {
+        // High satisfaction
+        result.push({
+          id: 'overall-satisfaction-high',
+          title: 'Strong Overall Satisfaction',
+          description: `Overall satisfaction rate of ${satisfied_pct}% indicates very good service quality across most categories.`,
+          severity: 'positive',
+          metric: `${satisfied_pct}%`,
+          icon: <CheckCircleIcon />,
+          recommendations: [
+            'Maintain current service standards while looking for refinement opportunities',
+            'Focus on consistency to ensure all customers receive the same high-quality experience',
+            'Look for opportunities to turn satisfied customers into advocates',
+            'Document successful service approaches for training and onboarding'
+          ]
+        });
+      } else if (satisfied_pct >= 90) {
+        // Excellent satisfaction
+        result.push({
+          id: 'overall-satisfaction-excellent',
+          title: 'Exceptional Customer Satisfaction',
+          description: `Overall satisfaction rate of ${satisfied_pct}% indicates industry-leading service quality.`,
+          severity: 'positive',
+          metric: `${satisfied_pct}%`,
+          icon: <CheckCircleIcon />,
+          recommendations: [
+            'Document the service formula that has led to this exceptional result',
+            'Consider developing case studies of your service excellence',
+            'Leverage this exceptional rating in marketing and promotional materials',
+            'Look for ways to maintain this high standard while optimising operations'
+          ]
+        });
+      }
+    }
+
+    return result;
+  }, [analyticsData, timeRange]);
   
-    const noInsightsMessage = (
-      <Paper 
-        elevation={0}
-        sx={{ 
-          p: 4, 
-          borderRadius: 3, 
-          textAlign: 'center',
-          backgroundColor: alpha(theme.palette.primary.main, 0.05),
-          border: '1px dashed',
-          borderColor: alpha(theme.palette.primary.main, 0.2)
-        }}
-      >
-        <SentimentSatisfiedAltIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.5), mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          No Actionable Insights Available
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Based on the current data, there are no significant insights to highlight for {timeRangeText}.
-          This could indicate stable performance or insufficient data for analysis.
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Try changing the time period or check back when more feedback data is available.
-        </Typography>
-      </Paper>
-    );
+  // Separate insights by severity for UI organisation
+  const positiveInsights = insights.filter(i => i.severity === 'positive');
+  const warningInsights = insights.filter(i => i.severity === 'warning');
+  const negativeInsights = insights.filter(i => i.severity === 'negative');
+  const neutralInsights = insights.filter(i => i.severity === 'neutral');
+
+  // Format time range for display
+  const timeRangeText = timeRange === 'week' ? 'the past week' : 
+                        timeRange === 'month' ? 'the past month' : 
+                        'the past year';
+
+  // Component for empty state
+  const noInsightsMessage = (
+    <Paper 
+      elevation={0}
+      sx={{ 
+        p: 4, 
+        borderRadius: 3, 
+        textAlign: 'center',
+        backgroundColor: alpha(theme.palette.primary.main, 0.05),
+        border: '1px dashed',
+        borderColor: alpha(theme.palette.primary.main, 0.2)
+      }}
+    >
+      <SentimentSatisfiedAltIcon sx={{ fontSize: 60, color: alpha(theme.palette.primary.main, 0.5), mb: 2 }} />
+      <Typography variant="h6" gutterBottom>
+        No Actionable Insights Available
+      </Typography>
+      <Typography variant="body1" color="text.secondary">
+        Based on the current data, there are no significant insights to highlight for {timeRangeText}.
+        This could indicate stable performance or insufficient data for analysis.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        Try changing the time period or check back when more feedback data is available.
+      </Typography>
+    </Paper>
+  );
+
+  return (
+    <Box>
+      {/* Section header */}
+      <Typography variant="h5" fontWeight="500" gutterBottom>
+        Actionable Insights
+      </Typography>
+      <Typography variant="body1" paragraph color="text.secondary">
+        Based on data analysis from {timeRangeText}, here are key insights and recommended actions.
+      </Typography>
+
+      {/* Main content - either insights or empty state */}
+      {insights.length === 0 ? (
+        noInsightsMessage
+      ) : (
+        <Grid container spacing={3}>
+          {/* Priority Issues */}
+          {negativeInsights.length > 0 && (
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.error.main, display: 'flex', alignItems: 'center' }}>
+                <ErrorOutlineIcon sx={{ mr: 1 }} />
+                Priority Issues
+              </Typography>
+              {negativeInsights.map(renderInsightCard)}
+            </Grid>
+          )}
+
+          {/* Areas to Monitor */}
+          {warningInsights.length > 0 && (
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.warning.main, display: 'flex', alignItems: 'center' }}>
+                <WarningIcon sx={{ mr: 1 }} />
+                Areas to Monitor
+              </Typography>
+              {warningInsights.map(renderInsightCard)}
+            </Grid>
+          )}
+
+          {/* Positive Highlights */}
+          {positiveInsights.length > 0 && (
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, display: 'flex', alignItems: 'center' }}>
+                <CheckCircleIcon sx={{ mr: 1 }} />
+                Positive Highlights
+              </Typography>
+              {positiveInsights.map(renderInsightCard)}
+            </Grid>
+          )}
+
+          {/* Other Insights */}
+          {neutralInsights.length > 0 && (
+            <Grid item xs={12}>
+              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.info.main, display: 'flex', alignItems: 'center' }}>
+                <RecommendIcon sx={{ mr: 1 }} />
+                Other Insights
+              </Typography>
+              {neutralInsights.map(renderInsightCard)}
+            </Grid>
+          )}
+        </Grid>
+      )}
+    </Box>
+  );
+};
   
-    return (
-      <Box>
-        <Typography variant="h5" fontWeight="500" gutterBottom>
-          Actionable Insights
-        </Typography>
-        <Typography variant="body1" paragraph color="text.secondary">
-          Based on data analysis from {timeRangeText}, here are key insights and recommended actions.
-        </Typography>
-  
-        {insights.length === 0 ? (
-          noInsightsMessage
-        ) : (
-          <Grid container spacing={3}>
-            {/* Priority Issues */}
-            {negativeInsights.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2, color: theme.palette.error.main, display: 'flex', alignItems: 'center' }}>
-                  <ErrorOutlineIcon sx={{ mr: 1 }} />
-                  Priority Issues
-                </Typography>
-                {negativeInsights.map(renderInsightCard)}
-              </Grid>
-            )}
-  
-            {/* Areas to Monitor */}
-            {warningInsights.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2, color: theme.palette.warning.main, display: 'flex', alignItems: 'center' }}>
-                  <WarningIcon sx={{ mr: 1 }} />
-                  Areas to Monitor
-                </Typography>
-                {warningInsights.map(renderInsightCard)}
-              </Grid>
-            )}
-  
-            {/* Positive Highlights */}
-            {positiveInsights.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, display: 'flex', alignItems: 'center' }}>
-                  <CheckCircleIcon sx={{ mr: 1 }} />
-                  Positive Highlights
-                </Typography>
-                {positiveInsights.map(renderInsightCard)}
-              </Grid>
-            )}
-  
-            {/* Other Insights */}
-            {neutralInsights.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="h6" sx={{ mb: 2, color: theme.palette.info.main, display: 'flex', alignItems: 'center' }}>
-                  <RecommendIcon sx={{ mr: 1 }} />
-                  Other Insights
-                </Typography>
-                {neutralInsights.map(renderInsightCard)}
-              </Grid>
-            )}
-          </Grid>
-        )}
-      </Box>
-    );
-  };
-  
-  export default InsightsSection;
+export default InsightsSection;

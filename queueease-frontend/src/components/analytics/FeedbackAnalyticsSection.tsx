@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Box,  Typography,  Grid, Paper, Card, CardContent, useTheme, 
+  Box, Typography, Grid, Paper, Card, CardContent, useTheme, 
   alpha, Divider, Chip, Rating, Tabs, Tab, CircularProgress
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
@@ -24,6 +24,19 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Reusable styled component for card styling
+  const cardStyle = { 
+    borderRadius: 3, 
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    height: '100%',
+    transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+    '&:hover': {
+      transform: 'translateY(-5px)',
+      boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
+    }
+  };
+
+  // Fetch feedback data when component mounts or userId changes
   useEffect(() => {
     const fetchFeedbackData = async () => {
       if (!userId) return;
@@ -36,7 +49,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
         
         setUserFeedback(data);
         
-        // Calculate average rating
+        // Calculate average rating from all feedback
         if (Array.isArray(data) && data.length > 0) {
           const totalRating = data.reduce((sum, item) => sum + item.rating, 0);
           const avgRating = Math.round((totalRating / data.length) * 10) / 10;
@@ -52,45 +65,62 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
     fetchFeedbackData();
   }, [userId]);
 
-  // Count feedback by sentiment
-  const positiveFeedback = userFeedback.filter(f => f.sentiment === 'positive').length;
-  const neutralFeedback = userFeedback.filter(f => f.sentiment === 'neutral').length;
-  const negativeFeedback = userFeedback.filter(f => f.sentiment === 'negative').length;
-  
-  // Calculate percentages
-  const totalFeedback = userFeedback.length;
-  const positivePercentage = totalFeedback > 0 ? Math.round((positiveFeedback / totalFeedback) * 100) : 0;
-  const neutralPercentage = totalFeedback > 0 ? Math.round((neutralFeedback / totalFeedback) * 100) : 0;
-  const negativePercentage = totalFeedback > 0 ? Math.round((negativeFeedback / totalFeedback) * 100) : 0;
+  // Calculate feedback sentiment statistics
+  const calculateSentimentStats = () => {
+    // Count feedback by sentiment type
+    const positiveFeedback = userFeedback.filter(f => f.sentiment === 'positive').length;
+    const neutralFeedback = userFeedback.filter(f => f.sentiment === 'neutral').length;
+    const negativeFeedback = userFeedback.filter(f => f.sentiment === 'negative').length;
+    
+    // Calculate percentages for visualisation
+    const totalFeedback = userFeedback.length;
+    const positivePercentage = totalFeedback > 0 ? Math.round((positiveFeedback / totalFeedback) * 100) : 0;
+    const neutralPercentage = totalFeedback > 0 ? Math.round((neutralFeedback / totalFeedback) * 100) : 0;
+    const negativePercentage = totalFeedback > 0 ? Math.round((negativeFeedback / totalFeedback) * 100) : 0;
 
-  // Extract all categories for analysis
-  const allCategories = userFeedback.flatMap(f => f.categories);
-  const categoryCount: {[key: string]: {total: number, positive: number, negative: number}} = {};
-  
-  allCategories.forEach(category => {
-    if (!categoryCount[category]) {
-      categoryCount[category] = {total: 0, positive: 0, negative: 0};
-    }
-    categoryCount[category].total += 1;
-  });
-  
-  // Add sentiment data
-  userFeedback.forEach(feedback => {
-    feedback.categories.forEach(category => {
-      if (feedback.sentiment === 'positive') {
-        categoryCount[category].positive += 1;
-      } else if (feedback.sentiment === 'negative') {
-        categoryCount[category].negative += 1;
+    return {
+      positiveFeedback,
+      neutralFeedback,
+      negativeFeedback,
+      totalFeedback,
+      positivePercentage,
+      neutralPercentage,
+      negativePercentage
+    };
+  };
+
+  // Analyze categories mentioned in feedback
+  const analyzeFeedbackCategories = () => {
+    // Extract all categories for analysis
+    const allCategories = userFeedback.flatMap(f => f.categories);
+    const categoryCount: {[key: string]: {total: number, positive: number, negative: number}} = {};
+    
+    // Count initial occurrences of each category
+    allCategories.forEach(category => {
+      if (!categoryCount[category]) {
+        categoryCount[category] = {total: 0, positive: 0, negative: 0};
       }
+      categoryCount[category].total += 1;
     });
-  });
-  
-  // Sort categories by frequency
-  const sortedCategories = Object.entries(categoryCount)
-    .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 5);
+    
+    // Add sentiment data to categories
+    userFeedback.forEach(feedback => {
+      feedback.categories.forEach(category => {
+        if (feedback.sentiment === 'positive') {
+          categoryCount[category].positive += 1;
+        } else if (feedback.sentiment === 'negative') {
+          categoryCount[category].negative += 1;
+        }
+      });
+    });
+    
+    // Sort categories by frequency and return top 5
+    return Object.entries(categoryCount)
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5);
+  };
 
-  // Filter feedback based on active tab
+  // Filter feedback based on active tab selection
   const getFilteredFeedback = () => {
     if (activeTab === 0) return userFeedback;
     if (activeTab === 1) return userFeedback.filter(f => 
@@ -102,6 +132,54 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
     return userFeedback;
   };
 
+  // Reusable progress bar component for sentiment visualisation
+  const SentimentProgressBar = ({ 
+    label, 
+    icon, 
+    color, 
+    value, 
+    count, 
+    percentage 
+  }: { 
+    label: string; 
+    icon: React.ReactElement; 
+    color: string; 
+    value: number;
+    count: number; 
+    percentage: number 
+  }) => (
+    <Box sx={{ mb: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+          {React.cloneElement(icon, { fontSize: "small", sx: { mr: 0.5, color } })}
+          {label}
+        </Typography>
+        <Typography variant="body2" fontWeight={600}>
+          {count} ({percentage}%)
+        </Typography>
+      </Box>
+      <Box sx={{ 
+        width: '100%', 
+        height: 8, 
+        bgcolor: alpha(color, 0.2),
+        borderRadius: 5,
+        overflow: 'hidden'
+      }}>
+        <Box sx={{ 
+          width: `${percentage}%`, 
+          height: '100%', 
+          bgcolor: color,
+          borderRadius: 5
+        }} />
+      </Box>
+    </Box>
+  );
+
+  // Calculate all statistics
+  const stats = calculateSentimentStats();
+  const sortedCategories = analyzeFeedbackCategories();
+
+  // Show loading state
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
@@ -110,6 +188,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
     );
   }
 
+  // Show error state
   if (error) {
     return (
       <EmptyState 
@@ -118,7 +197,8 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
     );
   }
 
-  if (totalFeedback === 0) {
+  // Show empty state when no feedback
+  if (stats.totalFeedback === 0) {
     return (
       <EmptyState 
         message="You haven't submitted any feedback yet."
@@ -130,23 +210,15 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
 
   return (
     <Grid container spacing={3}>
-      {/* Stats Cards */}
+      {/* Feedback Summary Card */}
       <Grid item xs={12} md={4}>
-        <Card sx={{ 
-          borderRadius: 3, 
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-          height: '100%',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-          }
-        }}>
+        <Card sx={cardStyle}>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Your Feedback Summary
             </Typography>
             
+            {/* Average Rating Display */}
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: 3 }}>
               <Box sx={{ textAlign: 'center' }}>
                 <Rating 
@@ -167,108 +239,50 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
             
             <Divider sx={{ my: 2 }} />
             
-            <Box sx={{ mb: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ThumbUpIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.success.main }} />
-                  Positive
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {positiveFeedback} ({positivePercentage}%)
-                </Typography>
-              </Box>
-              <Box sx={{ 
-                width: '100%', 
-                height: 8, 
-                bgcolor: alpha(theme.palette.success.main, 0.2),
-                borderRadius: 5,
-                overflow: 'hidden'
-              }}>
-                <Box sx={{ 
-                  width: `${positivePercentage}%`, 
-                  height: '100%', 
-                  bgcolor: theme.palette.success.main,
-                  borderRadius: 5
-                }} />
-              </Box>
-            </Box>
+            {/* Sentiment Distribution */}
+            <SentimentProgressBar
+              label="Positive"
+              icon={<ThumbUpIcon />}
+              color={theme.palette.success.main}
+              value={stats.positiveFeedback}
+              count={stats.positiveFeedback}
+              percentage={stats.positivePercentage}
+            />
             
-            <Box sx={{ mb: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-                  <SentimentNeutralIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.warning.main }} />
-                  Neutral
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {neutralFeedback} ({neutralPercentage}%)
-                </Typography>
-              </Box>
-              <Box sx={{ 
-                width: '100%', 
-                height: 8, 
-                bgcolor: alpha(theme.palette.warning.main, 0.2),
-                borderRadius: 5,
-                overflow: 'hidden'
-              }}>
-                <Box sx={{ 
-                  width: `${neutralPercentage}%`, 
-                  height: '100%', 
-                  bgcolor: theme.palette.warning.main,
-                  borderRadius: 5
-                }} />
-              </Box>
-            </Box>
+            <SentimentProgressBar
+              label="Neutral"
+              icon={<SentimentNeutralIcon />}
+              color={theme.palette.warning.main}
+              value={stats.neutralFeedback}
+              count={stats.neutralFeedback}
+              percentage={stats.neutralPercentage}
+            />
             
-            <Box sx={{ mb: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ThumbDownIcon fontSize="small" sx={{ mr: 0.5, color: theme.palette.error.main }} />
-                  Negative
-                </Typography>
-                <Typography variant="body2" fontWeight={600}>
-                  {negativeFeedback} ({negativePercentage}%)
-                </Typography>
-              </Box>
-              <Box sx={{ 
-                width: '100%', 
-                height: 8, 
-                bgcolor: alpha(theme.palette.error.main, 0.2),
-                borderRadius: 5,
-                overflow: 'hidden'
-              }}>
-                <Box sx={{ 
-                  width: `${negativePercentage}%`, 
-                  height: '100%', 
-                  bgcolor: theme.palette.error.main,
-                  borderRadius: 5
-                }} />
-              </Box>
-            </Box>
+            <SentimentProgressBar
+              label="Negative"
+              icon={<ThumbDownIcon />}
+              color={theme.palette.error.main}
+              value={stats.negativeFeedback}
+              count={stats.negativeFeedback}
+              percentage={stats.negativePercentage}
+            />
             
             <Divider sx={{ my: 2 }} />
             
+            {/* Total Feedback Count */}
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>
               Total Feedback Submitted
             </Typography>
             <Typography variant="h5" fontWeight={700} color="primary">
-              {totalFeedback}
+              {stats.totalFeedback}
             </Typography>
           </CardContent>
         </Card>
       </Grid>
       
-      {/* Categories Analysis */}
+      {/* Categories Analysis Card */}
       <Grid item xs={12} md={8}>
-        <Card sx={{ 
-          borderRadius: 3, 
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-          height: '100%',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-          }
-        }}>
+        <Card sx={cardStyle}>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Feedback by Category
@@ -276,7 +290,9 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
             
             {sortedCategories.length > 0 ? (
               <Box sx={{ mt: 2 }}>
+                {/* Map through top categories */}
                 {sortedCategories.map(([category, stats], index) => {
+                  // Calculate sentiment percentages for this category
                   const positivePercent = stats.total > 0 ? (stats.positive / stats.total) * 100 : 0;
                   const negativePercent = stats.total > 0 ? (stats.negative / stats.total) * 100 : 0;
                   const neutralPercent = 100 - positivePercent - negativePercent;
@@ -291,6 +307,8 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                           {stats.total} mentions
                         </Typography>
                       </Box>
+                      
+                      {/* Stacked bar chart for sentiment distribution */}
                       <Box sx={{ 
                         display: 'flex', 
                         width: '100%', 
@@ -320,6 +338,8 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                           }} />
                         )}
                       </Box>
+                      
+                      {/* Legend for the chart */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
                         <Typography variant="caption" sx={{ color: theme.palette.success.main }}>
                           {Math.round(positivePercent)}% Positive
@@ -343,22 +363,15 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
         </Card>
       </Grid>
       
-      {/* Feedback List */}
+      {/* Feedback History Card */}
       <Grid item xs={12}>
-        <Card sx={{ 
-          borderRadius: 3, 
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-          '&:hover': {
-            transform: 'translateY(-5px)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.1)'
-          }
-        }}>
+        <Card sx={cardStyle}>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight={600} gutterBottom>
               Your Feedback History
             </Typography>
             
+            {/* Tabs for filtering feedback */}
             <Tabs 
               value={activeTab} 
               onChange={(e, val) => setActiveTab(val)}
@@ -369,9 +382,10 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
               <Tab label="Negative" />
             </Tabs>
             
+            {/* Display filtered feedback items */}
             {getFilteredFeedback().length > 0 ? (
               <Grid container spacing={2}>
-                {getFilteredFeedback().map((feedback, index) => (
+                {getFilteredFeedback().map((feedback) => (
                   <Grid item xs={12} md={6} key={feedback.id}>
                     <Paper
                       elevation={0}
@@ -386,6 +400,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                         }
                       }}
                     >
+                      {/* Feedback header with service name and date */}
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="body2" fontWeight={600}>
                           {feedback.service_name}
@@ -395,9 +410,11 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                         </Typography>
                       </Box>
                       
+                      {/* Rating and sentiment indicator */}
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <Rating value={feedback.rating} readOnly size="small" />
                         <Box sx={{ ml: 'auto' }}>
+                          {/* Sentiment chip - positive case */}
                           {(feedback.sentiment === 'positive' || (!feedback.sentiment && feedback.rating >= 4)) && (
                             <Chip 
                               icon={<SentimentSatisfiedAltIcon />} 
@@ -410,6 +427,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                               }}
                             />
                           )}
+                          {/* Sentiment chip - neutral case */}
                           {(feedback.sentiment === 'neutral' || (!feedback.sentiment && feedback.rating === 3)) && (
                             <Chip 
                               icon={<SentimentNeutralIcon />} 
@@ -422,6 +440,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                               }}
                             />
                           )}
+                          {/* Sentiment chip - negative case */}
                           {(feedback.sentiment === 'negative' || (!feedback.sentiment && feedback.rating <= 2)) && (
                             <Chip 
                               icon={<SentimentVeryDissatisfiedIcon />} 
@@ -437,6 +456,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                         </Box>
                       </Box>
                       
+                      {/* Feedback comment */}
                       {feedback.comment && (
                         <Typography variant="body2" color="text.secondary" sx={{ 
                           mb: 1,
@@ -450,6 +470,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
                         </Typography>
                       )}
                       
+                      {/* Category tags */}
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
                         {feedback.categories.map((category, idx) => (
                           <Chip 
@@ -470,7 +491,7 @@ const FeedbackAnalyticsSection: React.FC<FeedbackAnalyticsSectionProps> = ({
             ) : (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
                 <Typography variant="body1" color="text.secondary">
-                  {totalFeedback === 0 ? 'No feedback submitted yet' : 'No feedback matching selected filter'}
+                  {stats.totalFeedback === 0 ? 'No feedback submitted yet' : 'No feedback matching selected filter'}
                 </Typography>
               </Box>
             )}

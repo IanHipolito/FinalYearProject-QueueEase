@@ -10,7 +10,7 @@ const FeedbackDistributionChart: React.FC<FeedbackDistributionChartProps> = ({
   timeRange,
   onTimeRangeChange
 }) => {
-  // Helper function to capitalize and clean category names
+  // Helper function to capitalise and clean category names
   const formatCategoryName = (category: string) => {
     return category
       .replace(/_/g, ' ')

@@ -5,8 +5,6 @@ from core.models import Service, ServiceWaitTime
 from django.utils import timezone
 
 class Command(BaseCommand):
-    help = 'Generate realistic historical wait time data for fast food and other service types'
-
     def add_arguments(self, parser):
         parser.add_argument('--days', type=int, default=30, help='Number of days of historical data to generate')
         parser.add_argument('--samples-per-day', type=int, default=8, help='Number of samples per day')
@@ -52,7 +50,7 @@ class Command(BaseCommand):
                 
                 # Generate samples throughout the day
                 for sample in range(samples_per_day):
-                    # Determine if this is a peak time (lunch, dinner, etc.)
+                    # Determine if this is a peak time
                     hour = random.randint(9, 22)  # Between 9 AM and 10 PM
                     is_peak = (12 <= hour <= 14) or (17 <= hour <= 19)  # Lunch or dinner hours
                     is_weekend = date.weekday() >= 5  # Saturday or Sunday
@@ -70,7 +68,7 @@ class Command(BaseCommand):
                     else:
                         min_wait, max_wait = base_range
                     
-                    # Add some noise: occasionally have a very busy period
+                    # Occasionally have a very busy period
                     if random.random() < 0.05:  # 5% chance of an unusual wait
                         wait_time = random.randint(max_wait, max_wait + 10)
                     else:
@@ -87,10 +85,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'Successfully generated {total_generated} historical wait time records'))
 
     def get_service_wait_ranges(self, service):
-        """
-        Determine realistic wait time ranges based on service type and category.
-        Returns (base_range, peak_range) as tuples of (min, max) wait times in minutes.
-        """
         # Default ranges
         base_range = (5, 15)
         peak_range = (10, 20)
